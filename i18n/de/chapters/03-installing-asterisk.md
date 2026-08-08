@@ -1,67 +1,67 @@
-# Installing Asterisk 22
+# Installation von Asterisk 22
 
-Im ersten Kapitel haben wir ein wenig darüber gelernt, wie Asterisk in der Telefonieumgebung nützlich ist. In diesem Kapitel behandeln wir, wie man Asterisk herunterlädt und installiert. Vor dem Start ist es wichtig zu wissen, wie man es kompiliert und installiert. Der Kompilierungsprozess mag für traditionelle Microsoft™ Windows™‑Benutzer seltsam erscheinen, ist aber in der Linux™‑Umgebung ziemlich üblich. Beim Kompilieren von Asterisk kann man einen für die eigene Hardware optimierten Code erhalten, was wir hier tun werden. Asterisk läuft auf mehreren Betriebssystemen, aber wir halten es einfach und verwenden nur eines: Linux. Wir benutzen **Ubuntu 24.04 LTS**, weil seine Abhängigkeiten leicht zu installieren sind und es eine stabile, gut unterstützte Server‑Distribution mit geringem Ressourcenverbrauch ist. Wenn Sie eine andere Distribution bevorzugen, passen Sie die Paketnamen entsprechend an.
+Im ersten Kapitel haben wir ein wenig darüber gelernt, wie Asterisk in der Telefonieumgebung nützlich ist. In diesem Kapitel werden wir behandeln, wie man Asterisk herunterlädt und installiert. Bevor wir beginnen, ist es wichtig zu lernen, wie man es kompiliert und installiert. Der Kompilierungsprozess mag für traditionelle Microsoft™ Windows™-Benutzer seltsam erscheinen, aber er ist in der Linux™-Umgebung ziemlich üblich. Man kann beim Kompilieren von Asterisk einen für die eigene Hardware optimierten Code erhalten, was wir hier tun werden. Asterisk läuft auf verschiedenen Betriebssystemen, aber wir halten die Dinge einfach und verwenden nur eines: Linux. Wir verwenden **Ubuntu 24.04 LTS**, da dessen Abhängigkeiten einfach zu installieren sind und es eine stabile, gut unterstützte Server-Distribution mit geringem Ressourcenbedarf ist. Falls Sie eine andere Distribution bevorzugen, passen Sie die Paketnamen entsprechend an.
 
-Diese Ausgabe richtet sich an **Asterisk 22 LTS** (veröffentlicht am 2024-10-16; voller Support bis 2028-10-16, Sicherheitsupdates bis 2029-10-16). Asterisk 22 ist die aktuelle Long‑Term‑Support‑Version. Beachten Sie, dass Digium 2018 von **Sangoma** übernommen wurde und Asterisk nun von Sangoma gesponsert wird – Verweise auf „Digium“ in diesem Kapitel beziehen sich auf die frühere Marke für historische Hardware.
+Diese Ausgabe zielt auf **Asterisk 22 LTS** ab (veröffentlicht am 2024-10-16; voller Support bis 2028-10-16, Sicherheitsupdates bis 2029-10-16). Asterisk 22 ist die aktuelle Long-Term-Support-Version. Beachten Sie, dass Digium 2018 von **Sangoma** übernommen wurde und Asterisk nun von Sangoma gesponsert wird – Verweise auf "Digium" in diesem Kapitel beziehen sich auf die ehemalige Marke für historische Hardware.
 
 ## Ziele
 
-Am Ende dieses Kapitels sollten Sie in der Lage sein:
+Nach Abschluss dieses Kapitels sollten Sie in der Lage sein:
 
-- Die Hardware-Anforderungen für Asterisk zu bestimmen;
+- Die Hardwareanforderungen für Asterisk zu bestimmen;
 - Linux mit den erforderlichen Abhängigkeiten zu installieren;
 - Eine stabile Version über HTTPS herunterzuladen;
 - Asterisk zu kompilieren; und
-- Zu lernen, wie man Asterisk beim Systemstart startet.
+- Zu lernen, wie Asterisk beim Systemstart automatisch gestartet wird.
 
-## Minimum Hardware Required
+## Minimale Hardwareanforderungen
 
-Asterisk benötigt nicht viel Hardware zum Betrieb, jedoch gibt es einige Hinweise, um die beste Hardware für Ihre Anforderungen auszuwählen. Sie sollten die folgenden Hauptfaktoren bei der Auswahl Ihrer Hardware berücksichtigen:
+Asterisk benötigt nicht viel Hardware für den Betrieb, es gibt jedoch einige Tipps zur Auswahl der besten Hardware für Ihre Anforderungen. Sie sollten die folgenden Hauptfaktoren bei der Auswahl Ihrer Hardware berücksichtigen:
 
-- Gesamtzahl der registrierten Benutzer. Definieren Sie, wie viele Registrierungen pro Sekunde Sie unterstützen müssen
-- Gesamtzahl gleichzeitiger Anrufe. Definieren Sie, wie viele Netzwerkgespräche Sie im Netzwerkadapter und in der Bridge auf dem Asterisk‑Server verarbeiten müssen
-- Welche Codecs Sie unterstützen müssen. Codecs mit hoher Komplexität erfordern viel CPU/FPU‑Leistung in Ihrem Server; iLBC wurde beispielsweise von seinem Erfinder (Global IP Sound) mit etwa 18 MIPS pro Kanal für 30 ms‑Frames (und etwa 15 MIPS für 20 ms‑Frames) auf einem TI C54x DSP gemessen
-- Echo‑Unterdrückung. Echo‑Unterdrückung kann viel CPU/FPU beanspruchen, in manchen Fällen sollten Sie hardwarebasierte Echo‑Unterdrückung mit DSPs in der Telefonie‑Schnittstellenkarte wählen
-- Verfügbarkeit. Verwenden Sie RAID1 oder 5, um die Verfügbarkeit zu erhöhen. Denken Sie daran, dass Asterisk eine 24x7‑Anwendung ist.
+- Gesamtzahl der registrierten Benutzer. Definieren Sie, wie viele Registrierungen pro Sekunde Sie unterstützen müssen.
+- Gesamtzahl der gleichzeitigen Anrufe. Definieren Sie, wie viele Netzwerkgespräche Sie im Netzwerkadapter verarbeiten und auf dem Asterisk Server überbrücken müssen.
+- Welche codecs Sie unterstützen müssen. Codecs mit hoher Komplexität erfordern viel CPU/FPU-Leistung auf Ihrem Server; iLBC wurde beispielsweise von seinem Entwickler (Global IP Sound) mit etwa 18 MIPS pro Kanal für 30 ms Frames (und etwa 15 MIPS für 20 ms Frames) auf einem TI C54x DSP gemessen.
+- Echounterdrückung. Die Echounterdrückung kann viel CPU/FPU beanspruchen; in einigen Fällen sollten Sie eine hardwarebasierte Echounterdrückung mittels DSPs auf der Telefonieschnittstellenkarte wählen.
+- Verfügbarkeit. Verwenden Sie RAID1 oder 5, um die Verfügbarkeit zu erhöhen. Denken Sie daran, Asterisk ist eine 24x7-Anwendung.
 
-Die Hauptkomponente für einen Asterisk‑Server ist der Netzwerkadapter. Ein guter Server‑Netzwerkadapter wird empfohlen. Die CPU ist wichtig, wenn Sie Codecs mit hoher Komplexität wie g.729 und iLBC sowie Echo‑Unterdrückung unterstützen müssen. Sie können dies auf dedizierte DSPs auslagern: Sangoma (früher Digium) bietet eine DSP‑Karte namens TC400B, die 120 gleichzeitige G.729‑Anrufe unterstützen kann.
+Die Hauptkomponente für einen Asterisk Server ist der Netzwerkadapter. Ein guter Server-Netzwerkadapter wird empfohlen. Die CPU ist wichtig, wenn Sie komplexe codecs wie g.729 und iLBC sowie Echounterdrückung unterstützen müssen. Sie können dies auf dedizierte DSPs auslagern: Sangoma (ehemals Digium) bietet eine DSP-Karte namens TC400B an, die 120 gleichzeitige G.729-Anrufe unterstützen kann.
 
-Die bewährte Vorgehensweise ist, einen neuen, serverklassigen Computer von einem bekannten Hersteller zu wählen. Um genau zu wissen, wie viele gleichzeitige Anrufe oder wie viele registrierte Benutzer eine bestimmte Maschine unterstützen kann, sollten Sie diese Hardware mit einem Stresstest‑Tool wie SIPP (http://sipp.sourceforge.net) testen. Einige Hardware‑Hersteller wie Xorcom (http://www.xorcom.com) veröffentlichen ihre Ergebnisse auf der Website.
+Die bewährte Methode ist die Wahl eines neuen Computers der Serverklasse von einem bekannten Hersteller. Um genau zu wissen, wie viele gleichzeitige Anrufe oder wie viele registrierte Benutzer eine bestimmte Maschine unterstützen kann, sollten Sie diese Hardware mit einem Stresstest-Tool wie SIPP (http://sipp.sourceforge.net) testen. Einige Hardwarehersteller wie Xorcom (http://www.xorcom.com) veröffentlichen ihre Ergebnisse auf ihrer Website.
 
-Hinweis: Einige Asterisk‑Anwendungen, wie ConfBridge und Music on Hold, benötigen eine interne Zeitquelle. Auf modernen Linux‑Systemen wird diese automatisch vom eingebauten `res_timing_timerfd`‑Modul bereitgestellt – es wird keine Telefonie‑Hardware benötigt. (Der alte `dahdi_dummy`‑Software‑Timer existiert nicht mehr; seine Funktionalität wurde in das Haupt‑`dahdi`‑Kernelmodul in DAHDI Linux 2.3.0 integriert.) Sie können den aktiven Timer mit dem CLI‑Befehl `timing test` bestätigen.
+Hinweis: Einige Asterisk-Anwendungen, wie ConfBridge und music on hold, benötigen eine interne Zeitquelle. Auf modernem Linux wird dies automatisch durch das integrierte `res_timing_timerfd` Modul bereitgestellt — es ist keine Telefonie-Hardware erforderlich. (Der alte `dahdi_dummy` Software-Timer existiert nicht mehr; seine Funktionalität wurde in das Hauptmodul `dahdi` in DAHDI Linux 2.3.0 integriert.) Sie können den aktiven Timer mit dem CLI-Befehl `timing test` bestätigen.
 
-### Hardware configuration
+### Hardwarekonfiguration
 
-Die Asterisk‑Hardware muss nicht besonders anspruchsvoll sein. Sie benötigen keine teure Grafikkarte oder zahlreiche Peripheriegeräte. Einige Hinweise zur Hardware‑Konfiguration:
+Die Asterisk-Hardware muss nicht komplex sein. Sie benötigen keine teure Grafikkarte oder zahlreiche Peripheriegeräte. Einige Tipps zur Hardwarekonfiguration:
 
-- Deaktivieren Sie ungenutzte USB-, seriellen und Parallelanschlüsse, um unnötige Interrupts zu vermeiden.
-- Eine robuste Netzwerkschnittstellenkarte ist essenziell.
-- Achten Sie besonders, wenn Sie Telefonie‑Schnittstellenkarten verwenden. Einige Karten nutzen einen 3,3‑Volt‑PCI‑Bus, und es ist nicht einfach, dafür Motherboards zu finden. Heutzutage ist PCI‑Express leichter zu bekommen.
-- Achten Sie genau auf die Festplatte, PBX‑Systeme arbeiten im 24x7‑Betrieb, während Desktop‑Computer 8x5 laufen. Verwenden Sie keine Desktop‑Hardware für eine PBX, da die Festplatte meist bereits nach dem ersten Jahr ausfällt. Meine Empfehlung ist, eine Server‑Maschine oder ein Appliance‑Gerät zu verwenden, das für den 24x7‑Betrieb ausgelegt ist.
+- Deaktivieren Sie ungenutzte USB-, serielle und parallele Anschlüsse, um den Verbrauch unnötiger Interrupts zu vermeiden.
+- Eine robuste Netzwerkschnittstellenkarte ist unerlässlich.
+- Seien Sie besonders vorsichtig, wenn Sie Telefonieschnittstellenkarten verwenden. Einige Karten verwenden einen 3,3-Volt-PCI-Bus, und es ist nicht einfach, Motherboards dafür zu finden. Heutzutage ist PCI Express leichter zu finden.
+- Achten Sie genau auf die Festplatte; eine PBX arbeitet normalerweise im 24x7-Betrieb, während Desktop-Computer 8x5 arbeiten. Verwenden Sie keine Desktop-Hardware für eine PBX, da die Festplatte normalerweise vor dem ersten Jahr ausfällt. Meine Empfehlung ist die Verwendung einer Servermaschine oder eines Geräts, das für 24x7-Anwendungen ausgelegt ist.
 
-### IRQ sharing (legacy PCI cards only)
+### IRQ-Sharing (nur bei älteren PCI-Karten)
 
-Dieses Thema gilt **nur**, wenn Sie physische PCI/PCI‑Express‑Telefoniekarten (DAHDI‑Hardware) installieren. Solche Karten erzeugen viele Interrupts, und auf älteren Single‑CPU‑Systemen kann das Teilen einer IRQ‑Leitung mit einem anderen Gerät den Treiber „aushungern“ und die Sprachqualität verschlechtern. Wenn Sie Telefoniekarten verwenden, widmen Sie die Maschine Asterisk, deaktivieren Sie alle ungenutzten On‑Board‑Geräte im BIOS und prüfen Sie die zugewiesenen Interrupts mit `cat /proc/interrupts`. Moderne Multi‑
+Dieses Problem betrifft **nur** die Installation physischer PCI/PCI-Express-Telefoniekarten (DAHDI-Hardware). Solche Karten erzeugen eine große Anzahl von Interrupts, und auf älteren Single-CPU-Systemen könnte das Teilen einer IRQ-Leitung mit einem anderen Gerät den Treiber ausbremsen und die Sprachqualität verschlechtern. Wenn Sie Telefoniekarten verwenden, widmen Sie die Maschine ausschließlich Asterisk, deaktivieren Sie alle ungenutzten On-Board-Geräte im BIOS und überprüfen Sie die zugewiesenen Interrupts mit `cat /proc/interrupts`. Moderne Multi-Core-Server, die MSI/MSI-X-Interrupts verwenden, machen IRQ-Sharing in der Praxis zu einem vernachlässigbaren Problem, und bei einer reinen VoIP-Bereitstellung (ohne Karten) müssen Sie sich darüber überhaupt keine Sorgen machen.
 
-## Choosing a Linux distribution
+## Auswahl einer Linux-Distribution
 
-Asterisk wurde ursprünglich für Linux entwickelt. Es kann jedoch auch auf BSD Unix oder macOS laufen. Wenn Sie neu bei Asterisk sind, probieren Sie zuerst Linux, da es viel einfacher ist. Asterisk richtet sich offiziell an die RHEL‑Familie (CentOS/RHEL/Fedora), Ubuntu und Debian. Gute praktische Optionen heute sind **Debian 12**, **Ubuntu 22.04 LTS / 24.04 LTS** und **Rocky Linux 9 / AlmaLinux 9** — CentOS Linux ist am Lebensende, daher bevorzugen Sie Rocky oder AlmaLinux auf RHEL‑Familien‑Systemen. Für dieses Buch verwende ich Ubuntu 24.04 LTS. Laden Sie das neueste 24.04‑Punkt‑Release‑Server‑Image aus dem offiziellen Release‑Verzeichnis unten herunter (der genaue Dateiname enthält das aktuelle Punkt‑Release, z. B. `ubuntu-24.04.4-live-server-amd64.iso`):
+Asterisk wurde ursprünglich für den Betrieb unter Linux entwickelt. Es kann jedoch auch unter BSD Unix oder macOS ausgeführt werden. Wenn Sie neu bei Asterisk sind, versuchen Sie es zunächst mit Linux, da dies wesentlich einfacher ist. Asterisk zielt offiziell auf die RHEL-Familie (CentOS/RHEL/Fedora), Ubuntu und Debian ab. Gute praktische Optionen sind heute **Debian 12**, **Ubuntu 22.04 LTS / 24.04 LTS** und **Rocky Linux 9 / AlmaLinux 9** — da CentOS Linux das Ende seines Lebenszyklus erreicht hat, sollten Sie auf Systemen der RHEL-Familie Rocky oder AlmaLinux bevorzugen. Für dieses Buch werde ich Ubuntu 24.04 LTS verwenden. Laden Sie das neueste 24.04 Point-Release-Server-Image aus dem offiziellen Release-Verzeichnis unten herunter (der genaue Dateiname enthält das aktuelle Point-Release, z. B. `ubuntu-24.04.4-live-server-amd64.iso`):
 
 ```
 https://releases.ubuntu.com/24.04/
 ```
 
-### Preparing Linux for Asterisk
+### Vorbereitung von Linux für Asterisk
 
-Bevor Sie Asterisk kompilieren, benötigen Sie ein funktionierendes Linux‑System mit den installierten Build‑Paketen. Installieren Sie **Ubuntu 24.04 LTS Server** in einer virtuellen Maschine oder auf einem dedizierten Rechner (verwenden Sie das 64‑Bit‑Image; alles in diesem Buch ist 64‑Bit, obwohl Asterisk selbst noch 32‑Bit‑x86 unterstützt). Wir haben VirtualBox für dieses Training verwendet; Sie können das Image von <https://releases.ubuntu.com/24.04> herunterladen. Die Installation von Linux selbst liegt außerhalb des Umfangs dieses Buches — grundlegende Linux‑Kenntnisse sind eine Voraussetzung. Nach der Installation von Linux fügen Sie die Asterisk‑Build‑Abhängigkeiten hinzu (siehe *Installing dependencies* weiter unten) und kompilieren dann Asterisk.
+Bevor Sie Asterisk kompilieren, benötigen Sie ein funktionierendes Linux-System, auf dem die Build-Pakete installiert sind. Installieren Sie **Ubuntu 24.04 LTS Server** in einer virtuellen Maschine oder auf einem dedizierten Rechner (verwenden Sie das 64-Bit-Image; alles in diesem Buch ist 64-Bit, obwohl Asterisk selbst immer noch 32-Bit x86 unterstützt). Wir haben für dieses Training VirtualBox verwendet; Sie können das Image unter <https://releases.ubuntu.com/24.04> herunterladen. Die Installation von Linux selbst liegt außerhalb des Rahmens dieses Buches — grundlegende Linux-Kenntnisse sind eine Voraussetzung. Sobald Linux installiert ist, fügen Sie die Asterisk-Build-Abhängigkeiten hinzu (siehe *Abhängigkeiten installieren* unten) und kompilieren anschließend Asterisk.
 
-## Installing Linux for Asterisk
+## Installation von Linux für Asterisk
 
-Installieren Sie Linux wie üblich, ohne grafische Desktop-Umgebung. Aktivieren Sie während der Installation auch einen Mail-Transfer-Agent (wir verwenden **exim4**) — Asterisk wird ihn später in diesem Buch benötigen, um Voicemail‑zu‑E‑Mail‑Benachrichtigungen zu senden. **Caution:** Das Installieren eines Betriebssystems löscht die Ziel‑Festplatte. Wenn Sie auf physischer Hardware installieren, sichern Sie zuerst Ihre Daten; die Installation in einer virtuellen Maschine lässt Ihren Host unberührt. Starten Sie den Installer vom Ubuntu Server ISO (oder vom virtuellen optischen Laufwerk der VM) und beantworten Sie die Eingabeaufforderungen — die meisten sind eindeutig.
+Installieren Sie Linux wie gewohnt, ohne grafische Benutzeroberfläche. Aktivieren Sie während der Installation auch einen Mail Transfer Agent (wir verwenden **exim4**) — Asterisk wird diesen später in diesem Buch benötigen, um Voicemail-zu-E-Mail-Benachrichtigungen zu versenden. **Achtung:** Die Installation eines Betriebssystems löscht die Zielfestplatte. Wenn Sie auf physischer Hardware installieren, sichern Sie zuerst Ihre Daten; die Installation in einer virtuellen Maschine lässt Ihren Host unberührt. Starten Sie das Installationsprogramm von der Ubuntu Server ISO (oder dem virtuellen optischen Laufwerk der VM) und beantworten Sie die Eingabeaufforderungen — die meisten sind selbsterklärend.
 
-## Installing dependencies
+## Abhängigkeiten installieren
 
-Um Asterisk und DAHDI zu installieren, müssen Sie viele Software‑Abhängigkeiten installieren. Der empfohlene Weg, dies in Asterisk 22 zu tun, ist das Skript zu verwenden, das im Quellbaum mitgeliefert wird und die korrekten Paketnamen für jede unterstützte Distribution kennt. Nachdem Sie den Asterisk‑Quellcode heruntergeladen und entpackt haben (siehe „Compiling Asterisk“ weiter unten), führen Sie aus:
+Um Asterisk und DAHDI zu installieren, müssen Sie zahlreiche Software-Abhängigkeiten installieren. Der empfohlene Weg hierfür in Asterisk 22 ist die Verwendung des Skripts, das mit dem Quellcode-Baum ausgeliefert wird, da dieses die korrekten Paketnamen für jede unterstützte Distribution kennt. Nachdem Sie den Asterisk-Quellcode heruntergeladen und entpackt haben (siehe „Asterisk kompilieren“ weiter unten), führen Sie Folgendes aus:
 
 ```
 cd /usr/src/asterisk-22.x.y
@@ -69,7 +69,7 @@ cd /usr/src/asterisk-22.x.y
 ```
 
 1. Melden Sie sich als root an (oder verwenden Sie `sudo`).
-2. Wenn Sie die Abhängigkeiten manuell auf einem Debian/Ubuntu‑System installieren möchten, lautet die entsprechende Paketliste:
+2. Falls Sie die Abhängigkeiten auf einem Debian/Ubuntu-System lieber manuell installieren möchten, lautet die entsprechende Paketliste:
 
 ```
 apt-get install build-essential git wget openssl libssl-dev libxml2-dev \
@@ -77,11 +77,11 @@ apt-get install build-essential git wget openssl libssl-dev libxml2-dev \
   libcurl4-openssl-dev pkg-config autoconf-archive
 ```
 
-Beachten Sie, dass der Asterisk‑Quellcode jetzt auf Git gehostet wird, sodass `subversion` nicht mehr benötigt wird, und moderne Debian/Ubuntu liefern `libncurses-dev` anstelle des versionierten `libncurses5-dev`. Bevorzugen Sie `./contrib/scripts/install_prereq install` gegenüber einer selbst gepflegten Liste, da das Skript stets die korrekten Paketnamen für Ihre Distribution verfolgt.
+Beachten Sie, dass der Asterisk-Quellcode mittlerweile auf Git gehostet wird, weshalb `subversion` nicht mehr benötigt wird und moderne Debian/Ubuntu-Systeme `libncurses-dev` anstelle der versionierten `libncurses5-dev` bereitstellen. Bevorzugen Sie `./contrib/scripts/install_prereq install` gegenüber einer manuell gepflegten Liste, da das Skript stets die korrekten Paketnamen für Ihre Distribution nachverfolgt.
 
 ### DAHDI
 
-DAHDI (Digium/Sangoma Asterisk Hardware Device Interface) ist die Treiberarchitektur für analoge und digitale Karten. Vor der Installation von Asterisk ist es wichtig, DAHDI zu installieren, wenn Sie analoge oder digitale Schnittstellen nutzen wollen. DAHDI gibt es nach wie vor für analoge/digitale Telefoniekarten, ist aber zunehmend eine Nischenlösung — die meisten modernen Einsätze sind reine VoIP und können diesen Abschnitt komplett überspringen. Installieren Sie DAHDI nur, wenn Sie physische Telefonie‑Schnittstellen‑Hardware besitzen. Holen Sie sich die Quelldateien mit:
+DAHDI (Digium/Sangoma Asterisk Hardware Device Interface) ist die Architektur der Treiber für analoge und digitale Karten. Vor der Installation von Asterisk ist es wichtig, DAHDI zu installieren, falls Sie analoge oder digitale Schnittstellen verwenden möchten. DAHDI existiert weiterhin für analoge/digitale Telefoniekarten, ist jedoch zunehmend ein Nischenprodukt — die meisten modernen Implementierungen sind reine VoIP-Lösungen und können diesen Abschnitt vollständig überspringen. Installieren Sie DAHDI nur, wenn Sie physische Telefonie-Schnittstellenhardware besitzen. Laden Sie die Quelldateien mit folgendem Befehl herunter:
 
 ```
 wget https://downloads.asterisk.org/pub/telephony/dahdi-linux-complete/dahdi-linux-complete-current.tar.gz
@@ -93,9 +93,9 @@ Entpacken Sie die Dateien mit:
 tar -xzvf dahdi-linux-complete-current.tar.gz
 ```
 
-### Compiling DAHDI drivers
+### DAHDI-Treiber kompilieren
 
-Sie müssen die DAHDI‑Module kompilieren. Die Befehle `./configure` und `make menuselect` wurden vor mehreren Jahren eingeführt. Letzterer ermöglicht Ihnen, auszuwählen, welche Dienstprogramme und Module gebaut werden sollen. Die folgenden Befehle erledigen das:
+Sie müssen die DAHDI-Module kompilieren. Die Befehle ./configure und make menuselect wurden vor einigen Jahren eingeführt. Letzterer ermöglicht es Ihnen, auszuwählen, welche Dienstprogramme und Module erstellt werden sollen. Die folgenden Befehle führen dies aus:
 
 ```
 cd dahdi-linux-complete-X.Y.Z+X.Y.Z/linux   # adapt to the version downloaded
@@ -108,7 +108,7 @@ make
 make install
 ```
 
-`make install-config` DAHDI wurde konfiguriert. Wenn Sie DAHDI‑Hardware besitzen, wird jetzt empfohlen, die Datei `/etc/dahdi/modules` zu bearbeiten, um nur die Unterstützung für die im System installierte DAHDI‑Hardware zu laden. Standardmäßig wird die Unterstützung für alle DAHDI‑Hardware beim Start von DAHDI geladen. Ich vermute, dass die DAHDI‑Hardware in Ihrem System ist: `usb:004/002 xpp_usb- e4e4:1150 Astribank-multi no-firmware`. Dieser Bildschirm (oben) fordert Sie auf, die Datei `/etc/dahdi/modules` zu ändern, damit nur die für Ihre spezifische Konfiguration erforderlichen Treiber geladen werden und die erkannte Hardware angezeigt wird. Bearbeiten Sie die Datei `/etc/dahdi/modules` und laden Sie nur die benötigte Hardware. In meinem Fall nutzte ich eine Testmaschine mit einem Xorcom Astribank 6FXS und 2FXO. Die Datei wird unten gezeigt.
+make install-config DAHDI wurde konfiguriert. Wenn Sie DAHDI-Hardware besitzen, wird nun empfohlen, /etc/dahdi/modules zu bearbeiten, um nur die Unterstützung für die in diesem System installierte DAHDI-Hardware zu laden. Standardmäßig wird beim Start von DAHDI die Unterstützung für sämtliche DAHDI-Hardware geladen. Ich denke, dass die DAHDI-Hardware, die Sie auf Ihrem System haben, folgende ist: usb:004/002 xpp_usb- e4e4:1150 Astribank-multi no-firmware Dieser Bildschirm (oben) fordert Sie auf, die Datei /etc/dahdi/modules zu ändern, um nur die erforderlichen Treiber für Ihre spezifische Konfiguration zu laden und die erkannte Hardware anzuzeigen. Bearbeiten Sie die Datei /etc/dahdi/modules und laden Sie nur die benötigte Hardware. In meinem Fall verwendete ich eine Testmaschine mit einer Xorcom Astribank 6FXS und 2FXO. Die Datei ist unten dargestellt.
 
 ```
 # Contains the list of modules to be loaded / unloaded by /etc/init.d/dahdi.
@@ -146,15 +146,15 @@ make install
 xpp_usb
 ```
 
-Starten Sie Ihren Computer neu und prüfen Sie, ob die Treiber korrekt geladen wurden.
+Starten Sie Ihren Computer neu und überprüfen Sie das korrekte Laden der Treiber.
 
-## Welche Version wählen
+## Welche Version soll man wählen
 
-Als Faustregel sollten Sie die Version mit den benötigten Funktionen verwenden. Asterisk folgt einem Release‑Modell mit abwechselnden LTS‑ (Long‑Term‑Support) und Standard‑Releases. Zum Zeitpunkt dieser Ausgabe ist **Asterisk 22 das aktuelle LTS‑Release** (veröffentlicht im Oktober 2024; das neueste Point‑Release ist 22.10.0), was es zur besten Wahl macht. Asterisk 20 ist das vorherige LTS, und Version 16 (verwendet in der ersten Ausgabe) ist am Ende ihres Lebenszyklus. Für Produktionssysteme wählen Sie immer ein LTS‑Release.
+Als Faustregel gilt, dass Sie die Version mit den benötigten Funktionen verwenden sollten. Asterisk folgt einem Release-Modell, bei dem sich LTS-Releases (Long-Term Support) und Standard-Releases abwechseln. Zum Zeitpunkt dieser Ausgabe ist **Asterisk 22 das aktuelle LTS-Release** (veröffentlicht im Oktober 2024; das neueste Point-Release ist 22.10.0), was es zur besten Wahl für den aktuellen Zeitpunkt macht. Asterisk 20 ist das vorherige LTS-Release, und Version 16 (verwendet in der ersten Ausgabe) hat das Ende ihres Lebenszyklus erreicht. Für Produktionssysteme sollten Sie immer ein LTS-Release wählen.
 
 ## Compiling Asterisk
 
-Wenn Sie bereits Software kompiliert haben, wird das Kompilieren von Asterisk eine einfache Aufgabe sein. Führen Sie die folgenden Befehle aus, um Asterisk zu kompilieren und zu installieren. Denken Sie daran, dass Sie mit **make menuselect** auswählen können, welche Anwendungen und Module gebaut werden sollen. Schritt 1: Quellcode herunterladen
+Wenn Sie bereits Software kompiliert haben, wird das Kompilieren von Asterisk eine einfache Aufgabe sein. Führen Sie die folgenden Befehle aus, um Asterisk zu kompilieren und zu installieren. Denken Sie daran, dass Sie mit make menuselect auswählen können, welche Anwendungen und Module erstellt werden sollen. Schritt 1: Laden Sie den Quellcode herunter
 
 ```
 cd /usr/src
@@ -162,28 +162,28 @@ wget https://downloads.asterisk.org/pub/telephony/asterisk/asterisk-22-current.t
 tar -xzvf asterisk-22-current.tar.gz
 ```
 
-Schritt 2: Build‑Voraussetzungen installieren (siehe „Installing dependencies“ weiter oben)
+Schritt 2: Installieren Sie die Build-Voraussetzungen (siehe „Installing dependencies“ oben)
 
 ```
 cd asterisk-22.x.y (adapt to the version downloaded)
 ./contrib/scripts/install_prereq install
 ```
 
-Schritt 3: Build konfigurieren
+Schritt 3: Konfigurieren Sie den Build
 
 ```
 ./configure
 ```
 
-Schritt 4: Module zum Bau auswählen
+Schritt 4: Wählen Sie die zu erstellenden Module aus
 
 ```
 make menuselect
 ```
 
-Verwenden Sie **make menuselect**, um nur die notwendigen Module zu installieren. In Asterisk 22 ist der SIP‑Kanal **chan_pjsip** (standardmäßig gebaut); der alte **chan_sip** wurde in Asterisk 21 entfernt und existiert nicht mehr. Opus *Pass‑Through* funktioniert out of the box (das im Quellbaum befindliche `res_format_attr_opus`‑Modul übernimmt die SDP‑Verhandlung), aber das **codec_opus**‑Transcoding‑Modul ist weiterhin ein externes, proprietäres Binary von Sangoma/Digium — die Auswahl im menuselect lädt es von Digiums Servern herunter. Das Binary ist kostenlos. Siehe unten „Selecting modules with menuselect“ für Details.
+Verwenden Sie make menuselect, um nur die notwendigen Module zu installieren. In Asterisk 22 ist der SIP-Kanal **chan_pjsip** (standardmäßig erstellt); das alte **chan_sip** wurde in Asterisk 21 entfernt und existiert nicht mehr. Opus *pass-through* funktioniert sofort (das in-tree `res_format_attr_opus` Modul übernimmt die SDP-Aushandlung), aber das **codec_opus** Transcoding-Modul ist weiterhin ein externes, proprietäres Binärpaket von Sangoma/Digium — wenn Sie es in menuselect auswählen, wird es von den Servern von Digium heruntergeladen. Das Binärpaket ist kostenlos. Details finden Sie weiter unten unter „Selecting modules with menuselect“.
 
-Schritt 5: Asterisk bauen und installieren, dann die Standard‑Konfiguration und Beispiel‑Dateien erzeugen
+Schritt 5: Erstellen und installieren Sie Asterisk und erstellen Sie dann die Standardkonfigurations- und Beispieldateien
 
 ```
 make
@@ -193,35 +193,35 @@ make config
 ldconfig
 ```
 
-`make install` installiert die Binaries und Module, `make samples` schreibt die Beispiel‑Konfigurationsdateien nach `/etc/asterisk`, `make config` installiert das SysV‑Init‑Startskript für Ihre erkannte Distribution (z. B. `/etc/init.d/asterisk` unter Debian/Ubuntu) und `ldconfig` aktualisiert den Shared‑Library‑Cache. Eine systemd‑Unit wird ebenfalls im Quellbaum unter `contrib/systemd/asterisk.service` mitgeliefert, aber `make config` installiert sie nicht automatisch — kopieren Sie sie selbst an den richtigen Ort, wenn Sie Asterisk unter systemd betreiben möchten (siehe unten).
+`make install` installiert die Binärdateien und Module, `make samples` schreibt die Beispielkonfigurationsdateien in `/etc/asterisk`, `make config` installiert das SysV init-Startskript für Ihre erkannte Distribution (z. B. `/etc/init.d/asterisk` unter Debian/Ubuntu) und `ldconfig` aktualisiert den Cache der gemeinsam genutzten Bibliotheken. Eine systemd-Unit wird ebenfalls im Quellbaum unter `contrib/systemd/asterisk.service` mitgeliefert, aber `make config` installiert diese nicht automatisch — kopieren Sie sie selbst an den entsprechenden Ort, wenn Sie Asterisk lieber unter systemd ausführen möchten (siehe unten).
 
 ### Selecting modules with menuselect
 
-`make menuselect` öffnet ein textbasiertes Menü, in dem Sie exakt auswählen können, welche Anwendungen, Codecs, Kanäle und Ressourcen gebaut werden sollen. Einige Hinweise speziell für Asterisk 22:
+`make menuselect` öffnet ein textbasiertes Menü, in dem Sie genau auswählen können, welche Anwendungen, codecs, Kanäle und Ressourcen erstellt werden sollen. Ein paar spezifische Hinweise zu Asterisk 22:
 
-- **chan_pjsip** (unter *Channel Drivers*) ist der moderne SIP‑Kanal und ist standardmäßig aktiviert; er ist der einzige SIP‑Kanal in Asterisk 22.
-- **codec_opus** (unter *Codec Translators*) ist ein **externes** Modul (sein menuselect‑Eintrag lautet „Download the Opus codec from Digium“); die Aktivierung lässt `make` das kostenlose, proprietäre Binary von Sangoma/Digium herunterladen. Opus Pass‑Through selbst benötigt kein zusätzliches Modul. Sangomas **codec_g729**‑Modul ist ebenfalls verfügbar — das Binary ist kostenlos, aber das legale G.729‑Transcoding erfordert eine pro‑Kanal‑Lizenz, die erworben werden muss.
-- Wählen Sie die Sound‑Formate und Sprachen, die Sie in den Menüs *Core Sound Packages*, *Music On Hold File Packages* und *Extras Sound Packages* benötigen; alles, was Sie dort aktivieren, wird automatisch während `make install` heruntergeladen und installiert.
+- **chan_pjsip** (unter *Channel Drivers*) ist der moderne SIP-Kanal und standardmäßig aktiviert; er ist der einzige SIP-Kanal in Asterisk 22.
+- **codec_opus** (unter *Codec Translators*) ist ein **externes** Modul (der menuselect-Eintrag lautet „Download the Opus codec from Digium“); wenn Sie es aktivieren, ruft `make` das kostenlose, proprietäre Binärpaket von Sangoma/Digium ab. Opus pass-through selbst benötigt kein zusätzliches Modul. Das **codec_g729** Modul von Sangoma ist ebenfalls verfügbar — das Binärpaket kann kostenlos heruntergeladen werden, aber für legales G.729 Transcoding ist eine kostenpflichtige Lizenz pro Kanal erforderlich.
+- Wählen Sie die gewünschten Soundformate und Sprachen in den Menüs *Core Sound Packages*, *Music On Hold File Packages* und *Extras Sound Packages* aus; alles, was Sie dort auswählen, wird während `make install` automatisch heruntergeladen und installiert.
 
-Nachdem Sie Ihre Auswahl getroffen haben, wählen Sie **Save & Exit** und fahren mit `make` fort.
+Nachdem Sie Ihre Auswahl getroffen haben, wählen Sie **Save & Exit** und fahren Sie mit `make` fort.
 
-## Starting and stopping Asterisk
+## Starten und Stoppen von Asterisk
 
-Mit dieser Minimal-Konfiguration ist es möglich, Asterisk erfolgreich zu starten. Zum Lernen und Debuggen können Sie Asterisk im Vordergrund an die Konsole anhängen:
+Mit dieser minimalen Konfiguration ist es möglich, Asterisk erfolgreich zu starten. Zum Lernen und zur Fehlersuche können Sie Asterisk im Vordergrund starten, wobei es an die Konsole angehängt bleibt:
 
 ```
 /usr/sbin/asterisk -vvvgc
 ```
 
-Verwenden Sie den CLI‑Befehl `core stop now`, um Asterisk herunterzufahren:
+Verwenden Sie den CLI-Befehl `core stop now`, um Asterisk herunterzufahren:
 
 ```
 *CLI> core stop now
 ```
 
-### Starting Asterisk with systemd
+### Starten von Asterisk mit systemd
 
-Auf modernen Linux‑Distributionen (Debian 12, Ubuntu 22.04/24.04, Rocky/AlmaLinux 9) ist der System‑Service‑Manager **systemd**. Asterisk liefert eine systemd‑Unit unter `contrib/systemd/asterisk.service` im Quellbaum; kopieren Sie sie nach `/etc/systemd/system/asterisk.service` und führen Sie `systemctl daemon-reload` aus. Sobald sie installiert ist, ist der empfohlene Weg, Asterisk in der Produktion zu betreiben, über `systemctl`:
+Auf modernen Linux-Distributionen (Debian 12, Ubuntu 22.04/24.04, Rocky/AlmaLinux 9) ist der Systemdienst-Manager **systemd**. Asterisk liefert eine systemd-Unit unter `contrib/systemd/asterisk.service` im Quellbaum mit; kopieren Sie diese nach `/etc/systemd/system/asterisk.service` und führen Sie `systemctl daemon-reload` aus. Sobald Asterisk installiert ist, ist die empfohlene Methode, Asterisk in der Produktion zu betreiben, über `systemctl`:
 
 ```
 systemctl start asterisk      # start the service
@@ -231,27 +231,27 @@ systemctl status asterisk     # show current status
 systemctl enable asterisk     # start automatically at boot
 ```
 
-Wenn Asterisk als Service läuft, können Sie sich mit `asterisk -r` (connect) oder `asterisk -rvvv` (connect with verbose output) an dessen CLI anhängen.
+Sobald Asterisk als Dienst läuft, verbinden Sie sich mit dessen CLI über `asterisk -r` (verbinden) oder `asterisk -rvvv` (verbinden mit ausführlicher Ausgabe).
 
-Auf älteren Systemen wurde Asterisk über das klassische SysV‑Init‑Script (`/etc/init.d/asterisk`) und den **safe_asterisk**‑Wrapper gestartet, der Asterisk automatisch neu startete, falls es abstürzte. Bei systemd wird der automatische Neustart durch die `Restart=`‑Direktive der Unit‑Datei gehandhabt, sodass `safe_asterisk` im Allgemeinen nicht mehr nötig ist. Der alte Init/`safe_asterisk`‑Ansatz funktioniert weiterhin, ist aber auf systemd‑basierten Distributionen veraltet.
+Auf älteren Systemen wurde Asterisk über das klassische SysV-Init-Skript (`/etc/init.d/asterisk`) und den **safe_asterisk**-Wrapper gestartet, der Asterisk bei einem Absturz automatisch neu startete. Bei systemd wird der automatische Neustart durch die `Restart=`-Direktive der Unit-Datei gehandhabt, daher wird `safe_asterisk` im Allgemeinen nicht mehr benötigt. Der klassische Init/`safe_asterisk`-Ansatz funktioniert zwar weiterhin, ist aber auf systemd-basierten Distributionen veraltet.
 
-### Asterisk runtime options
+### Asterisk-Laufzeitoptionen
 
-Der Startvorgang von Asterisk ist sehr einfach. Wird Asterisk ohne Parameter gestartet, wird es als Daemon ausgeführt.
+Der Startprozess von Asterisk ist sehr einfach. Wenn Asterisk ohne Parameter ausgeführt wird, startet es als Daemon.
 
 ```
 /sbin/asterisk
 ```
 
-Sie können auf die Asterisk‑Konsole zugreifen, indem Sie den folgenden Befehl ausführen. Bitte beachten Sie, dass gleichzeitig mehr als ein Konsolen‑Prozess laufen kann.
+Sie können auf die Asterisk-Konsole zugreifen, indem Sie den folgenden Befehl ausführen. Bitte beachten Sie, dass mehr als ein Konsolenprozess gleichzeitig ausgeführt werden kann.
 
 ```
 /sbin/asterisk -r
 ```
 
-### Available runtime options for Asterisk
+### Verfügbare Laufzeitoptionen für Asterisk
 
-Sie können die verfügbaren Laufzeitoptionen mit `asterisk -h` anzeigen:
+Sie können die verfügbaren Laufzeitoptionen mit `asterisk -h` anzeigen.
 
 ```text
 sipast:/usr/src/asterisk-22.x.y# asterisk -h
@@ -290,11 +290,11 @@ Valid Options:
 
 ## Installationsverzeichnisse
 
-Asterisk wird in mehreren Verzeichnissen installiert, die in der asterisk.conf Datei geändert werden können. Zu Trainingszwecken würde ich das verbose von 3 auf 15 setzen, für den Produktionseinsatz bei 3 belassen. Die Optionen `maxcalls` und `maxload` sind gute Optionen, um Ihr System vor Überlastung zu schützen.
+Asterisk wird in verschiedenen Verzeichnissen installiert, die in der Datei asterisk.conf geändert werden können. Zu Schulungszwecken würde ich den Wert für verbose von 3 auf 15 erhöhen; für den Produktivbetrieb sollte er auf 3 belassen werden. Die Optionen `maxcalls` und `maxload` sind gute Möglichkeiten, um Ihr System vor Überlastung zu schützen.
 
 ### asterisk.conf (Auszug)
 
-Der `[directories]` Abschnitt definiert, wo Asterisk seine Konfiguration, Module, Daten, spool und Logs ablegt:
+Der Abschnitt `[directories]` definiert, wo Asterisk seine Konfiguration, Module, Daten, Spool-Dateien und Protokolle speichert:
 
 ```
 [directories](!) ; remove the (!) to enable this
@@ -311,7 +311,7 @@ astlogdir => /var/log/asterisk
 astsbindir => /usr/sbin
 ```
 
-Der `[options]` Abschnitt enthält Runtime‑Tuning. Die nützlichsten Optionen sind unten gezeigt (auskommentieren, um zu aktivieren); die Datei liefert viele weitere, jeweils durch einen Inline‑Kommentar dokumentiert:
+Der Abschnitt `[options]` enthält Einstellungen zur Laufzeitoptimierung. Die nützlichsten Optionen, die man kennen sollte, sind unten aufgeführt (zum Aktivieren auskommentieren); die Datei wird mit vielen weiteren Optionen ausgeliefert, die jeweils durch einen Kommentar im Code dokumentiert sind:
 
 ```
 [options]
@@ -324,9 +324,9 @@ Der `[options]` Abschnitt enthält Runtime‑Tuning. Die nützlichsten Optionen 
 ;rungroup = asterisk  ; The group to run as
 ```
 
-## Logdateien und Logrotation
+## Log-Dateien und Log-Rotation
 
-Asterisk PBX protokolliert seine Meldungen in `/var/log/asterisk`. Das Logging wird durch `logger.conf` gesteuert. Der zentrale Teil ist der Abschnitt `[logfiles]`, in dem jede Zeile einen Log‑Kanal und die erfassten Meldungsstufen definiert (Auszug):
+Asterisk PBX protokolliert seine Meldungen in `/var/log/asterisk`. Die Protokollierung wird über `logger.conf` gesteuert. Der entscheidende Teil ist der Abschnitt `[logfiles]`, in dem jede Zeile einen Log-Kanal und die zu erfassenden Meldungsebenen definiert (Auszug):
 
 ```ini
 ; logger.conf (excerpt)
@@ -341,7 +341,7 @@ full     => notice,warning,error,verbose,dtmf,fax
 security => security              ; PJSIP/auth security events (used by Fail2Ban)
 ```
 
-Nach dem Bearbeiten die Änderung mit `logger reload` anwenden und die Kanäle mit `logger show channels` bestätigen:
+Wenden Sie die Änderung nach dem Bearbeiten mit `logger reload` an und bestätigen Sie die Kanäle mit `logger show channels`:
 
 ```text
 *CLI> logger show channels
@@ -351,7 +351,7 @@ Channel                       Type   Formatter  Status   Configuration
 /var/log/asterisk/messages    File   default    Enabled  - NOTICE WARNING ERROR
 ```
 
-Die Logdateien können schnell wachsen, daher sollten sie mit dem System‑Daemon `logrotate` rotiert werden — eine Datei unter `/etc/logrotate.d/` hinzufügen:
+Die Log-Dateien können schnell anwachsen, rotieren Sie diese daher mit dem System-Daemon `logrotate` — fügen Sie eine Datei unter `/etc/logrotate.d/` hinzu:
 
 ```text
 /var/log/asterisk/messages /var/log/asterisk/*log {
@@ -371,7 +371,7 @@ Weitere Informationen zu logrotate erhalten Sie mit:
 #man logrotate
 ```
 
-## Deinstallieren von Asterisk
+## Deinstallation von Asterisk
 
 Um Asterisk zu deinstallieren, verwenden Sie:
 
@@ -379,56 +379,56 @@ Um Asterisk zu deinstallieren, verwenden Sie:
 make uninstall
 ```
 
-Um Asterisk und alle Konfigurationsdateien zu deinstallieren, verwenden Sie:
+Um Asterisk sowie alle Konfigurationsdateien zu deinstallieren, verwenden Sie:
 
 ```
 make uninstall-all
 ```
 
-## Asterisk installation notes
+## Asterisk Installationshinweise
 
-This section will provide some advice about issues to address before installing Asterisk.
+Dieser Abschnitt enthält einige Ratschläge zu Themen, die vor der Installation von Asterisk beachtet werden sollten.
 
-### Production Systems
+### Produktionssysteme
 
-If Asterisk is installed in a production environment, you should pay attention to the system design. A server has to be optimized in such a way that telephony systems have priority over other system processes. Asterisk should not run together with processor-intensive software such as X-Windows. If you need to run CPU-intensive processes (e.g., a huge database), use a separate server. Generally speaking, Asterisk is susceptible to hardware performance variations. Thus, try using Asterisk in a hardware environment that does not require more than 40% of CPU utilization.
+Wenn Asterisk in einer Produktionsumgebung installiert wird, sollten Sie auf das Systemdesign achten. Ein Server muss so optimiert sein, dass Telefonsysteme Vorrang vor anderen Systemprozessen haben. Asterisk sollte nicht zusammen mit prozessorintensiver Software wie X-Windows ausgeführt werden. Wenn Sie CPU-intensive Prozesse (z. B. eine große Datenbank) ausführen müssen, verwenden Sie einen separaten Server. Allgemein gesagt ist Asterisk anfällig für Schwankungen der Hardwareleistung. Versuchen Sie daher, Asterisk in einer Hardwareumgebung zu betreiben, die nicht mehr als 40% der CPU-Auslastung erfordert.
 
-### Network Tips
+### Netzwerktipps
 
-If you plan to use IP phones, it is important that you pay attention to your network. Voice protocols are very good and resistant to latency and even jitters; however, if you use a poorly configured local area network, voice quality will suffer. It is only possible to guarantee good voice quality using quality of service (QoS) in switches and routers. Voice in a local area network tends to be good, but even in a LAN environment, if you have 10 Mbps hubs with too many collisions, you will end up having a distorted or crappy voice. Follow these recommendations to ensure the best possible voice quality:
+Wenn Sie planen, IP-Telefone zu verwenden, ist es wichtig, dass Sie auf Ihr Netzwerk achten. Sprachprotokolle sind sehr gut und resistent gegenüber Latenz und sogar Jitter; wenn Sie jedoch ein schlecht konfiguriertes lokales Netzwerk verwenden, wird die Sprachqualität leiden. Eine gute Sprachqualität lässt sich nur durch die Verwendung von Quality of Service (QoS) in Switches und Routern garantieren. Sprache in einem lokalen Netzwerk ist tendenziell gut, aber selbst in einer LAN-Umgebung werden Sie bei 10 Mbps Hubs mit zu vielen Kollisionen eine verzerrte oder schlechte Sprachqualität erhalten. Befolgen Sie diese Empfehlungen, um die bestmögliche Sprachqualität zu gewährleisten:
 
-- Use end-to-end QoS if possible or economically feasible. With end-to-end QoS, the voice quality is perfect. No excuses!
-- Avoid using 10/100 Mbps hubs for voice in a production environment. Collisions can impose jitters on the network. Full duplex 10/100 Mbps are preferred because no collisions occur.
-- Use VLANs to separate unnecessary broadcasts of the voice network. You don’t want a virus destroying your voice network with ARP broadcasts.
-- Educate users about expectations in a voice network. Without QoS, don’t state that the voice will be perfect as in most cases it won’t be. A quality of voice similar to a mobile phone will most often be achieved. Use quality phones as problems with firmware and hardware design are common.
+- Verwenden Sie nach Möglichkeit oder bei wirtschaftlicher Machbarkeit End-to-End QoS. Mit End-to-End QoS ist die Sprachqualität perfekt. Keine Ausreden!
+- Vermeiden Sie die Verwendung von 10/100 Mbps Hubs für Sprache in einer Produktionsumgebung. Kollisionen können Jitter im Netzwerk verursachen. Vollduplex 10/100 Mbps sind zu bevorzugen, da keine Kollisionen auftreten.
+- Verwenden Sie VLANs, um unnötige Broadcasts vom Sprachnetzwerk zu trennen. Sie möchten nicht, dass ein Virus Ihr Sprachnetzwerk mit ARP-Broadcasts zerstört.
+- Klären Sie die Benutzer über die Erwartungen an ein Sprachnetzwerk auf. Ohne QoS sollten Sie nicht behaupten, dass die Sprache perfekt sein wird, da dies in den meisten Fällen nicht der Fall sein wird. Eine Sprachqualität ähnlich der eines Mobiltelefons wird meistens erreicht. Verwenden Sie hochwertige Telefone, da Probleme mit Firmware und Hardwaredesign häufig vorkommen.
 
 ## Zusammenfassung
 
-In diesem Kapitel haben Sie die minimalen Hardwareanforderungen sowie das Herunterladen, Installieren und Kompilieren von Asterisk kennengelernt. Asterisk sollte aus Sicherheitsgründen mit einem Nicht‑Root‑Benutzer ausgeführt werden. Sie sollten Ihre Netzwerkumgebung prüfen, bevor Sie die Produktionsumgebung starten.
+In diesem Kapitel haben Sie die minimalen Hardwareanforderungen kennengelernt sowie erfahren, wie man Asterisk herunterlädt, installiert und kompiliert. Aus Sicherheitsgründen sollte Asterisk mit einem Nicht-Root-Benutzer ausgeführt werden. Sie sollten Ihre Netzwerkumgebung überprüfen, bevor Sie die Produktionsumgebung starten.
 
 ## Quiz
 
-1. In Asterisk 22, welcher Channel‑Treiber bietet SIP‑Unterstützung, und was ist mit dem älteren `chan_sip` passiert?
+1. Welcher Channel-Treiber bietet in Asterisk 22 SIP-Unterstützung und was ist mit dem älteren `chan_sip` passiert?
    - A. `chan_sip` ist weiterhin der Standard; `chan_pjsip` ist optional.
-   - B. `chan_pjsip` ist der Standard‑SIP‑Channel; `chan_sip` wurde in Asterisk 21 entfernt und existiert nicht mehr.
-   - C. Beide werden standardmäßig gebaut und Sie wählen zur Laufzeit zwischen ihnen.
-   - D. SIP‑Unterstützung wurde vollständig zugunsten von IAX2 entfernt.
-2. Telephoniekarten für Asterisk besitzen in der Regel integrierte Digital Signal Processor (DSP) und benötigen daher kaum CPU‑Leistung vom PC.
+   - B. `chan_pjsip` ist der Standard-SIP-Channel; `chan_sip` wurde in Asterisk 21 entfernt und existiert nicht mehr.
+   - C. Beide werden standardmäßig erstellt und man wählt zur Laufzeit zwischen ihnen.
+   - D. Die SIP-Unterstützung wurde zugunsten von IAX2 vollständig entfernt.
+2. Telefonie-Schnittstellenkarten für Asterisk verfügen normalerweise über integrierte Digital Signal Processors (DSPs) und benötigen daher kaum CPU-Leistung des PCs.
    - A. Wahr
    - B. Falsch
-3. Wenn Sie perfekte Sprachqualität wollen, müssen Sie End‑to‑End‑Quality of Service (QoS) implementieren.
+3. Wenn Sie eine perfekte Sprachqualität wünschen, müssen Sie ein End-to-End Quality of Service (QoS) implementieren.
    - A. Wahr
    - B. Falsch
-4. Sie sollten immer die neueste Asterisk‑Version wählen, da sie die stabilste ist.
+4. Sie sollten immer die neueste Asterisk-Version wählen, da diese am stabilsten ist.
    - A. Wahr
    - B. Falsch
-5. Was ist der empfohlene Weg, die Build‑Abhängigkeiten für Asterisk 22 zu installieren?
-6. Wenn Sie keine TDM‑Karte besitzen, haben Sie trotzdem eine interne Zeitquelle zur Synchronisation, bereitgestellt vom `res_timing_timerfd`‑Modul unter Linux. Diese Zeitquelle wird von Anwendungen wie ________ und ________ verwendet.
-7. Beim Installieren von Asterisk ist es besser, Desktop‑Umgebungen wie GNOME oder KDE wegzulassen, weil grafische Oberflächen CPU‑Zyklen verbrauchen.
+5. Was ist die empfohlene Methode, um die Build-Abhängigkeiten für Asterisk 22 zu installieren?
+6. Wenn Sie keine TDM-Schnittstellenkarte besitzen, verfügen Sie dennoch über eine interne Zeitquelle zur Synchronisation, die durch das `res_timing_timerfd` Modul unter Linux bereitgestellt wird. Dieses Timing wird von Anwendungen wie ________ und ________ verwendet.
+7. Bei der Installation von Asterisk ist es besser, Desktop-Umgebungen wie GNOME oder KDE wegzulassen, da grafische Oberflächen CPU-Zyklen verbrauchen.
    - A. Wahr
    - B. Falsch
-8. Asterisk‑Konfigurationsdateien befinden sich im Verzeichnis ________.
-9. Um die Asterisk‑Beispielkonfigurationsdateien zu installieren, geben Sie den Befehl ein: ________
-10. Warum ist es wichtig, Asterisk als Nicht‑Root‑Benutzer auszuführen?
+8. Asterisk-Konfigurationsdateien befinden sich im Verzeichnis ________.
+9. Um die Asterisk-Beispielkonfigurationsdateien zu installieren, geben Sie den Befehl ein: ________
+10. Warum ist es wichtig, Asterisk als Nicht-Root-Benutzer auszuführen?
 
-**Answers:** 1 — B · 2 — B · 3 — A · 4 — B · 5 — Run `./contrib/scripts/install_prereq install` from the extracted Asterisk source tree · 6 — ConfBridge and Music on Hold · 7 — A · 8 — `/etc/asterisk` · 9 — `make samples` · 10 — Security (limits the damage if Asterisk is compromised)
+**Antworten:** 1 — B · 2 — B · 3 — A · 4 — B · 5 — Führen Sie `./contrib/scripts/install_prereq install` aus dem entpackten Asterisk-Quellverzeichnis aus · 6 — ConfBridge und Music on Hold · 7 — A · 8 — `/etc/asterisk` · 9 — `make samples` · 10 — Sicherheit (begrenzt den Schaden, falls Asterisk kompromittiert wird)

@@ -1,59 +1,65 @@
-# Using PBX features
+# PBX機能の利用
 
-SIP システムでは、ほとんどの電話機能はエンドポイントで実装されています。さまざまな SIP 電話機やメーカーが存在し、相互運用性は保証されていません。Asterisk 開発チームは、これらの機能の多くを PBX 自体で実装するという素晴らしい仕事を成し遂げ、Asterisk をほぼエンドポイントに依存しないものにしています。しかし、時には同じ機能が電話と Asterisk の両方で実行されていることがあります。電話と PBX の統合は、使いやすさに関する次のフロンティアであり、現在はプロプライエタリシステムが注力している領域です。本章では、これらの機能のほとんどをどのように使用するかを学びます。
+SIPシステムでは、電話機能のほとんどがendpoint側で実装されています。多種多様なSIP電話機やメーカーが存在しており、相互運用性は保証されていません。Asteriskの開発チームは、これらの機能のほとんどをPBX自体に実装するという素晴らしい仕事をしており、Asteriskをほぼendpointに依存しないものにしています。しかし、電話機とAsteriskの両方で同じ機能が実行されている状況に遭遇することもあるでしょう。電話機とPBXの統合は、ユーザビリティにおける次のフロンティアであり、現在プロプライエタリなシステムが注力している分野です。本章では、これらの機能のほとんどを利用する方法を学びます。
 
-## 目的
+## Objectives
 
-- コールパーキング
-- コールピックアップ
-- コール転送
-- コール会議 (ConfBridge)
-- コール録音
-- 保留音楽
+この章を読み終えることで、以下の機能を理解し、使用できるようになります。
 
-## 機能が実装される場所
+- Call Parking
+- Call Pickup
+- Call Transfer
+- Call Conference (ConfBridge)
+- Call Recording
+- Music on hold
 
-まず第一に、PBX の機能が実行されるタイミングと、電話機がすべての処理を行うタイミングを理解することが重要です。たとえば、電話機の TRANSFER ボタンを使用するか、# をダイヤルして（PBX 自体が実行する無条件転送）転送を行うことができます。
+## 機能が実装されている場所
 
-## Asteriskで実装された機能
+何よりもまず、PBXの機能が実行されているタイミングと、電話機側ですべての処理が行われているタイミングの違いを理解することが重要です。例えば、電話機の TRANSFER ボタンを使用して通話を転送する場合と、# をダイヤルして転送する場合（PBX自体によって実行される無条件転送）では、処理の主体が異なります。
 
-- ミュージック・オン・ホールド
-- コール・パーキング
-- コール・ピックアップ
-- コール・レコーディング
-- ConfBridge カンファレンスルーム
-- コール・トランスファー（ブラインドおよびコンサルティブ）
+## Asteriskによって実装される機能
 
-## ダイヤルプランで通常実装される機能
+これらの機能は、AsteriskのコードによってPBX内に実装されています。
 
-- ビジー時の転送
-- 即時転送
-- 応答なし時の転送
-- コールフィルタリング（ブラックリスト）
-- 取り込み拒否
-- 再ダイヤル
+- 保留音 (Music on hold)
+- 通話パーク (Call parking)
+- 通話ピックアップ (Call pickup)
+- 通話録音 (Call recording)
+- ConfBridge会議室 (ConfBridge conference room)
+- 通話転送 (ブラインド転送および相談転送) (Call transfer (blind and consultative))
 
-## 電話で通常実装される機能
+## dialplanで一般的に実装される機能
 
-These features are implemented by the phone’s firmware:
+これらの機能は、Asteriskのdialplan（extensions.conf）でプログラムする必要があります。
 
-![PBX の機能は通常、Asterisk 本体、ダイヤルプラン、または電話側に実装されます](../images/13-pbx-features-fig01.png)
+- 話中時転送（Call forward on busy）
+- 無条件転送（Call forward immediate）
+- 不応答時転送（Call forward on unanswered）
+- 着信フィルタリング（ブラックリスト）
+- おやすみモード（Do not disturb）
+- リダイヤル
 
-- 保留
-- ブラインド転送
-- コンサルティブ転送
-- 三者会議
-- メッセージ待ちインジケータ
+## 電話機側で通常実装される機能
 
-## The features configuration file
+これらの機能は、電話機のファームウェアによって実装されます。
 
-この章で紹介する機能の一部は、features.conf 設定ファイルで構成されています。このファイルを変更することで、いくつかの機能の動作を変更することが可能です。以下に関連する抜粋を示します。この章の次のセクションでは、各機能について説明します。サンプルファイル（Asterisk 22）からの抜粋
+![PBXの機能が通常どこで実装されるか：Asterisk自体、dialplan、または電話機](../images/13-pbx-features-fig01.png)
 
-![The `[featuremap]` section of features.conf, with the default DTMF feature codes](../images/13-pbx-features-fig02.png)
+- Call on hold
+- Blind transfer
+- Consultative transfer
+- Three-way conference
+- Message waiting indicator
 
-Asterisk 12 以降、コールパーキングは `features.conf` から独立したモジュール `res_parking` に移行し、設定は `res_parking.conf` にあります。以下の parking-lot ブロック（`parkext`、`parkpos`、`context`、`parkingtime` など）は `res_parking.conf` にあります。DTMF 機能コード（`parkcall` を含む）を含む `[featuremap]` セクションは `features.conf` に残ります。
+## features設定ファイル
 
-parking-lot のオプションは `res_parking.conf` にあります。名前が `default` のパーキングロットは、設定ファイルに記述がなくても常に存在します。以下の抜粋は Asterisk 22 `res_parking.conf.sample` からのものです：
+本章で紹介する機能の一部は、features.conf設定ファイルで構成されます。このファイルを変更することで、いくつかの機能の動作を変更することが可能です。関連する抜粋を以下に記載しました。本章の次節以降で、各機能について説明します。サンプルファイルからの抜粋（Asterisk 22）
+
+![features.confの`[featuremap]`セクション、デフォルトのDTMF機能コード付き](../images/13-pbx-features-fig02.png)
+
+Asterisk 12以降、コールパーキングは`features.conf`から独立したモジュールである`res_parking`へと移行され、設定は`res_parking.conf`で行われるようになりました。以下のパーキングロットブロック（`parkext`、`parkpos`、`context`、`parkingtime`など）は`res_parking.conf`に記述されます。`[featuremap]`セクション（`parkcall`を含むDTMF機能コード）は`features.conf`に残っています。
+
+パーキングロットのオプションは`res_parking.conf`に記述されます。`default`という名前のパーキングロットは、設定ファイルに存在しない場合でも常に存在します。以下の抜粋はAsterisk 22の`res_parking.conf.sample`から引用したものです：
 
 ```
 ; res_parking.conf
@@ -78,7 +84,7 @@ context => parkedcalls          ; Which context parked calls and the default par
 ;parkedmusicclass = default    ; MOH class to use for the parked channel
 ```
 
-DTMF 機能コード（ワンステップ `parkcall` を含む）は `[featuremap]` セクションの `features.conf` に残ります：
+（ワンステップ`parkcall`を含む）DTMF機能コードは、`features.conf`の`[featuremap]`セクションに残っています：
 
 ```
 ; features.conf
@@ -90,54 +96,53 @@ DTMF 機能コード（ワンステップ `parkcall` を含む）は `[featurema
 ;automixmon => *3               ; One Touch Record a.k.a. Touch MixMonitor -- Make sure to set the X and/or x option in the Dial() or Queue() app call!
 ```
 
-## Call Transfer
+## 通話転送
 
-Call transfer can be implemented by the phone, by ATA, or by Asterisk itself. Refer to your phone manual to understand how calls are transferred. If your phone does not support call transfer, you can use Asterisk to accomplish this task. Call transfer is implemented in two different ways.
+通話転送は、電話機、ATA、またはAsterisk自体によって実装できます。通話の転送方法については、お使いの電話機のマニュアルを参照してください。もしお使いの電話機が通話転送をサポートしていない場合は、Asteriskを使用してこのタスクを実行できます。通話転送には2つの異なる実装方法があります。
 
-The first way is to use the blind transfer feature: dial # followed by the number to be transferred. Sometimes you will use the transfer feature of your IP phone or IP soft phone. You can change the transfer character by editing the blindxfer parameter in the features.conf file.
+1つ目の方法は、ブラインド転送機能を使用することです。# をダイヤルし、続いて転送先の番号を入力します。IP電話機やIP softphoneの転送機能を使用する場合もあります。features.conf ファイル内の blindxfer パラメータを編集することで、転送用の文字を変更できます。
 
-You can enable assisted transfer in Asterisk by removing the ; before the atxfer parameter in the features.conf file. During a conversation, you would press *2. Asterisk will say "transfer" and will give you a dial tone. The caller is sent to music on hold. After you speak to the destination person and hang up the phone, the system bridges the caller to the destination.
+Asteriskでアテンデッド転送を有効にするには、features.conf ファイル内の atxfer パラメータの前にある ; を削除します。通話中に *2 を押すと、Asteriskが「transfer」とアナウンスし、ダイヤルトーンが聞こえます。発信者は保留音（music on hold）の状態になります。転送先の相手と話した後に電話を切ると、システムは発信者と転送先をブリッジします。
 
-![Call transfer: the steps for a blind transfer (press # during the call) and an attended transfer (press *2)](../images/13-pbx-features-fig03.png)
+![通話転送：ブラインド転送（通話中に # を押す）とアテンデッド転送（*2 を押す）の手順](../images/13-pbx-features-fig03.png)
 
-### Configuration task list
+### 設定タスクリスト
 
-1. For a PJSIP endpoint, make sure the option `direct_media` is set to `no` (so the media flows through Asterisk and the feature codes are detected), or use a `t`/`T` option in the `Dial()` application
+1. PJSIP endpoint の場合、オプション `direct_media` が `no` に設定されていることを確認してください（これによりメディアがAsteriskを経由し、機能コードが検出されるようになります）。または、`Dial()` アプリケーションで `t`/`T` オプションを使用してください。
 
 ## Call parking
 
-この機能は通話をパーク（保留）するために使用されます。たとえば、部屋の外で電話に出て、通話をデスクに戻したい場合などに便利です。パーク用の内線に通話をパークすることで実現できます。デスクに戻ったら、パークされた内線番号をダイヤルするだけで通話を取り戻せます。
+この機能は、通話をパーク（保留）するために使用されます。例えば、部屋の外で電話に応答し、その通話を自分のデスクに戻したい場合などに役立ちます。これを実現するには、通話を特定の extension にパークします。デスクに到着したら、パークした extension の番号をダイヤルするだけで、通話を再開できます。
 
-![Call parking: dial 700 to park a call into the first free slot (701–720); Asterisk announces the slot, which you dial from any phone to retrieve the call](../images/13-pbx-features-fig04.png)
+![Call parking: 700をダイヤルして最初の空きスロット（701–720）に通話をパークします。Asteriskがスロット番号をアナウンスし、どの電話機からでもその番号をダイヤルすることで通話を復帰できます](../images/13-pbx-features-fig04.png)
 
-既定では 700 内線が通話のパークに使用されます。会話の最中に # を押して通話を 700 内線に転送します。すると Asterisk がパークされた内線（例: 701 や 702）をアナウンスします。電話を切ると、発信者は保留状態になります。デスクの電話でアナウンスされたパーク内線をダイヤルすれば通話を取り戻せます。発信者が長時間パークされた場合、タイムアウト機能が作動し、元のダイヤル先内線が再び鳴ります。
+デフォルトでは、700という extension が通話のパークに使用されます。通話中に # を押すと、通話が700という extension に転送されます。すると Asterisk が701や702といったパーク先の extension をアナウンスします。電話を切ると、発信者は保留状態になります。デスクの電話機まで移動し、アナウンスされたパーク先の extension をダイヤルすれば、通話を再開できます。発信者が長時間パークされたままの場合、タイムアウト機能が作動し、最初にダイヤルされた extension が再び呼び出されます。
 
 ### Configuration task list
 
-以下の手順に従って通話パークを有効にします。  
-Step 1: ダイヤルプランからパークロットへアクセスできるようにします（必須）。既定のパークロットの `context` は `parkedcalls`（`res_parking.conf`で設定）です。そのコンテキストを、電話がダイヤルするコンテキストに `extensions.conf` で含めます。
+Call parking を有効にするには、以下の手順に従ってください。ステップ1：dialplan から parking lot に到達できるようにします（必須）。デフォルトの parking lot の `context` は `parkedcalls` です（`res_parking.conf` で設定）。その context を、電話機がダイヤルを行う context に含めます（`extensions.conf`）：
 
 ```
 include => parkedcalls
 ```
 
-Step 2: #700 をダイヤルして通話パーク機能をテストします。注意点:
+ステップ2：#700 をダイヤルして Call parking 機能をテストします。注意点：
 
-- パーク内線は `dialplan show` CLI コマンドには表示されません。
-- パーク設定ファイルを変更した後はパークモジュールをリロードする必要があります: `module reload res_parking.so`。`features.conf` の変更後は `module reload features.so`。
-- 通話をパークするには #700 に転送する必要があります。``t`` と ``T`` オプションが ``Dial()`` アプリケーションで有効か確認してください。
+- パーク用の extension は `dialplan show` CLI コマンドには表示されません。
+- parking 設定ファイルを変更した後は、parking モジュールをリロードする必要があります：`module reload res_parking.so`。features.conf を変更した場合は、`module reload features.so` を実行してください。
+- 通話をパークするには、#700 に転送する必要があります。`Dial()` アプリケーションにおける `t` および `T` オプションを確認してください。
 
 ## Call pickup
 
-Call pickup allows you to capture a call from a colleague in the same call group. This would help avoid, for example, having to wake up to take a call that is ringing to another person in your room, but who is not present. By dialing *8, you can capture a call within your call group. This number can be modified in the `features.conf` file.
+Call pickup を使用すると、同じ call group に属する同僚への着信を自分の端末で応答することができます。これは、例えば、同じ部屋にいる別の人の電話が鳴っているものの本人が不在である場合に、わざわざ席を立たなくても電話に出られるようにするのに役立ちます。*8 をダイヤルすることで、自分の call group 内の着信をピックアップできます。この番号は `features.conf` ファイルで変更可能です。
 
-![Call pickup: members can only capture calls within their own group; the operator (pickupgroup=1,2,3) can pick up calls from every group](../images/13-pbx-features-fig05.png)
+![Call pickup: メンバーは自分のグループ内の着信のみをピックアップできます。オペレーター (pickupgroup=1,2,3) はすべてのグループの着信をピックアップできます](../images/13-pbx-features-fig05.png)
 
 ### Configuration task list
 
-Follow the steps below to configure the call pickup feature. Step 1: Configure a call group for your extensions. This is done in the channel configuration file (pjsip.conf, iax.conf, chan_dahdi.conf). For PJSIP endpoints, set `call_group` and `pickup_group` in the endpoint section of `pjsip.conf` (pjsip.conf uses snake_case option names). This task is required.
+Call pickup 機能を設定するには、以下の手順に従ってください。ステップ 1: extension 用の call group を設定します。これはチャネル設定ファイル (pjsip.conf, iax.conf, chan_dahdi.conf) で行います。PJSIP endpoint の場合は、 `pjsip.conf` の endpoint セクションで `call_group` と `pickup_group` を設定します (pjsip.conf では snake_case のオプション名を使用します)。このタスクは必須です。
 
-For PJSIP (pjsip.conf):
+PJSIP (pjsip.conf) の場合:
 ```
 [4x00]
 type=endpoint
@@ -146,7 +151,7 @@ pickup_group=1,2
 ```
 
 
-Step 2: Change the call-pickup feature number (optional). This is set in the `[general]` section of `features.conf`, not in `pjsip.conf`:
+ステップ 2: Call-pickup の機能番号を変更します (オプション)。これは `pjsip.conf` ではなく、 `features.conf` の `[general]` セクションで設定します:
 
 ```
 ; features.conf
@@ -154,31 +159,31 @@ Step 2: Change the call-pickup feature number (optional). This is set in the `[g
 pickupexten = *8   ; Configures the call pickup extension (default is *8)
 ```
 
-## Conference (call conference)
+## Conference (通話会議)
 
-Asterisk でカンファレンスを実装する方法はいくつかあります。最初のオプションは、電話機の三者通話機能を単に使用することです。この機能を電話機で利用すれば、サーバ側でのサポートは必要ありません。ただし、3 人以上のカンファレンスを行いたい場合は、カンファレンスルームを実行する必要があります。Asterisk の最新のカンファレンスアプリケーションは ConfBridge (`app_confbridge`) です。
+Asteriskで会議を実装する方法はいくつかあります。最初の選択肢は、電話機が持つ3者通話機能を使用することです。この機能を使用すれば、サーバー側でのサポートは一切不要です。しかし、3人以上の会議が必要な場合は、会議室（カンファレンスルーム）を運用する必要があります。Asteriskの現代的な会議アプリケーションが ConfBridge (`app_confbridge`) です。
 
-ConfBridge は HD 音声カンファレンスとビデオカンファレンスをサポートします。ビデオカンファレンスにはいくつかの制限があり、トランスコーディングができないため、すべての参加者が同じコーデックとプロファイルを使用しなければなりません。ビデオカンファレンスは「話者追従」モードで、最後に話した人の映像が表示されます。ConfBridge では新しい DTMF メニューを簡単に設定できます。
+ConfBridgeはHD音声会議とビデオ会議をサポートしています。ビデオ会議にはトランスコーディングが行われないという制限がいくつかあり、すべての参加者が同じ codec とプロファイルを使用する必要があります。ビデオ会議では「話者追従（follow-the-talker）」モードが使用され、最後に発言した人の映像が表示されます。ConfBridgeでは、新しい DTMF メニューを簡単に設定できます。
 
-ConfBridge は、Asterisk 19 で非推奨となった従来の MeetMe アプリケーションに取って代わります。MeetMe は Asterisk 22 のソースツリーにはまだ含まれていますが、DAHDI に依存しておりデフォルトではビルドされません。そのため、一般的な PJSIP インストールでは利用できず、ConfBridge がサポートされるカンファレンスアプリケーションとなります。MeetMe とは異なり、ConfBridge は **DAHDI** やハードウェアタイミングソースを必要とせず、Asterisk の組み込みタイミングインターフェース（Linux の場合は`res_timing_timerfd`、または`res_timing_pthread`）に依存します。そのため `dahdi_dummy` モジュールは不要です。古いシステムで `MeetMe()` と `meetme.conf` を使用していた場合は、以下に示すようにそれらを `ConfBridge()` と `confbridge.conf` に置き換えてください。
+ConfBridgeは、Asterisk 19で非推奨となった古い MeetMe アプリケーションに代わるものです。MeetMeは Asterisk 22 のソースツリーにも含まれていますが、DAHDI に依存しておりデフォルトではビルドされないため、一般的な PJSIP インストール環境では単純に使用できません。現在サポートされている会議アプリケーションは ConfBridge です。MeetMeとは異なり、ConfBridgeは DAHDI やハードウェアのタイミングソースを**必要としません**。Asteriskの組み込みタイミングインターフェース（Linux上の`res_timing_timerfd`、または`res_timing_pthread`）に依存しているため、いかなる`dahdi_dummy`モジュールも不要です。もし`MeetMe()`や`meetme.conf`を使用していた古いシステムから移行する場合は、以下で説明するようにそれらを`ConfBridge()`や`confbridge.conf`に置き換えてください。
 
 ### ConfBridge
 
-カンファレンスルームを開始する構文は以下のとおりです。
+会議室を開始するための構文は以下の通りです。
 
 ```
 ConfBridge(conference,bridge_profile,user_profile,menu)
 ```
 
-完全なコマンドの説明を取得するには、`core show application confbridge` を使用します。
+コマンドの詳細な説明については、core show application confbridge を使用してください。
 
-![Output of `core show application confbridge`, showing the synopsis, syntax, and the bridge_profile, user_profile, and menu arguments](../images/13-pbx-features-fig06.png)
+![`core show application confbridge`の出力。シノプシス、構文、および bridge_profile、user_profile、menu の各引数が表示されている](../images/13-pbx-features-fig06.png)
 
-![Several PJSIP endpoints join one named ConfBridge conference (101); one participant is the admin. The mixing and timing are handled by `app_confbridge` together with `bridge_softmix` and the built-in `res_timing_*` timer — no DAHDI required.](../images/13-pbx-features-fig09.png)
+![複数の PJSIP endpoint が1つの名前付き ConfBridge 会議 (101) に参加している様子。参加者の1人が管理者。ミキシングとタイミングは`app_confbridge`が`bridge_softmix`および組み込みの`res_timing_*`タイマーと連携して処理しており、DAHDI は不要。](../images/13-pbx-features-fig09.png)
 
-上記のように、3 つの重要な引数があり、各々が`confbridge.conf`のセクションタイプに対応しています。**bridge_profile**（`type=bridge`セクション）：ここで参加者の最大数（`max_members`）、録音（`record_conference`）、`video_mode`、その他多数のブリッジ全体のパラメータを選択します。
+上記のように、3つの重要な引数があり、それぞれが`confbridge.conf`内のセクションタイプに対応しています。**bridge_profile**（`type=bridge`セクション）では、最大参加者数（`max_members`）、録音（`record_conference`）、`video_mode`、その他多くのブリッジ全体に関わるパラメータを選択します。
 
-ここに全例ファイルをすべて掲載する意味はありませんので、`confbridge.conf` ファイルで bridge_profile を設定する簡単な例を示します。
+ここで例のファイル全体を再現しても意味がないため、confbridge.conf ファイル内で bridge_profile を設定する簡単な例を紹介します。
 
 ```
 [default_bridge]
@@ -187,7 +192,7 @@ max_members=10
 record_conference=yes
 ```
 
-**user_profile**（`type=user`セクション）：ここでユーザーごとに固有のオプションを定義します。たとえば、ユーザーが管理者かどうか（`admin=yes`）、ミュート状態で開始するかどうか（`startmuted=yes`）、ミュージックオンホールドなど、その他多数のユーザー固有オプションがあります。例:
+**user_profile**（`type=user`セクション）では、ユーザーが管理者かどうか（`admin=yes`）、ミュート状態で開始するかどうか（`startmuted=yes`）、保留音、その他多くのユーザーごとのオプションなど、ユーザー固有のオプションを定義します。例：
 
 ```
 [admin_user]
@@ -195,7 +200,7 @@ type=user
 admin=yes
 ```
 
-**menu** (a `type=menu` section): ここで会議のキーパッド（DTMF）マッピングを定義します — たとえばどのキーがミュートの切替、音量調整、会議からの退出を行うかです。 `confbridge.conf.sample` ファイルを確認して利用可能なすべてのアクションを確認してください。 Example:
+**menu**（`type=menu`セクション）では、会議用のキーパッド（DTMF）マッピングを定義します。例えば、どのキーでミュートの切り替え、音量調整、会議からの退出を行うかなどを設定します。利用可能なすべてのアクションについては`confbridge.conf.sample`ファイルを確認してください。例：
 
 ```
 [my_menu]
@@ -211,7 +216,7 @@ type=menu
 
 #### Confbridge 関数
 
-会議ブリッジのオプションは、dial plan で CONFBRIDGE() 関数を使用して動的に渡すことができます。以下の例をご覧ください。
+会議ブリッジのオプションは、dialplan 内で CONFBRIDGE() 関数を使用して動的に渡すことができます。以下の例を参照してください。
 
 ```
 exten => 1,1,Answer()
@@ -221,76 +226,76 @@ exten => 1,n,Set(CONFBRIDGE(user,marked)=yes)
 exten => 1,n,ConfBridge(sales)
 ```
 
-### ConfBridge 管理コマンドと MeetMe からの移行
+### ConfBridge 管理者コマンドと MeetMe からの移行
 
-MeetMe から移行してくる場合、`MeetMeAdmin()` と `a` (admin) オプションで使用していた管理機能は、**admin ユーザープロファイル**（`admin=yes`）と **メニュー** アクションで表現されます。admin プロファイルで参加し、admin アクションを含むメニューを持つ管理者は、キー入力だけで部屋をロックしたり、ユーザーをキックしたり、参加者をミュートにしたりできます。`confbridge.conf` の該当メニューアクションは次のとおりです。
+MeetMeから移行する場合、以前`MeetMeAdmin()`や`a`（管理者）オプションを通じて使用していた管理者機能は、現在では **admin user profile**（`admin=yes`）と **menu** アクションを通じて表現されます。管理者プロファイルと管理者アクションを含むメニューで参加した管理者は、キーパッドから直接、会議室のロック、ユーザーの強制退出、参加者のミュートをライブで行うことができます。`confbridge.conf`における関連メニューアクションは以下の通りです。
 
-- `admin_kick_last` -- 最後に参加したユーザーをキック
-- `admin_toggle_mute_participants` -- 管理者以外の全参加者をミュート/ミュート解除
-- `toggle_mute` -- 自分自身をミュート/ミュート解除
-- `participant_count` -- 参加者数をアナウンス
-- `leave_conference` -- ブリッジを離れ、ダイヤルプランで続行
+- `admin_kick_last` -- 最後に参加したユーザーを強制退出させる
+- `admin_toggle_mute_participants` -- 管理者以外の全参加者をミュート/ミュート解除する
+- `toggle_mute` -- 自分自身をミュート/ミュート解除する
+- `participant_count` -- 参加者数をアナウンスする
+- `leave_conference` -- ブリッジから退出して dialplan の続きを実行する
 
-これらは MeetMe `MeetMe()` オプションフラグ（`a`、`A`、`m`、`M`、`l`、`x`、…）および `MeetMeAdmin()` コマンド（`k`、`K`、`L`、`M`、`N`、…）に取って代わります。最新の PJSIP 環境では `app_meetme` をロードすることはなく、すべての会議設定は `confbridge.conf` にあり、変更は `module reload app_confbridge.so` で適用されます（ConfBridge のロジックは `app_confbridge` にあり、`res_confbridge` モジュールは存在しません）。
+これらは、MeetMeの`MeetMe()`オプションフラグ（`a`、`A`、`m`、`M`、`l`、`x`、…）および`MeetMeAdmin()`コマンド（`k`、`K`、`L`、`M`、`N`、…）に代わるものです。現代的な PJSIP インストール環境では`app_meetme`を読み込む必要は一切ありません。すべての会議設定は`confbridge.conf`に存在し、変更は`module reload app_confbridge.so`で適用されます（ConfBridgeのロジックは`app_confbridge`に存在し、`res_confbridge`モジュールは存在しません）。
 
 ### ConfBridge の例
 
-エクステンション 500 でアクセス可能な会議室を作成するには、`extensions.conf` で次のようにします。
+extension 500 で到達可能な会議室を作成するには、`extensions.conf`で以下のように設定します。
 
 ```
 exten => 500,1,Answer()
  same => n,ConfBridge(101,default_bridge,default_user,sample_user_menu)
 ```
 
-500 をダイヤルした最初の発信者が会議 `101` を作成します；その後の発信者はそれに参加します。ここで参照されているプロファイルとメニュー（`default_bridge`、`default_user`、`sample_user_menu`）は `confbridge.conf` で定義されています。PIN を要求するには、ユーザープロファイルで `pin=` を設定します；参加者を会議管理者にするには、`admin=yes` を持つユーザープロファイルを付与します。
+500 にダイヤルした最初の発信者が会議`101`を作成し、後続の発信者がそれに参加します。ここで参照されているプロファイルとメニュー（`default_bridge`、`default_user`、`sample_user_menu`）は`confbridge.conf`で定義されています。PIN を要求するには user profile で`pin=`を設定し、参加者を会議管理者に設定するには`admin=yes`を含む user profile を割り当ててください。
 
-## Call Recording
+## 通話録音
 
-Asterisk で通話を録音する方法はいくつかあります。通話を簡単に録音するには `MixMonitor()` アプリケーションを使用できます。（2 つの別々のファイルを録音していた古い `Monitor` アプリケーションは削除されました；代わりに `MixMonitor` を使用してください。）
+Asteriskで通話録音を行う方法はいくつかあります。 `MixMonitor()` アプリケーションを使用すると、簡単に通話を録音できます。（2つの別々のファイルを録音していた古い `Monitor` アプリケーションは削除されました。代わりに `MixMonitor` を使用してください。）
 
-### Using the MixMonitor application
+### MixMonitorアプリケーションの使用
 
-`MixMonitor` アプリケーションは、現在のチャンネルの音声を指定されたファイルに録音します。ファイル名が絶対パスの場合はそのパスを使用します。そうでない場合は、asterisk.conf の設定された monitoring ディレクトリにファイルを作成します。
+`MixMonitor` アプリケーションは、現在のチャネルの音声を指定されたファイルに録音します。ファイル名が絶対パスである場合、そのパスが使用されます。それ以外の場合は、asterisk.confで設定されたモニタリングディレクトリ内にファイルが作成されます。
 
-![The MixMonitor() application: records and mixes the audio of a channel to a file, with options for append, bridged-only, and volume adjustment](../images/13-pbx-features-fig09.png)
+![MixMonitor() アプリケーション: チャネルの音声をファイルに録音・ミキシングします。追記、ブリッジのみ、音量調整のオプションがあります](../images/13-pbx-features-fig09.png)
 
 ### MixMonitor()
 
-通話を録音し、録音中に音声をミックスします。構文: `MixMonitor(filename.extension[,options[,command]])`。現在のチャンネルの音声を指定されたファイルに録音します。有効なオプション:
+通話を録音し、録音中に音声をミキシングします。構文: `MixMonitor(filename.extension[,options[,command]])`。現在のチャネルの音声を指定されたファイルに録音します。有効なオプションは以下の通りです。
 
-- a - 上書きせずにファイルに追記します。
-- b - チャンネルがブリッジされている間だけ音声をファイルに保存します。
-- Note: does not include conferences.
-- v(<x>) - 可聴音量を <x> 倍に調整します（範囲は -4 から 4）。
-- V(<x>) - 発話音量を <x> 倍に調整します（範囲は -4 から 4）。
-- W(<x>) - 可聴音量と発話音量の両方を <x> 倍に調整します（範囲は -4 から 4）。
-- <command> は録音が終了したときに実行されます。`^{X}` にマッチする文字列は `${X}` にアンエスケープされ、すべての変数はその時点で評価されます。変数 `MIXMONITOR_FILENAME` には録音に使用されたファイル名が格納されます。
+- a - ファイルを上書きせず、追記します。
+- b - チャネルがブリッジされている間のみ、音声をファイルに保存します。
+- 注: 会議は含まれません。
+- v(<x>) - 可聴音量を <x> 倍（-4から4の範囲）に調整します。
+- V(<x>) - 通話音量を <x> 倍（-4から4の範囲）に調整します。
+- W(<x>) - 可聴音量と通話音量の両方を <x> 倍（-4から4の範囲）に調整します。
+- <command> は録音終了時に実行されます。^{X} に一致する文字列は ${X} にエスケープ解除され、その時点で全ての変数が評価されます。変数 MIXMONITOR_FILENAME には、録音に使用されたファイル名が格納されます。
 
-興味深いリソースとして、ワンタッチ録音機能 `automixmon` があります。これは通話中に相手が DTMF コードをダイヤル（`features.conf` のサンプルでは `*3` が示唆されています；デフォルトは組み込みされていないため設定が必要です）すると、すぐに録音を開始（またはオフに）できます。MixMonitor 上に構築されているため、単一のミックスファイルが生成されます。例:
+興味深いリソースとして、ワンタッチ録音機能 `automixmon` があります。これは、通話中に当事者がDTMFコード（`features.conf` のサンプルでは `*3` が提案されていますが、組み込みのデフォルトはないため設定が必要です）をダイヤルすることで、即座に録音を開始（および停止）できる機能です。これはMixMonitorに基づいて構築されているため、単一のミキシングされたファイルが書き込まれます。例:
 
 ```
 exten => _4XXX,1,Set(DYNAMIC_FEATURES=automixmon)
  same => n,Dial(PJSIP/${EXTEN},20,jtTXx) ; X and x enable one-touch MixMonitor recording
 ```
 
-`X`および`x`オプションは、発信者と受信者それぞれにワンタッチMixMonitor機能を有効にします。MixMonitorは単一の混合ファイルを記録するため、後で別々のIN/OUTファイルを結合する必要はありません（`automon`/`Monitor`方式のように`soxmix`用に2つのファイルを生成した古い手法は、`Monitor`アプリケーションとともに削除されました）。
+`X` および `x` オプションは、それぞれ発信者と着信者に対してワンタッチMixMonitor機能を有効にします。MixMonitorは単一のミキシングされたファイルを録音するため、後で個別のIN/OUTファイルを結合する必要はありません（`soxmix` 用に2つのファイルを作成していた古い `automon`/`Monitor` アプローチは、 `Monitor` アプリケーションと共に削除されました）。
 
-Dial()アプリケーションの前にSet()を使用したくない場合は、globalsセクションでこれを設定できます。
+Dial() アプリケーションの前に Set() を使用したくない場合は、globalsセクションで以下のように設定できます。
 
 ```
 [globals]
 DYNAMIC_FEATURES=automixmon
 ```
 
-### Music on hold
+### 保留音 (Music on hold)
 
-Music on hold (MOH) はバージョン 1.0、1.2、1.4 の間で何度か変更されました。最新バージョンでは、MOH のデフォルトは「FILE-BASED」になっています。つまり、Asterisk は g729、alaw、ulaw、gsm などの形式の MOH ファイルを直接提供します。そのため、音楽をチャンネルに送る前にトランスコードする必要はありません。これにより CPU 時間が節約でき、実運用システムで作業する人にとっては歓迎すべき変更です。
+保留音 (MOH) は、バージョン 1.0、1.2、1.4 の間で何度か変更されました。最新バージョンでは、MOHはデフォルトで "FILE-BASED" になっています。つまり、Asteriskは g729、alaw、ulaw、gsm などの形式でMOHファイルを提供します。そのため、チャネルに送信する前に音楽をトランスコードする必要はありません。これによりプロセッサの時間を節約でき、本番システムを運用するユーザーにとって歓迎すべき変更となっています。
 
-古いバージョンでは、MOH は通常 MP3 で提供されていました（まだそのように設定することも可能です）。MP3 で MOH を提供すると、Asterisk はトランスコードを行わなければならず、貴重な CPU リソースを消費します。
+古いバージョンでは、MOHは通常MP3で提供されていました（現在もそのように設定可能です）。MP3を使用してMOHを提供すると、Asteriskはトランスコードを強制され、貴重なCPUパワーを消費してしまいます。
 
-新しい設定ファイルは以下に示されています。デフォルトクラスは現在、ネイティブファイル形式 mode=files を使用しています。他のモードはすべてコメントアウトされています。各セクションがクラスです。現時点でコメントが外されているクラスは default だけです。異なるファイル用に別のクラスを作成したい場合は、新しいセクション（クラス）を作成する必要があります。
+新しい設定ファイルを以下に示します。デフォルトのクラスがネイティブファイルフォーマットの mode=files を使用していることに注意してください。他の全てのモードはコメントアウトされています。現時点でコメントアウトされていないクラスは default のみです。異なるファイルに対して異なるクラスを持たせたい場合は、新しいセクション（クラス）を作成する必要があります。
 
-![musiconhold.conf のサンプル設定、利用可能な MOH モード（quietmp3、mp3、custom、files、…）を一覧表示](../images/13-pbx-features-fig10.png)
+![musiconhold.conf のサンプル設定。有効なMOHモード（quietmp3、mp3、custom、filesなど）がリストされています](../images/13-pbx-features-fig10.png)
 
 ```
 ; Music on Hold -- Sample Configuration
@@ -352,18 +357,18 @@ directory=/var/lib/asterisk/moh
 ;random=yes     ; Play the files in a random order
 ```
 
-### MOH 設定タスク
+### MOH設定タスク
 
-保留音楽（MOH）を使用するには、チャネル設定ファイル（chan_dahdi.conf、pjsip.conf、iax.conf など）で MOH クラスを設定します。PJSIP エンドポイントの場合、`moh_suggest` を `pjsip.conf` のエンドポイントセクションに設定します（レガシーの`musicclass` オプション名は chan_dahdi や他のチャネルドライバには適用されますが、PJSIP には適用されません）。フリープレイのチューンは現在 wav 形式でインストールされています。インストール時に、利用可能な MOH ファイル形式を（make menuselect を使用して）選択できます。新しい MOH ファイルを追加したい場合は、必要な形式で用意する必要があります。例：
+保留音を使用するには、チャネル設定ファイル（chan_dahdi.conf、pjsip.conf、iax.conf など）でMOHクラスを設定します。PJSIP endpoint の場合は、 `pjsip.conf` の endpoint セクションで `moh_suggest` を設定します（レガシーな `musicclass` オプション名は chan_dahdi やその他のチャネルドライバに適用されるものであり、PJSIPには適用されません）。インストールされるフリープレイの楽曲は現在 wav 形式です。インストール時に（make menuselect を使用して）利用可能なMOHファイル形式を選択できます。新しいMOHファイルを追加したい場合は、必要な形式で提供する必要があります。例:
 
-`/etc/asterisk/chan_dahdi.conf` に `musiconhold` 行を追加します。
+`/etc/asterisk/chan_dahdi.conf` に、 `musiconhold` 行を追加します。
 
 ```
 [channels]
 musiconhold=default
 ```
 
-次に、`/etc/asterisk/musiconhold.conf`を編集してそのクラスを定義します：
+次に、 `/etc/asterisk/musiconhold.conf` を編集してそのクラスを定義します。
 
 ```
 [default]
@@ -371,61 +376,61 @@ mode=files
 directory=/var/lib/asterisk/moh
 ```
 
-ダイヤルプランでは、`StartMusicOnHold`を使用してチャンネルで保留音を開始できます（`StopMusicOnHold`で停止します）。
+dialplan では、 `StartMusicOnHold` でチャネルの保留音を開始し（ `StopMusicOnHold` で停止し）ます。
 
 ```
 exten => 100,1,StartMusicOnHold(default)
  same => n,Dial(PJSIP/2)
 ```
 
-To play music on hold for a fixed time as a quick test, use the `MusicOnHold` application with a duration (in seconds):
+簡単なテストとして一定時間保留音を再生するには、期間（秒単位）を指定して `MusicOnHold` アプリケーションを使用します。
 
 ```
 [local]
 exten => 6601,1,MusicOnHold(default,30)
 ```
 
-## アプリケーションマップ
+## Application Maps
 
-アプリケーションマップを使用すると、features.conf ファイルの `[applicationmap]` セクションを利用して新機能を追加できます。コールセンターで対応する顧客のタイプを識別する必要があるとします。顧客タイプごとにアプリケーションマップを作成すれば、タイプ別に応答した顧客数をカウントできます。
+Application mapsを使用すると、features.confファイルの`[applicationmap]`セクションを使用して新しい機能を追加できます。例えば、コールセンターで応答する顧客のタイプを識別する必要があるとします。顧客タイプごとにapplication mapを作成すれば、タイプごとの応答済み顧客数をカウントできるようになります。
 
-## Summary
+## まとめ
 
-この章では、Asterisk の PBX 機能がどこに実装されているか――コア、ダイヤルプラン、電話機のそれぞれ――と、DTMF 機能コードが `[featuremap]` の `features.conf` セクションでどのようにマッピングされているかを学びました。**call transfer**（ブラインドおよびアテンド）と **call parking**（`res_parking.conf`、`k`/`K` Dial オプションと `parkedcalls` ロット）、**call pickup**（グループ単位）、そして **ConfBridge**（`confbridge.conf` bridge/user/menu プロファイル）による **conferencing**（旧 MeetMe の代替）を設定しました。**MixMonitor**（`automixmon`、`X`/`x` Dial オプション、`DYNAMIC_FEATURES`）を使用した **one-touch recording**、**music on hold** の設定、そして **application maps** によって DTMF シーケンスに独自のダイヤルプランロジックをバインドできる方法も確認しました。これらの構成要素を組み合わせることで、ビジネス PBX がユーザーに期待される日常的な機能を提供できるようになります。
+本章では、AsteriskのPBX機能がどこに存在するか（コア、dialplan、あるいは電話機側）、そしてDTMF機能コードが`features.conf`の`[featuremap]`セクションでどのようにマッピングされているかを学びました。また、**call transfer**（ブラインド転送およびアテンデッド転送）や**call parking**（`res_parking.conf`、および`k`/`K`のDialオプションと`parkedcalls`ロットを使用）、グループによる**call pickup**、そして従来のMeetMeに代わる**ConfBridge**（`confbridge.conf`のbridge/user/menuプロファイル）を使用した**conferencing**の設定を行いました。さらに、MixMonitor（`automixmon`、および`X`/`x`のDialオプションと`DYNAMIC_FEATURES`）を使用した**one-touch recording**の設定、**music on hold**の構成、そして**application maps**を使用して独自のdialplanロジックをDTMFシーケンスにバインドする方法についても解説しました。これらの構成要素を組み合わせることで、ビジネス用PBXとしてユーザーが期待する日常的な機能を提供できるようになります。
 
-## Quiz
+## クイズ
 
-1. Which statements are true about call parking?
-   - A. By default, extension 800 is used for call parking.
-   - B. When you are away from your desk and receive a call, you can park it; the system announces the parking slot, and you dial that slot from any phone to retrieve the call.
-   - C. By default, extension 700 parks a call, and calls are parked in slots 701–720.
-   - D. You dial 700 to retrieve a parked call.
-2. To use the call-pickup feature, all extensions must be in the same ___. For DAHDI channels this is configured in the ___ file.
-3. When transferring a call you can choose between a ___ transfer, where the destination is not consulted first, and an ___ transfer, where you talk to the destination before completing it.
-4. To make an attended (consultative) transfer you use the ___ sequence; for a blind transfer you use ___.
+1. コールパーキングについて正しい記述はどれですか？
+   - A. デフォルトでは、extension 800がコールパーキングに使用されます。
+   - B. 自分のデスクから離れているときに電話を受けた場合、それをパークすることができます。システムがパークスロットをアナウンスし、どの電話機からでもそのスロットにダイヤルすることで通話を再開できます。
+   - C. デフォルトでは、extension 700で通話をパークし、通話は701–720のスロットにパークされます。
+   - D. パークされた通話を再開するには700をダイヤルします。
+2. コールピックアップ機能を使用するには、すべての extension が同じ ___ に属している必要があります。DAHDI チャネルの場合、これは ___ ファイルで設定されます。
+3. 通話を転送する際、宛先に事前に確認を行わない ___ 転送と、完了前に宛先と会話を行う ___ 転送を選択できます。
+4. アテンデッド（相談）転送を行うには ___ シーケンスを使用し、ブラインド転送には ___ を使用します。
    - A. #1, *2
    - B. *2, #1
    - C. #2, #1
    - D. #1, #2
-5. To host conference calls in Asterisk 22, you use the ___ application.
-6. In ConfBridge, a participant is granted administrator privileges (kick, mute others, lock the room) by setting ___ in their user profile (`confbridge.conf`):
+5. Asterisk 22で電話会議をホストするには、___ アプリケーションを使用します。
+6. ConfBridgeにおいて、参加者に管理者権限（キック、他者のミュート、ルームのロック）を付与するには、ユーザープロファイル（`confbridge.conf`）で以下を設定します：
    - A. admin=yes
    - B. marked=yes
    - C. moderator=yes
    - D. type=admin
-7. The best format for music on hold is MP3, because it uses very little processing power on the Asterisk server.
-   - A. True
-   - B. False
-8. To pick up a call from a specific call group, you must be in the matching ___ group.
-9. You can record a call with the MixMonitor() application or the one-touch recording (`automixmon`) feature. In the `features.conf` sample, `automixmon` is mapped to the ___ DTMF sequence.
+7. 保留音（Music on Hold）に最適なフォーマットはMP3です。なぜなら、Asterisk サーバーの処理能力をほとんど消費しないからです。
+   - A. 正
+   - B. 誤
+8. 特定のコールグループから通話をピックアップするには、一致する ___ グループに属している必要があります。
+9. MixMonitor() アプリケーションまたはワンタッチ録音（`automixmon`）機能を使用して通話を録音できます。`features.conf`のサンプルでは、`automixmon`は ___ DTMFシーケンスにマッピングされています。
    - A. *1
    - B. *2
    - C. *3
    - D. #1
-10. In ConfBridge, which `confbridge.conf` user-profile option makes a participant join muted (they can hear the conference but cannot be heard until unmuted)?
+10. ConfBridgeにおいて、参加者をミュート状態で参加させる（会議を聞くことはできるが、ミュート解除されるまで発言できない）ための`confbridge.conf`ユーザープロファイルオプションはどれですか？
     - A. startmuted=yes
     - B. listen=only
     - C. muteall=yes
     - D. quiet=yes
 
-**Answers:** 1 — B, C · 2 — pickup group; `chan_dahdi.conf` · 3 — blind; attended · 4 — B · 5 — ConfBridge() · 6 — A · 7 — B · 8 — pickup · 9 — C · 10 — A
+**回答:** 1 — B, C · 2 — pickup group; `chan_dahdi.conf` · 3 — blind; attended · 4 — B · 5 — ConfBridge() · 6 — A · 7 — B · 8 — pickup · 9 — C · 10 — A

@@ -1,26 +1,28 @@
 # Déploiement, surveillance et mise à l'échelle
 
-Faire répondre Asterisk à un appel dans un laboratoire est une chose ; le faire fonctionner comme un service qui survive aux plantages, redémarrages, mises à jour et attaques — et que vous puissiez observer, sauvegarder et faire évoluer — en est une autre. Ce chapitre porte sur tout ce qui se passe *après* que le dialplan fonctionne. Nous commençons par le superviseur qui maintient Asterisk en vie (systemd), passons à son empaquetage dans un conteneur (en utilisant le laboratoire Docker du livre comme exemple concret), puis abordons la gestion de configuration et les sauvegardes, la surveillance et l’observabilité, et enfin les schémas que vous utilisez lorsque un serveur ne suffit pas : haute disponibilité et mise à l’échelle, ainsi que les réalités de l’hébergement dans le cloud.
+Faire en sorte qu'Asterisk réponde à un appel dans un laboratoire est une chose ; l'exécuter en tant que service capable de survivre aux plantages, redémarrages, mises à jour et attaques — et que vous pouvez observer, sauvegarder et faire évoluer — en est une autre. Ce chapitre traite de tout ce qui se passe *après* que le dialplan fonctionne. Nous commençons par le superviseur qui maintient Asterisk en vie (systemd), passons à son empaquetage dans un conteneur (en utilisant le laboratoire Docker du livre comme exemple pratique), puis nous abordons la gestion de la configuration et les sauvegardes, la surveillance et l'observabilité, et enfin les modèles vers lesquels vous vous tournez lorsqu'un seul serveur ne suffit plus : la haute disponibilité et la mise à l'échelle, ainsi que les réalités de l'hébergement dans le cloud.
 
-Tout ce qui est présenté a été vérifié sur le laboratoire Asterisk 22 du livre dans `lab/` — le même conteneur que vous avez construit tout au long du livre.
+Tout ce qui est présenté est vérifié par rapport au laboratoire Asterisk 22 du livre dans `lab/` — le même conteneur sur lequel vous avez travaillé tout au long du livre.
 
 ## Objectifs
 
-- Exécuter Asterisk 22 de manière fiable sous systemd, en tant qu'utilisateur non root, avec redémarrage automatique
-- Conteneuriser Asterisk avec Docker et comprendre les compromis réseau
-- Conserver `/etc/asterisk` dans le contrôle de version et sauvegarder l'état correct
-- Surveiller un système en cours d'exécution via la CLI, CDR/CEL, AMI/ARI et les métriques
-- Appliquer des modèles de haute disponibilité actif/veille et d'évolutivité horizontale
-- Héberger Asterisk dans le cloud en toute sécurité derrière le NAT et un pare-feu
+À la fin de ce chapitre, vous devriez être capable de :
+
+- Exécuter Asterisk 22 de manière fiable sous systemd, en tant qu'utilisateur non-root, avec redémarrage automatique
+- Conteneuriser Asterisk avec Docker et comprendre les compromis liés au réseau
+- Conserver `/etc/asterisk` dans un système de gestion de versions et sauvegarder l'état approprié
+- Surveiller un système en cours d'exécution via la CLI, les CDR/CEL, l'AMI/ARI et les métriques
+- Appliquer des modèles de haute disponibilité actif/passif et de mise à l'échelle horizontale
+- Héberger Asterisk dans le cloud en toute sécurité derrière un NAT et un pare-feu
 
 ## Exécution d'Asterisk sous systemd
 
-Sur chaque distribution Linux actuelle — Debian 12, Ubuntu 22.04/24.04, Rocky/AlmaLinux 9 — le gestionnaire de services est **systemd**. Le chapitre d'installation a montré que l'étape `make config` (exécutée pendant `make install`) installe un script d'initialisation de distribution (`/etc/init.d/asterisk` sur Debian, un script `rc.d` sur RedHat), que systemd encapsule automatiquement en tant que service ; Asterisk fournit également une unité native systemd sous `contrib/systemd/asterisk.service` que vous pouvez installer à la place pour un contrôle plus fin.  
-Quoi qu'il en soit, systemd est la méthode prise en charge et de production pour exécuter Asterisk. Référez‑vous à *Installing Asterisk 22* pour la compilation elle‑même ; ici nous nous concentrons sur ce que le service vous apporte et sur la façon de le gérer.
+Sur toutes les distributions Linux actuelles — Debian 12, Ubuntu 22.04/24.04, Rocky/AlmaLinux 9 — le gestionnaire de services est **systemd**. Le chapitre sur l'installation a montré que l'étape `make config` (exécutée pendant `make install`) installe un script d'initialisation de distribution (`/etc/init.d/asterisk` sur Debian, un script `rc.d` sur RedHat), que systemd encapsule ensuite automatiquement en tant que service ; Asterisk fournit également une unité systemd native sous `contrib/systemd/asterisk.service` que vous pouvez installer à la place pour un contrôle plus précis.
+Quoi qu'il en soit, systemd est la méthode prise en charge et recommandée pour exécuter Asterisk en production. Reportez-vous à *Installing Asterisk 22* pour la compilation elle-même ; nous nous concentrons ici sur ce que le service vous apporte et sur la manière de l'exploiter.
 
-### L’unité de service et son cycle de vie
+### L'unité de service et son cycle de vie
 
-Une fois que `make config` a installé le service, le cycle de vie est celui de systemd ordinaire :
+Une fois que `make config` a installé le service, le cycle de vie est celui, classique, de systemd :
 
 ```
 systemctl enable asterisk     # start automatically at boot
@@ -33,12 +35,12 @@ journalctl -u asterisk        # service logs via the journal
 
 Quelques notes opérationnelles :
 
-- **`restart` vs. un rechargement gracieux.** `systemctl restart` arrête le processus et coupe tous les appels. Pour des changements de configuration, vous ne voulez presque jamais cela — utilisez plutôt l’interface CLI d’Asterisk : `asterisk -rx 'core reload'` (ou un rechargement spécifique à un module tel que `pjsip reload`). Réservez `systemctl restart` pour les mises à jour ou un processus bloqué.
-- **Se connecter au démon en cours d’exécution.** Avec Asterisk fonctionnant comme service, ouvrez sa console avec `asterisk -r` (ou `asterisk -rvvv` pour une sortie verbeuse). Cela se connecte au démon déjà lancé via son socket de contrôle ; cela ne démarre pas une seconde copie.
+- **`restart` par rapport à un rechargement en douceur.** `systemctl restart` arrête le processus et interrompt tous les appels. Pour des modifications de configuration, vous ne voulez presque jamais cela — utilisez plutôt la CLI d'Asterisk : `asterisk -rx 'core reload'` (ou un rechargement spécifique à un module tel que `pjsip reload`). Réservez `systemctl restart` pour les mises à niveau ou si le processus est bloqué.
+- **Se connecter au démon en cours d'exécution.** Avec Asterisk fonctionnant en tant que service, ouvrez sa console avec `asterisk -r` (ou `asterisk -rvvv` pour une sortie détaillée). Cela se connecte au démon déjà en cours d'exécution via son socket de contrôle ; cela ne démarre pas une seconde instance.
 
 ### `Restart=` remplace safe_asterisk
 
-Historiquement, Asterisk était lancé via le wrapper **safe_asterisk**, un script shell qui relançait Asterisk en cas de plantage. Sous systemd, cette tâche appartient à la directive `Restart=` de l’unité — systemd remarque la sortie du processus et le relance, avec un délai de reprise contrôlé par `RestartSec=` et une protection contre les boucles de plantage assurée par `StartLimitIntervalSec=`/`StartLimitBurst=`. Ainsi, sur un hôte systemd, **safe_asterisk est remplacé** et généralement inutile. Si votre unité fournie ne le définit pas déjà, un remplacement « drop‑in » est la façon propre d’ajouter un redémarrage en cas d’échec sans modifier le fichier empaqueté :
+Historiquement, Asterisk était lancé via le wrapper **safe_asterisk**, un script shell qui relançait Asterisk s'il plantait. Sous systemd, cette tâche appartient à la directive `Restart=` de l'unité — systemd détecte la sortie du processus et le relance, avec un délai contrôlé par `RestartSec=` et une protection contre les boucles de plantage par `StartLimitIntervalSec=`/`StartLimitBurst=`. Ainsi, sur un hôte systemd, **safe_asterisk est obsolète** et généralement inutile. Si votre unité fournie ne le définit pas déjà, un fichier de remplacement (drop-in) est la méthode propre pour ajouter un redémarrage en cas d'échec sans modifier le fichier fourni par le paquet :
 
 ```
 # /etc/systemd/system/asterisk.service.d/override.conf
@@ -47,13 +49,13 @@ Restart=always
 RestartSec=2
 ```
 
-Appliquez‑le avec `systemctl daemon-reload && systemctl restart asterisk`. Utiliser un « drop‑in » (plutôt que de modifier l’unité installée) signifie qu’une future `make config` ne remplacera pas votre modification.
+Appliquez-le avec `systemctl daemon-reload && systemctl restart asterisk`. L'utilisation d'un fichier de remplacement (plutôt que la modification de l'unité installée) signifie qu'une future mise à jour `make config` n'écrasera pas votre modification.
 
-### Exécution en tant qu’utilisateur non‑root
+### Exécution en tant qu'utilisateur non privilégié
 
-Asterisk ne doit pas être exécuté en tant que root en production — un bug de code à distance dans un processus fonctionnant en tant que root compromet tout l’hôte, alors que le même bug dans un processus non privilégié reste confiné. Deux endroits complémentaires appliquent cette règle :
+Asterisk ne devrait pas s'exécuter en tant que root en production — un bug de code distant dans un processus s'exécutant en tant que root constitue une compromission totale de l'hôte, alors que le même bug dans un processus sans privilèges est contenu. Il existe deux endroits complémentaires où cela est appliqué :
 
-- **L’unité / asterisk.conf.** L’unité empaquetée exécute normalement Asterisk en tant qu’utilisateur et groupe `asterisk`. Vous pouvez également (ou à la place) définir `runuser` et `rungroup` dans la section `[options]` de `asterisk.conf`, que le démon respecte lorsqu’il abandonne les privilèges après la liaison :
+- **L'unité / asterisk.conf.** L'unité fournie exécute normalement Asterisk en tant qu'utilisateur et groupe `asterisk`. Vous pouvez également (ou à la place) définir `runuser` et `rungroup` dans la section `[options]` de `asterisk.conf`, ce que le démon respecte lorsqu'il abandonne ses privilèges après la liaison :
 
   ```
   [options]
@@ -61,26 +63,22 @@ Asterisk ne doit pas être exécuté en tant que root en production — un bug
   rungroup = asterisk
   ```
 
-- **Propriété des fichiers.** Les répertoires d’exécution doivent être accessibles en écriture par cet utilisateur. Après avoir créé le compte, assurez‑vous de la propriété :
+- **Propriété des fichiers.** Les répertoires d'exécution doivent être accessibles en écriture par cet utilisateur. Après avoir créé le compte, assurez-vous de la propriété :
 
   ```
   chown -R asterisk:asterisk /var/lib/asterisk /var/log/asterisk \
         /var/spool/asterisk /var/run/asterisk /etc/asterisk
   ```
 
-Comme SIP (5060) et RTP (10000+) utilisent tous des ports élevés, Asterisk **n’a pas besoin** de root pour les lier — seuls les ports privilégiés de type 25 nécessiteraient root, ce qu’Asterisk n’utilise pas. L’exécution non privilégiée est donc sans contrainte. (Le chapitre Sécurité développe pourquoi cela importe ; voir *Asterisk Security*.)
+Comme SIP (5060) et RTP (10000+) sont tous des ports élevés, Asterisk n'a **pas** besoin de root pour les lier — seuls les ports privilégiés de type port 25 en auraient besoin, ce qu'Asterisk n'utilise pas. L'exécution sans privilèges est donc gratuite. (Le chapitre sur la sécurité explique pourquoi cela est important ; voir *Asterisk Security*.)
 
-## Containerizing Asterisk
+## Conteneurisation d'Asterisk
 
-Un conteneur regroupe Asterisk et ses dépendances exactes dans une image immuable, de sorte que
-ce que vous testez est exactement le même bit‑pour‑bit que ce que vous livrez. Le compromis porte sur le média en temps réel : un serveur SIP est sensible à la latence et nécessite une large plage prévisible de ports UDP accessibles depuis l’extérieur, et le réseau des conteneurs peut interférer. Le reste de
-cette section parcourt le laboratoire du livre — `lab/Dockerfile` et
-`lab/docker-compose.yml` — comme exemple concret et fonctionnel, puis explique le seul
-piège que tout le monde rencontre : RTP et le réseau en pont.
+Un conteneur regroupe Asterisk et ses dépendances exactes dans une image immuable, de sorte que ce que vous testez est identique octet pour octet à ce que vous déployez. Le compromis concerne les médias en temps réel : un serveur SIP est sensible à la latence et nécessite une plage large et prévisible de ports UDP accessibles depuis l'extérieur, ce que la mise en réseau des conteneurs peut entraver. Le reste de cette section présente le laboratoire du livre — `lab/Dockerfile` et `lab/docker-compose.yml` — comme un exemple concret et fonctionnel, puis explique le piège dans lequel tout le monde tombe : le RTP et la mise en réseau en mode pont (bridged).
 
-### The image: building Asterisk from source
+### L'image : compiler Asterisk à partir des sources
 
-Le `Dockerfile` du laboratoire compile Asterisk 22 à partir des sources sur Debian 12. Sa forme vaut la peine d’être lue même si vous n’en écrivez jamais un vous‑même :
+Le `Dockerfile` du laboratoire compile Asterisk 22 à partir des sources sur Debian 12. Sa structure mérite d'être étudiée, même si vous n'en écrivez jamais vous-même :
 
 ```dockerfile
 FROM debian:12-slim
@@ -110,21 +108,13 @@ CMD ["asterisk", "-f", "-vvv"]
 
 Trois points à souligner :
 
-- **La version est figée** (`ARG ASTERISK_VERSION=22.10.0`). La reproductibilité est le
-  but même de la containerisation — augmentez‑la délibérément, reconstruisez, retestez.
-- **`--with-pjproject-bundled` et `--with-jansson-bundled`** construisent la pile SIP
-  avec une version correspondant à Asterisk, de sorte que vous dépendez de moins de paquets apt et n’avez jamais à combattre un
-  PJSIP de la distribution qui serait désynchronisé.
-- **`CMD ["asterisk", "-f", "-vvv"]`** exécute Asterisk au *premier plan* (`-f`, « ne pas
-  fork »). C’est la différence clé avec un hôte systemd : le processus principal d’un conteneur
-  ne doit pas se daemoniser, sinon le conteneur se terminerait immédiatement. Ainsi, dans un conteneur vous
-  **ne** utilisez pas du tout l’unité systemd — le runtime du conteneur (Docker, plus la politique `restart:`)
-  devient le superviseur que l’unité `Restart=` était sur une VM.
+- **La version est figée** (`ARG ASTERISK_VERSION=22.10.0`). La reproductibilité est tout l'intérêt de la conteneurisation : augmentez-la délibérément, reconstruisez, retestez.
+- **`--with-pjproject-bundled` et `--with-jansson-bundled`** compilent la pile SIP avec une version adaptée à Asterisk, ce qui vous permet de dépendre de moins de paquets apt et d'éviter les conflits avec un PJSIP de distribution qui ne serait pas à jour.
+- **`CMD ["asterisk", "-f", "-vvv"]`** exécute Asterisk au *premier plan* (`-f`, "do not fork"). C'est la différence clé par rapport à un hôte systemd : le processus principal d'un conteneur ne doit pas se transformer en démon, sinon le conteneur s'arrêterait immédiatement. Ainsi, dans un conteneur, vous n'utilisez **pas** du tout l'unité systemd — le moteur de conteneur (Docker, plus la politique `restart:`) devient le superviseur que le `Restart=` de l'unité était sur une VM.
 
-### Montage‑bind `/etc/asterisk`
+### Montage par liaison (bind-mount) de `/etc/asterisk`
 
-L’image contient délibérément **aucune** configuration. À la place, `docker-compose.yml`
-monte en bind le répertoire de configuration de l’hôte dans :
+L'image ne contient délibérément **aucune** configuration. À la place, `docker-compose.yml` monte par liaison le répertoire de configuration de l'hôte :
 
 ```yaml
 services:
@@ -140,13 +130,13 @@ services:
       - "10000-10100:10000-10100/udp"
 ```
 
-`./asterisk/etc:/etc/asterisk:ro` mappe le répertoire versionné `lab/asterisk/etc` sur le `/etc/asterisk` du conteneur, en lecture seule (`:ro`). Le gain est important : l’image reste immuable et réutilisable, tandis que la configuration vit sur l’hôte où elle peut être modifiée et, surtout, conservée dans git (section suivante). Pour appliquer un changement de configuration, vous modifiez le fichier et rechargez — `docker compose exec asterisk asterisk -rx 'core reload'` — sans reconstruction. `restart: unless-stopped` est l’équivalent au niveau compose de systemd's `Restart=` : Docker redémarre le conteneur si Asterisk se termine, mais pas si vous l’arrêtez délibérément.
+`./asterisk/etc:/etc/asterisk:ro` mappe le répertoire `lab/asterisk/etc` sous contrôle de version vers le `/etc/asterisk` du conteneur, en lecture seule (`:ro`). Le bénéfice est important : l'image reste immuable et réutilisable, tandis que la configuration réside sur l'hôte où elle peut être modifiée et, surtout, conservée dans git (section suivante). Pour appliquer une modification de configuration, vous éditez le fichier et rechargez — `docker compose exec asterisk asterisk -rx 'core reload'` — sans reconstruction. `restart: unless-stopped` est l'équivalent au niveau de compose du `Restart=` de systemd : Docker redémarre le conteneur si Asterisk s'arrête, mais pas si vous l'avez arrêté délibérément.
 
-### Hôte vs. réseau ponté — le problème RTP
+### Mise en réseau hôte vs pont — le problème du RTP
 
-Ceci est le problème le plus courant avec Asterisk conteneurisé, il vaut donc la peine de le comprendre précisément. Par défaut Docker place un conteneur sur un réseau **bridged** et vous publiez des ports individuels avec `ports:`. La signalisation fonctionne — 5060 est un port. Le problème est le média : RTP utilise une *plage* de ports UDP (le `rtp.conf` du laboratoire définit `rtpstart=10000` / `rtpend=10100`), et **chaque** port pouvant transporter de l’audio doit être publié.
+C'est l'échec le plus courant avec Asterisk conteneurisé, il vaut donc la peine d'être compris précisément. Par défaut, Docker place un conteneur sur un réseau en **mode pont** (bridged) et vous publiez des ports individuels avec `ports:`. La signalisation fonctionne bien — 5060 est un port unique. Le problème concerne les médias : le RTP utilise une *plage* de ports UDP (le `rtp.conf` du laboratoire définit `rtpstart=10000` / `rtpend=10100`), et **chaque** port susceptible de transporter de l'audio doit être publié.
 
-Le laboratoire fait exactement cela :
+Le laboratoire fait exactement cela :
 
 ```yaml
     ports:
@@ -154,32 +144,16 @@ Le laboratoire fait exactement cela :
       - "10000-10100:10000-10100/udp"
 ```
 
-Notez que la plage de publication RTP (`10000-10100`) correspond exactement à `rtp.conf`. Faites une erreur —
-publiez trop peu de ports, ou une plage différente de `rtp.conf` — et les appels se connectent mais
-ont **un son à sens unique ou aucun son**, parce que les paquets RTP atterrissent sur un port que Docker ne
-transmet pas. Deux autres précautions avec le mode pont :
+Notez que la plage de publication RTP (`10000-10100`) correspond exactement à `rtp.conf`. Si vous vous trompez — en publiant trop peu de ports, ou une plage différente de `rtp.conf` — les appels se connecteront mais vous aurez de l'**audio unidirectionnel ou inexistant**, car les paquets RTP arrivent sur un port que Docker ne redirige pas. Deux précautions supplémentaires avec le mode pont :
 
-- **Publier des milliers de ports est lent et lourd.** Une plage RTP de production est
-  généralement de 10000 à 20000. Docker crée ~10000 proxys userland est coûteux au
-  démarrage et ajoute un saut dans le chemin média. Le laboratoire garde une plage
-  délibérément petite de 100 ports parce qu’il ne lance jamais plus d’un ou deux appels de test.
-- **NAT dans le SDP.** Derrière le pont, Asterisk voit l’adresse IP privée du conteneur et peut
-  la publier dans le SDP. Sur un hôte public, vous devez indiquer à PJSIP son adresse externe avec
-  `external_media_address` / `external_signaling_address` sur le transport (et définir
-  `local_net`), exactement comme vous le feriez derrière n’importe quel NAT — voir *Cloud hosting* ci‑dessous.
+- **Publier des milliers de ports est lent et lourd.** Une plage RTP de production est généralement comprise entre 10000 et 20000. La création par Docker d'environ 10000 redirections de proxy en espace utilisateur est coûteuse au démarrage et ajoute un saut dans le chemin des médias. Le laboratoire conserve une plage délibérément petite de 100 ports car il n'exécute qu'un ou deux appels de test.
+- **NAT dans le SDP.** Derrière le pont, Asterisk voit son IP de conteneur privée et peut l'annoncer dans le SDP. Sur un hôte public, vous devez indiquer à PJSIP son adresse externe avec `external_media_address` / `external_signaling_address` sur le transport (et définir `local_net`), exactement comme vous le feriez derrière n'importe quel NAT — voir *Hébergement cloud* ci-dessous.
 
-L’alternative est **host networking** (`network_mode: host`), qui supprime complètement le pont : le conteneur partage la pile réseau de l’hôte, ainsi le 5060 et toute la plage RTP sont accessibles sans publication de ports et sans saut média supplémentaire. C’est le
-mode recommandé pour un vrai conteneur Asterisk — il contourne complètement le problème de plage RTP. Son coût est l’isolation : le conteneur peut lier n’importe quel port de l’hôte et vous perdez le réseau par service de compose. (Le host networking est une fonctionnalité Linux ; sous Docker Desktop
-pour macOS/Windows il se comporte différemment, ce qui explique en partie pourquoi ce laboratoire pédagogique utilise
-des ports publiés explicitement à la place.)
+L'alternative est la **mise en réseau hôte** (`network_mode: host`), qui supprime complètement le pont : le conteneur partage la pile réseau de l'hôte, de sorte que le port 5060 et toute la plage RTP sont accessibles sans publication de port et sans saut média supplémentaire. C'est le mode recommandé pour un conteneur Asterisk réel — il évite complètement le problème de la plage RTP. Son coût est l'isolation : le conteneur peut se lier à n'importe quel port de l'hôte et vous perdez le réseau par service de compose. (La mise en réseau hôte est une fonctionnalité Linux ; sur Docker Desktop pour macOS/Windows, elle se comporte différemment, ce qui explique en partie pourquoi ce laboratoire pédagogique utilise des ports publiés explicitement.)
 
-### Volumes persistants pour spool et voicemail
+### Volumes persistants pour le spool et la messagerie vocale
 
-La couche writable d’un conteneur est **éphémère** — détruisez le conteneur et tout ce qu’il
-a écrit disparaît. Pour Asterisk, cela signifie que la messagerie vocale, les enregistrements, le spool des appels sortants
-et la base de données locale disparaîtraient à chaque `docker compose up --build`. La configuration
-survit parce qu’elle est bind‑montée depuis l’hôte ; *l’état* nécessite le même traitement.
-À l’intérieur du conteneur, les arbres pertinents sont :
+La couche inscriptible d'un conteneur est **éphémère** — détruisez le conteneur et tout ce qu'il a écrit disparaît. Pour Asterisk, cela signifie que la messagerie vocale, les enregistrements, la file d'attente des appels sortants et la base de données locale disparaîtraient à chaque `docker compose up --build`. La configuration survit car elle est montée par liaison depuis l'hôte ; l'*état* nécessite le même traitement. À l'intérieur du conteneur, les arborescences pertinentes sont :
 
 ```
 /var/spool/asterisk        # voicemail, monitor recordings, outgoing/, etc.
@@ -187,10 +161,7 @@ survit parce qu’elle est bind‑montée depuis l’hôte ; *l’état* néce
 /var/log/asterisk          # full, messages, security, cdr-csv/, cel-custom/
 ```
 
-(The lab's running container shows exactly these — `/var/spool/asterisk` contains
-`voicemail`, `monitor`, `outgoing`, `recording`; `/var/lib/asterisk` holds
-`astdb.sqlite3`.) To preserve them, mount named volumes for the directories that hold
-state you care about:
+(Le conteneur en cours d'exécution du laboratoire montre exactement celles-ci — `/var/spool/asterisk` contient `voicemail`, `monitor`, `outgoing`, `recording` ; `/var/lib/asterisk` contient `astdb.sqlite3`.) Pour les préserver, montez des volumes nommés pour les répertoires qui contiennent l'état qui vous importe :
 
 ```yaml
     volumes:
@@ -205,64 +176,70 @@ volumes:
   ast-log:
 ```
 
-Le laboratoire d'enseignement omet ceux‑ci exprès — il est sans état et reproductible par conception, donc chaque `up` est une ardoise vierge — mais un conteneur de production **doit** les avoir, sinon vous perdrez la messagerie vocale lors du premier redéploiement.
+Le laboratoire pédagogique les omet volontairement — il est sans état et reproductible par conception, donc chaque `up` est une page blanche — mais un conteneur de production **doit** les avoir, sinon vous perdrez la messagerie vocale dès le premier redéploiement.
 
 ## Gestion de la configuration et sauvegardes
 
-Le bind‑mount ci‑dessus indique le bon modèle : traiter `/etc/asterisk` comme **code** et le reste comme **données**.
+Le bind-mount ci-dessus suggère le bon modèle : traitez `/etc/asterisk` comme du **code** et
+le reste comme des **données**.
 
-### Conserver `/etc/asterisk` sous contrôle de version
+### Gardez `/etc/asterisk` sous contrôle de version
 
-Le répertoire de configuration est un ensemble plat de fichiers texte sans secrets qui ne peuvent pas être templatisés — il est idéal pour git. Initialise un dépôt dans `/etc/asterisk` (ou, comme le laboratoire le fait, garde la configuration à côté du projet et bind‑mount‑le). Avantages :
+Le répertoire de configuration est un ensemble plat de fichiers texte sans secrets qui ne peuvent pas être
+templatés — il est idéal pour git. Initialisez un dépôt dans `/etc/asterisk` (ou, comme le
+fait le labo, gardez la configuration à côté du projet et montez-la via un bind-mount). Avantages :
 
 - Chaque modification est révisable et réversible (`git diff`, `git revert`).
-- Vous disposez d’une trace d’audit indiquant qui a changé quoi et quand.
-- Combiné avec une image de conteneur, un commit de configuration connu‑bon plus une balise d’image figée décrit entièrement un déploiement.
+- Vous disposez d'une piste d'audit de qui a modifié quoi et quand.
+- Combiné avec une image de conteneur, un commit de configuration connu comme fonctionnel plus une balise d'image épinglée
+  décrivent entièrement un déploiement.
 
-Quelques mises en garde spécifiques à la configuration d’Asterisk :
+Quelques précautions spécifiques à la configuration d'Asterisk :
 
 - **Secrets.** `pjsip.conf` (et `manager.conf`, `ari.conf`) contiennent des mots de passe. Ne
-  commettez pas de vrais secrets dans un dépôt partagé en texte clair — templatez‑les (un fichier par
-  environnement, ou un gestionnaire de secrets / substitution d’environnement au moment du déploiement) et ne conservez
-  que des espaces réservés dans git. Les mots de passe de style `Lab-6001-secret` du laboratoire sont acceptables
-  *uniquement* parce qu’ils résident sur un sous‑réseau Docker privé.
-- **Templatisation par environnement.** Les valeurs en temps réel qui diffèrent entre dev, staging
-  et production (adresses de bind, IP externes, identifiants de trunk, URL de bases de données) sont
-  exactement les lignes que vous templatez, en gardant le gros du fichier de configuration identique entre
-  les environnements.
+  committez pas de vrais secrets dans un dépôt partagé en texte clair — templatez-les (un fichier par
+  environnement, ou un gestionnaire de secrets / substitution d'environnement au moment du déploiement) et gardez
+  uniquement des espaces réservés dans git. Les mots de passe triviaux de style `Lab-6001-secret` du labo sont acceptables
+  *uniquement* parce qu'ils résident sur un sous-réseau Docker privé.
+- **Templating par environnement.** Les valeurs realtime qui diffèrent entre le dev, la staging
+  et la production (adresses de bind, IP externes, identifiants de trunk, URL de base de données) sont
+  exactement les lignes que vous devez templatiser, en gardant la majeure partie de la configuration identique entre les
+  environnements.
 
-### Ce qu’il faut sauvegarder
+### Que sauvegarder
 
-La configuration dans git couvre le dialplan et les endpoints, mais un PBX en fonctionnement accumule
-*un état* qui n’est présent dans aucun fichier de configuration. Une sauvegarde complète comprend :
+La configuration dans git couvre le dialplan et les endpoints, mais un PBX en production accumule
+de l'**état** qui ne se trouve dans aucun fichier de configuration. Une sauvegarde complète comprend :
 
 | Quoi | Où | Pourquoi |
-|------|----|----------|
+|------|-------|-----|
 | Configuration | `/etc/asterisk/` | dialplan, endpoints (également dans git) |
-| Messagerie vocale & enregistrements | `/var/spool/asterisk/` | données utilisateur — irremplaçables |
-| Base de données interne | `/var/lib/asterisk/astdb.sqlite3` | clés `DB()`, état des appareils |
+| Voicemail & enregistrements | `/var/spool/asterisk/` | données utilisateur — irremplaçables |
+| Base de données interne | `/var/lib/asterisk/astdb.sqlite3` | clés `DB()`, état des périphériques |
 | CDR / CEL | `/var/log/asterisk/cdr-csv/` ou stockage SQL | facturation & historique |
-| Bases de données externes | votre MySQL/PostgreSQL | realtime, CDR, messagerie vocale |
+| Bases de données externes | votre MySQL/PostgreSQL | realtime, CDR, voicemail |
 
-L’**astdb** mérite une note : c’est le petit magasin clé/valeur intégré d’Asterisk (un fichier SQLite à `/var/lib/asterisk/astdb.sqlite3`) utilisé par les fonctions de dialplan `DB()`,
-les états des appareils, les paramètres follow‑me et similaires. Vous pouvez le dumper pour inspection ou sauvegarde
+L'**astdb** mérite une mention : il s'agit du petit magasin clé/valeur intégré d'Asterisk (un
+fichier SQLite à `/var/lib/asterisk/astdb.sqlite3`) utilisé par les fonctions de dialplan `DB()`,
+les états des périphériques, les paramètres de suivi d'appel et similaires. Vous pouvez le dumper pour inspection ou sauvegarde
 depuis la CLI :
 
 ```
 asterisk -rx 'database show'
 ```
 
-Si votre CDR/CEL ou votre messagerie vocale ou la configuration PJSIP résident dans une base de données externe (voir
-*Asterisk Real-Time* et *Asterisk Call Detail Records*), cette base de données devient la source de vérité pour ces données et doit figurer dans votre rotation habituelle de sauvegardes de bases de données —
-sauvegarder uniquement `/etc/asterisk` n’est pas suffisant.
+Si vos CDR/CEL ou votre voicemail ou votre configuration PJSIP résident dans une base de données externe (voir
+*Asterisk Real-Time* et *Asterisk Call Detail Records*), cette base de données est désormais la
+source de vérité pour ces données et doit être incluse dans votre rotation de sauvegarde de base de données habituelle —
+sauvegarder `/etc/asterisk` seul ne suffit pas.
 
-## Monitoring and observability
+## Surveillance et observabilité
 
-Vous ne pouvez pas gérer ce que vous ne voyez pas. Asterisk expose son état à quatre niveaux, d’un coup d’œil humain rapide à un pipeline de métriques : le **CLI**, les enregistrements **CDR/CEL**, les événements **AMI/ARI**, et les **metrics exporters**.
+Vous ne pouvez pas exploiter ce que vous ne pouvez pas voir. Asterisk expose son état à quatre niveaux, allant d'un coup d'œil humain rapide à un pipeline de métriques : la **CLI**, les enregistrements **CDR/CEL**, les événements **AMI/ARI** et les **exportateurs de métriques**.
 
-### CLI health checks
+### Vérifications de santé via la CLI
 
-Le test le plus rapide « est‑il en bonne santé ? » est le CLI. Les commandes ci‑dessous sont exécutées en direct contre le laboratoire. Channels first:
+La vérification la plus rapide pour savoir si le système est sain est la CLI. Les commandes ci-dessous sont exécutées en direct sur le laboratoire. D'abord les canaux :
 
 ```
 *CLI> core show channels
@@ -272,7 +249,7 @@ Channel              Location             State   Application(Data)
 0 calls processed
 ```
 
-`0 active calls` sur un système calme est normal ; sur un système chargé, c’est votre concurrence en temps réel. `core show uptime` confirme que le processus ne redémarre pas sous vous :
+`0 active calls` sur un système calme est normal ; sur un système chargé, il s'agit de votre concurrence en temps réel. `core show uptime` confirme que le processus n'a pas redémarré à votre insu :
 
 ```
 *CLI> core show uptime
@@ -280,7 +257,7 @@ System uptime: 1 hour, 40 minutes, 19 seconds
 Last reload: 12 minutes, 32 seconds
 ```
 
-Pour la santé SIP, `pjsip show endpoints` montre chaque endpoint et si ses contacts enregistrés sont accessibles. D'après le laboratoire:
+Pour la santé SIP, `pjsip show endpoints` affiche chaque endpoint et indique si ses contacts enregistrés sont joignables. Depuis le laboratoire :
 
 ```
 *CLI> pjsip show endpoints
@@ -300,11 +277,11 @@ Pour la santé SIP, `pjsip show endpoints` montre chaque endpoint et si ses cont
 Objects found: 4
 ```
 
-`Unavailable` signifie simplement qu’aucun téléphone n’est actuellement enregistré sur ces endpoints (le laboratoire n’a aucun client en ligne) — une fois qu’un softphone s’enregistre et que `qualify` le confirme, l’état indique que le contact est joignable. Commandes associées : `pjsip show contacts` (enregistrements actuels et temps de trajet aller‑retour), `pjsip show transports`, et `pjsip show aor <name>` pour un AOR. Ce sont les outils du quotidien pour « pourquoi l’extension X n’est‑elle pas joignable ? ».
+`Unavailable` ici signifie simplement qu'aucun téléphone n'est actuellement enregistré auprès de ces endpoints (le laboratoire n'a pas de clients actifs) — une fois qu'un softphone s'enregistre et que `qualify` le confirme, l'état affiche le contact comme joignable. Commandes complémentaires : `pjsip show contacts` (enregistrements actuels et temps de réponse), `pjsip show transports` et `pjsip show aor <name>` pour un AOR. Ce sont les outils quotidiens pour répondre à la question « pourquoi l'extension X est-elle injoignable ? ».
 
 ### CDR et CEL
 
-Chaque appel génère un **Call Detail Record** (CDR) ; **Channel Event Logging** (CEL) ajoute des événements plus fins par canal. Vérifiez que le CDR est actif et quel backend le stocke :
+Chaque appel laisse un **Call Detail Record** (CDR) ; le **Channel Event Logging** (CEL) ajoute des événements plus précis par canal. Confirmez que le CDR est actif et quel backend le stocke :
 
 ```
 *CLI> cdr show status
@@ -321,20 +298,20 @@ Call Detail Record (CDR) settings
     (none)
 ```
 
-Le laboratoire montre `(none)` sous les back‑ends enregistrés parce que la configuration minimale du laboratoire ne charge aucun module de stockage CDR — les enregistrements sont donc calculés mais n’écrits nulle part. En production, vous chargez un back‑end (CSV, ou `cdr_odbc`/`cdr_adaptive_odbc` dans MySQL/PostgreSQL) et cela devient votre source de facturation et d’historique. CEL est **désactivé par défaut** (`cel show status` reports `CEL Logging: Disabled` in the lab) and you enable it in `cel.conf` uniquement lorsque vous avez besoin de détails au niveau des événements. Les deux sont couverts en profondeur dans *Asterisk Call Detail Records* ; pour la surveillance, l’essentiel est que CDR/CEL sont votre enregistrement *historique*, tandis que le CLI est votre vue *en temps réel*.
+Le laboratoire affiche `(none)` sous les backends enregistrés car la configuration minimale du laboratoire ne charge aucun module de stockage CDR — les enregistrements sont donc calculés mais ne sont écrits nulle part. En production, vous chargez un backend (CSV, ou `cdr_odbc`/`cdr_adaptive_odbc` vers MySQL/PostgreSQL) et cela devient votre source de facturation et d'historique. Le CEL est **désactivé par défaut** (`cel show status` renvoie ` reports `CEL Logging: Disabled` in the lab) and you enable it in `) et ne doit être activé dans `cel.conf` que lorsque vous avez besoin de détails au niveau de l'événement. Les deux sont couverts en profondeur dans *Asterisk Call Detail Records* ; pour la surveillance, l'essentiel est que le CDR/CEL constitue votre enregistrement *historique*, tandis que la CLI est votre vue *en direct*.
 
-### AMI et événements ARI
+### Événements AMI et ARI
 
-Pour une surveillance programmatique et en temps réel, vous voulez un flux poussé d’événements plutôt que d’interroger le CLI :
+Pour une surveillance programmatique en temps réel, vous préférez un flux d'événements poussés plutôt que d'interroger la CLI :
 
-- **AMI (Asterisk Manager Interface)** est le protocole d’événements/commandes TCP de longue date (`manager.conf`). Abonnez‑vous et vous recevez `Newchannel`, `Hangup`, `DialBegin`, `BridgeEnter`, `PeerStatus` et d’autres événements au fur et à mesure que les appels se produisent — l’épine dorsale des panneaux d’affichage et des outils de comptabilité des appels. Dans le laboratoire, AMI est désactivé par défaut (`manager show settings` signale `Manager (AMI): No`) ; vous l’activez et le sécurisez dans `manager.conf`.
-- **ARI (Asterisk REST Interface)** est l’interface moderne HTTP + WebSocket (`ari.conf`, servie par le serveur HTTP intégré). Elle fournit un flux d’événements JSON et un contrôle d’appel granulaire — le choix approprié pour les nouvelles intégrations.
+- **AMI (Asterisk Manager Interface)** est le protocole d'événements/commandes TCP historique (`manager.conf`). Abonnez-vous et vous recevrez des événements `Newchannel`, `Hangup`, `DialBegin`, `BridgeEnter`, `PeerStatus` et similaires au fur et à mesure que les appels se produisent — c'est l'épine dorsale des tableaux de bord et des outils de comptabilité d'appels. Dans le laboratoire, l'AMI est désactivé par défaut (`manager show settings` rapporte `Manager (AMI): No`) ; vous l'activez et le verrouillez dans `manager.conf`.
+- **ARI (Asterisk REST Interface)** est l'interface HTTP + WebSocket moderne (`ari.conf`, servie par le serveur HTTP intégré). Elle fournit un flux d'événements JSON et un contrôle d'appel granulaire — le bon choix pour les nouvelles intégrations.
 
-Les deux sont détaillés dans *Extending Asterisk with AMI and AGI* et *The Asterisk REST Interface (ARI)*. Avertissement lié au déploiement : **AMI et ARI sont puissants et ne doivent jamais être exposés à Internet.** Liez le serveur HTTP à localhost ou à un réseau de gestion, utilisez des secrets forts et uniques, et filtrez les ports avec un pare‑feu — voir *Asterisk Security*.
+Les deux sont détaillés dans *Extending Asterisk with AMI and AGI* et *The Asterisk REST Interface (ARI)*. L'avertissement pertinent pour le déploiement : **l'AMI et l'ARI sont puissants et ne doivent jamais être exposés à Internet.** Liez le serveur HTTP à localhost ou à un réseau de gestion, utilisez des secrets uniques et robustes, et firewallez les ports — voir *Asterisk Security*.
 
-### Métriques : Prometheus et Grafana
+### Métriques : Prometheus et Grafana
 
-Pour les tableaux de bord et les alertes, Asterisk 22 fournit un exportateur Prometheus, **`res_prometheus.so`** (un module avec un niveau de support *étendu*), qui expose des métriques sur un point de terminaison HTTP qu’un serveur Prometheus interroge. En plus des métriques de processus de base, il propose des fournisseurs modulables couvrant les canaux, les appels, les endpoints, les ponts et les enregistrements sortants PJSIP :
+Pour les tableaux de bord et les alertes, Asterisk 22 est livré avec un exportateur Prometheus, **`res_prometheus.so`** (un module avec un niveau de support *étendu*), qui expose des métriques sur un endpoint HTTP qu'un serveur Prometheus interroge. En plus des métriques de processus principales, il fournit des fournisseurs enfichables couvrant les canaux, les appels, les endpoints, les bridges et les enregistrements sortants PJSIP :
 
 ```
 # core process
@@ -360,7 +337,7 @@ asterisk_bridges_channels_count
 asterisk_pjsip_outbound_registration_status
 ```
 
-Vous pouvez confirmer que le module est présent dans la version du laboratoire :
+Vous pouvez confirmer que le module est présent dans la build du laboratoire :
 
 ```
 *CLI> module show like prometheus
@@ -368,43 +345,49 @@ Module                         Description                     Use Count  Status
 res_prometheus.so              Asterisk Prometheus Module      0          Not Running  extended
 ```
 
-Il affiche `Not Running` parce que le laboratoire ne le configure ni ne le charge ; l’activer (`prometheus.conf` plus le serveur HTTP) transforme Asterisk en cible Prometheus. Dirigez Prometheus vers le point de collecte et Grafana vers Prometheus, et vous obtenez des tableaux de bord de séries temporelles (appels concurrents, enregistrements, tendances ASR/ACD) ainsi que des alertes (par ex. « les appels actifs sont tombés à zéro » ou « les échecs d’enregistrement augmentent fortement »). Pour les équipes qui utilisent déjà Prometheus/Grafana, c’est la façon naturelle d’intégrer Asterisk à l’observabilité existante, plutôt que d’analyser la sortie CLI.
+Il affiche `Not Running` car le laboratoire ne le configure pas et ne le charge pas ; l'activer (`prometheus.conf` plus le serveur HTTP) transforme Asterisk en une cible Prometheus. Pointez Prometheus vers l'endpoint de scraping et Grafana vers Prometheus, et vous obtenez des tableaux de bord de séries temporelles (appels simultanés, enregistrements, tendances ASR/ACD) et des alertes (par exemple, « les appels actifs sont tombés à zéro » ou « pics d'échecs d'enregistrement »). Pour les équipes utilisant déjà Prometheus/Grafana, c'est le moyen naturel d'intégrer Asterisk dans l'observabilité existante, plutôt que d'analyser la sortie de la CLI.
 
 ### Codes de réponse SIP à surveiller
 
-Quel que soit le pipeline, quelques résultats SIP signalent des problèmes et méritent d’être surveillés : des échecs persistants de challenge `401`/`407` ou `403 Forbidden` suggèrent une attaque par force brute ou une tempête d’identifiants mal configurés (voir la correspondance avec Fail2Ban dans *Asterisk Security*) ; `503 Service Unavailable` indique un serveur ou un trunk surchargé ou congestionné ; et un pic de `408 Request Timeout`/`480 Temporarily Unavailable` signifie généralement que les points de terminaison sont devenus inaccessibles (expiration NAT, échecs de qualification).
+Quel que soit le pipeline, quelques résultats SIP signalent des problèmes et méritent une alerte : des échecs de challenge `401`/`407` soutenus ou des `403 Forbidden` suggèrent une attaque par force brute ou une tempête d'identifiants mal configurés (croisez avec Fail2Ban dans *Asterisk Security*) ; `503 Service Unavailable` pointe vers un serveur ou un trunk surchargé ou congestionné ; et un pic de `408 Request Timeout`/`480 Temporarily Unavailable` signifie généralement que les endpoints sont devenus injoignables (timeout NAT, échecs de qualification).
 
 ## Haute disponibilité et mise à l'échelle
 
-Un serveur Asterisk constitue un point de défaillance unique et possède un plafond d'appels fini. Les deux problèmes — *rester en ligne* et *grandir* — ont des réponses différentes.
+Un serveur Asterisk unique constitue un point de défaillance unique et possède un plafond d'appels limité. Les deux problèmes — *rester opérationnel* et *monter en charge* — ont des réponses différentes.
 
-### Actif/veille avec une IP flottante
+### Actif/passif avec une IP flottante
 
-Le modèle HA classique et bien éprouvé pour Asterisk est **actif/veille** (pas actif/actif — l'état des appels dans Asterisk est difficile à partager en temps réel). Deux serveurs identiques, un actif, un veille, partagent une **IP flottante (virtuelle)** gérée par un gestionnaire de cluster tel que **keepalived** (VRRP) ou **Pacemaker/Corosync**. Les téléphones et trunks s'enregistrent sur l'IP flottante, pas sur l'un ou l'autre hôte réel. Si le nœud actif échoue à son contrôle de santé, l'IP flottante passe au nœud veille, qui prend le relais.
+Le modèle de haute disponibilité (HA) classique et éprouvé pour Asterisk est le mode **actif/passif** (et non actif/actif — l'état des appels dans Asterisk est difficile à partager en temps réel). Deux serveurs identiques, l'un actif et l'autre en veille, partagent une **IP flottante (virtuelle)** gérée par un gestionnaire de cluster tel que **keepalived** (VRRP) ou **Pacemaker/Corosync**. Les téléphones et les trunks s'enregistrent auprès de l'IP flottante, et non auprès de l'un ou l'autre des hôtes réels. Si le nœud actif échoue à son test de santé, l'IP flottante bascule vers le nœud en veille, qui prend le relais.
 
-L’avertissement honnête : un basculement d’IP **interrompt les appels en cours** — Asterisk ne réplique pas l’état des canaux en direct entre les nœuds, donc toute personne en pleine conversation doit rappeler. Les enregistrements se rétablissent au cours d’un cycle de qualification/enregistrement. Ce que le basculement vous apporte, c’est que le *service* se rétablit en quelques secondes sans intervention manuelle, ce qui, pour la plupart des PBX, est exactement l’objectif. Pour que le nœud veille puisse réellement prendre le relais, les deux nœuds doivent disposer de la même configuration (votre `/etc/asterisk` versionnée dans git, déployée identiquement) et du même *état* — ce qui constitue le point suivant.
+La mise en garde honnête : un basculement IP **interrompt les appels en cours** — Asterisk ne réplique pas l'état des canaux en direct entre les nœuds, donc toute personne en communication doit rappeler. Les enregistrements se rétablissent au cours d'un cycle de qualify/registration. Ce que le basculement vous apporte, c'est que le *service* se rétablit en quelques secondes sans intervention manuelle, ce qui, pour la plupart des PBX, est exactement l'objectif recherché. Pour que le nœud en veille soit réellement capable de prendre le relais, les deux nœuds doivent avoir la même configuration (votre `/etc/asterisk` versionné sous git, déployé à l'identique) et le même *état* — ce qui constitue le point suivant.
 
-### Externaliser l’état avec PJSIP Realtime
+### Externaliser l'état avec PJSIP Realtime
 
-Actif/veille ne fonctionne que si le nœud veille connaît les mêmes endpoints et enregistrements que le nœud actif. La façon d’y parvenir est de **cesser de conserver l’état dans des fichiers plats sur une seule machine** et de le déplacer vers une base de données partagée que les deux nœuds lisent. **PJSIP Realtime** (Sorcery soutenu par une base de données) fait exactement cela : endpoints, AORs, auths — et, surtout, **registrations** (la table `ps_contacts`) — résident dans MySQL/PostgreSQL au lieu de `pjsip.conf` et de la mémoire locale. Les deux nœuds Asterisk pointent vers la même base de données, de sorte qu’un téléphone enregistré via un nœud soit visible par l’autre. Cela est couvert dans *Asterisk Real-Time* (la section PJSIP Realtime / Sorcery) ; ici le point de déploiement est que **externaliser l’état est le prérequis tant pour la HA que pour la mise à l’échelle horizontale** — sans cela, chaque nœud est une île.
+Le mode actif/passif ne fonctionne que si le nœud en veille connaît les mêmes endpoints et enregistrements que le nœud actif. La façon d'y parvenir est de **cesser de conserver l'état dans des fichiers plats sur une seule machine** et de le déplacer vers une base de données partagée lue par les deux nœuds. **PJSIP Realtime** (Sorcery adossé à une base de données) fait exactement cela : les endpoints, les AOR, les auths — et, surtout, les **enregistrements** (la table `ps_contacts`) — résident dans MySQL/PostgreSQL au lieu de `pjsip.conf` et de la mémoire locale. Les deux nœuds Asterisk pointent vers la même base de données, de sorte qu'un téléphone enregistré via un nœud est visible par l'autre. Ceci est couvert dans *Asterisk Real-Time* (la section PJSIP Realtime / Sorcery) ; ici, le point important pour le déploiement est que **l'externalisation de l'état est le prérequis à la fois pour la HA et pour la mise à l'échelle horizontale** — sans cela, chaque nœud est une île.
 
-Appliquez la même logique au reste de votre état : CDR/CEL dans un magasin SQL partagé, voicemail sur un stockage partagé/réplication (ou `ODBC_STORAGE`), et les clés astdb dont vous dépendez dans une base de données. Une fois l’état externalisé, les nœuds Asterisk deviennent presque interchangeables en tant que front‑ends.
+Appliquez la même logique au reste de votre état : les CDR/CEL dans un stockage SQL partagé, la voicemail sur un stockage partagé/répliqué (ou `ODBC_STORAGE`), et les clés astdb dont vous dépendez dans une base de données. Une fois l'état externalisé, les nœuds Asterisk deviennent plus proches de serveurs frontaux interchangeables.
 
-### Proxies SIP en façade (OpenSIPS)
+### Proxys SIP en frontal (OpenSIPS)
 
-Pour dépasser la capacité d’un seul serveur, on place un **proxy SIP/équilibreur de charge** devant un pool de serveurs médias Asterisk. **OpenSIPS** est un proxy SIP spécialement conçu, très **haute performance** (il gère des centaines de milliers d’enregistrements et route le signalement sans toucher aux médias). Le proxy présente une adresse SIP unique au monde, maintient le service d’enregistrement/localisation, et distribue les appels parmi les back‑ends Asterisk. Cette séparation — une couche proxy légère assurant l’enregistrement et le routage, une couche Asterisk horizontalement scalable effectuant le traitement réel des appels (IVR, files d’attente, conférences, transcodage) — est la façon dont les déploiements importants dépassent une seule boîte. (La plateforme SipPulse elle‑même utilise OpenSIPS devant ses serveurs médias/application pour exactement cette raison.)
+Pour monter en charge *au-delà* de la capacité d'un seul serveur, vous placez un **proxy SIP/répartiteur de charge** devant un pool de serveurs média Asterisk. **OpenSIPS** est un proxy SIP conçu spécifiquement pour un très haut débit (il gère des centaines de milliers d'enregistrements et achemine la signalisation sans toucher aux médias). Le proxy présente une adresse SIP unique au monde, maintient le service d'enregistrement/localisation et distribue les appels à travers les back-ends Asterisk. Cette séparation — une couche de proxy légère effectuant l'enregistrement et le routage, et une couche Asterisk évolutive horizontalement effectuant le traitement réel des appels (IVR, files d'attente, conférences, transcodage) — est la façon dont les grands déploiements dépassent les limites d'une seule machine. (La plateforme SipPulse elle-même utilise OpenSIPS devant ses serveurs média/applicatifs pour cette raison précise.)
 
-### Mise à l’échelle des médias
+### Mise à l'échelle des médias
 
-Le proxy distribue le *signalement* à moindre coût ; **les médias sont la ressource coûteuse**. Le relais RTP, et surtout le transcodage entre codecs (p. ex. Opus ↔ G.711) ou la gestion
+Le proxy distribue la *signalisation* à moindre coût ; **le média est la ressource coûteuse**. Le relais RTP, et surtout le transcodage entre codecs (par exemple Opus ↔ G.711) ou l'exécution de grandes conférences, est limité par le CPU et c'est ce qui plafonne réellement un serveur. Stratégies :
+
+- **Évitez le transcodage** autant que possible — négociez un codec commun de bout en bout afin qu'Asterisk ponte les flux nativement (pass-through) au lieu de transcoder. C'est le gain de capacité média le plus important.
+- **Mettez à l'échelle les médias horizontalement** en ajoutant des nœuds Asterisk derrière le proxy ; chacun supporte une part des appels simultanés.
+- **Déchargez les médias du navigateur** vers une passerelle WebRTC dédiée (par exemple Janus) afin que le PBX ne soit pas également en train de terminer et de relayer chaque flux DTLS-SRTP du navigateur — voir *WebRTC with Asterisk*, qui traite exactement de cette séparation Asterisk-plus-passerelle.
+
+Dimensionnez la capacité en fonction des **appels simultanés et de la charge de transcodage**, et non en fonction des utilisateurs enregistrés — 10 000 téléphones enregistrés qui sont pour la plupart inactifs coûtent beaucoup moins cher que 200 conférences transcodées simultanées.
 
 ## Hébergement cloud
 
-Exécuter Asterisk sur une VM cloud (AWS, GCP, Azure, un VPS) est courant et fonctionne bien, mais le réseau cloud est **NATé et protégé par défaut**, ce qui entre en conflit avec SIP. Les préoccupations spécifiques au déploiement sont les suivantes.
+Exécuter Asterisk sur une VM cloud (AWS, GCP, Azure, un VPS) est courant et fonctionne bien, mais le réseau cloud est **par défaut derrière NAT et protégé par un pare-feu**, ce qui entre en conflit avec SIP. Voici les préoccupations spécifiques au déploiement.
 
 ### NAT et le SDP
 
-Une VM cloud possède presque toujours une adresse **privée** sur son NIC et une adresse **publique** distincte que le fournisseur NATe vers elle. Si Asterisk annonce l’adresse privée dans le SDP, les téléphones distants envoient le RTP dans un trou noir — le symptôme classique d’audio à sens unique ou absent. Indiquez à PJSIP son identité publique sur le transport :
+Une VM cloud possède presque toujours une IP **privée** sur sa carte réseau et une IP **publique** distincte que le fournisseur lui attribue via NAT. Si Asterisk annonce l'IP privée dans le SDP, les téléphones distants envoient le RTP dans un trou noir — le symptôme classique d'un audio unidirectionnel ou absent. Indiquez à PJSIP son identité publique sur le transport :
 
 ```
 [transport-udp]
@@ -416,13 +399,13 @@ external_signaling_address=203.0.113.10
 local_net=10.0.0.0/8                     ; your private/VPC range(s)
 ```
 
-`external_*` fait réécrire à Asterisk l’adresse qu’il annonce aux pairs publics, tandis que
-`local_net` indique quels pairs sont locaux (et ne doivent *pas* être réécrits). C’est la même gestion du NAT décrite pour le réseau Docker en pont ci‑dessus — une VM cloud est, en fait, derrière un NAT.
+`external_*` force Asterisk à réécrire l'adresse qu'il annonce aux pairs publics, tandis que
+`local_net` lui indique quels pairs sont locaux (et ne doivent *pas* être réécrits). Il s'agit de la même gestion du NAT abordée précédemment pour le réseau Docker en pont — une VM cloud est, en effet, située derrière un NAT.
 
-### Pare‑feu et la plage RTP
+### Pare-feu et plage RTP
 
-Deux pare‑feux s’appliquent généralement sur une VM cloud : le groupe de sécurité / ACL réseau du **fournisseur**, et le **pare‑feu** iptables de l’**hôte**. Les deux doivent ouvrir les mêmes ports, et la politique est celle du chapitre Sécurité. Le jeu de règles de la première édition récupéré
-(`docs/legacy-labs/configs/Lab7/rules.v4`) capture la forme — accepter SIP et la plage RTP, accepter les connexions établies/connexes, bloquer le reste :
+Deux pare-feu s'appliquent généralement sur une VM cloud : le groupe de sécurité / ACL réseau du **fournisseur**, et les iptables de **l'hôte**. Les deux doivent ouvrir les mêmes ports, et la politique est celle décrite dans le chapitre Sécurité. L'ensemble de règles récupéré de la 1ère édition
+(`docs/legacy-labs/configs/Lab7/rules.v4`) en capture la forme — accepter SIP et la plage RTP, accepter les connexions établies/associées, rejeter le reste :
 
 ```
 -A INPUT -p udp -m udp --dport 5060 -j ACCEPT
@@ -432,68 +415,69 @@ Deux pare‑feux s’appliquent généralement sur une VM cloud : le groupe de
 -A INPUT -j DROP
 ```
 
-Deux corrections apportées par le chapitre Sécurité qui comptent ici : ouvrir **5061 en TCP** (pas UDP) si vous utilisez SIP/TLS, et veiller à ce que la plage UDP RTP de votre pare‑feu corresponde exactement à `rtpstart`/`rtpend` dans `rtp.conf` — la même plage que vous publiez sur un conteneur. Ne dupliquez pas la construction iptables/Fail2Ban ici ; **suivez les sections pare‑feu, Fail2Ban et TLS/SRTP du *Asterisk Security*** (Fail2Ban surveille le canal de journal `security` que le laboratoire active déjà dans `logger.conf`) et appliquez cette politique à la fois sur le pare‑feu de l’hôte et sur le groupe de sécurité cloud.
+Deux corrections apportées par le chapitre Sécurité sont importantes ici : ouvrez le port **5061 en TCP** (pas UDP) si vous utilisez SIP/TLS, et n'oubliez pas que la plage UDP RTP dans votre pare-feu doit correspondre exactement à `rtpstart`/`rtpend` dans `rtp.conf` — la même plage que celle que vous publiez sur un conteneur.
+Ne dupliquez pas la configuration iptables/Fail2Ban ici ; **suivez les sections pare-feu, Fail2Ban et TLS/SRTP de *Asterisk Security*** (Fail2Ban surveille le canal de journalisation `security` que le laboratoire active déjà dans `logger.conf`) et appliquez cette politique à la fois dans le pare-feu de l'hôte et dans le groupe de sécurité cloud.
 
-### Latence, région et le SBC
+### Latence, région et SBC
 
-- **Choisissez une région proche de vos utilisateurs.** La voix est sensible à la latence — une latence unidirectionnelle bouche‑à‑oreille supérieure à ~150 ms se remarque. Hébergez la VM dans la région la plus proche de la majorité de vos téléphones et trunks ; les médias intercontinentaux sont audiblement pires.
-- **Placez un SBC en façade pour tout déploiement exposé à Internet.** Un **Session Border Controller** termine SIP/RTP à la périphérie, masque votre topologie, normalise le NAT et absorbe le trafic DoS et de scan avant qu’il n’atteigne Asterisk. La recommandation principale du chapitre Sécurité — *ne pas exposer Asterisk brut à Internet* — s’applique doublement dans le cloud, où l’adresse IP publique de votre VM est scannée quelques minutes après son démarrage. Un SBC (ou au minimum un proxy SIP renforcé comme OpenSIPS avec Fail2Ban) est la solution de bord standard.
+- **Choisissez une région proche de vos utilisateurs.** La voix est sensible à la latence — une latence bouche-à-oreille unidirectionnelle supérieure à ~150 ms est perceptible. Hébergez la VM dans la région la plus proche de la majorité de vos téléphones et trunks ; le trafic média intercontinental est audiblement de moins bonne qualité.
+- **Placez un SBC en frontal pour tout déploiement exposé à internet.** Un **Session Border Controller** termine le SIP/RTP à la périphérie, masque votre topologie, normalise le NAT et absorbe le trafic DoS et de scan avant qu'il n'atteigne Asterisk. La recommandation principale du chapitre Sécurité — *ne pas exposer Asterisk directement à internet* — s'applique doublement dans le cloud, où l'IP publique de votre VM est scannée quelques minutes après son démarrage. Un SBC (ou au minimum un proxy SIP durci comme OpenSIPS couplé à Fail2Ban) est la norme en périphérie.
 
-## Summary
+## Résumé
 
-Le déploiement est l’endroit où un dialplan fonctionnel devient un service fiable. Sur une VM, exécutez Asterisk sous **systemd** en tant qu’utilisateur **non-root**, laissant le `Restart=` de l’unité le garder en vie (safe_asterisk est remplacé) et en utilisant `core reload` plutôt que `systemctl restart` pour les changements de configuration. **Containeriser** avec Docker — comme le laboratoire du livre le fait — vous fournit une image immuable, épinglée, avec la configuration **bind‑mounted** depuis un `/etc/asterisk` git; le problème réside dans les médias, donc utilisez soit **host networking** soit publiez une plage de ports RTP qui **correspond exactement à `rtp.conf`**, et montez des **volumes persistants** pour spool/voicemail/astdb afin que l’état survive à un redéploiement. Traitez la configuration comme du code et **sauvegardez l’état** que la configuration ne capture pas : voicemail, enregistrements, `astdb.sqlite3`, et CDR/CEL. **Observez** le système à quatre niveaux — le CLI (`core show channels`, `pjsip show endpoints`) pour la vue en temps réel, **CDR/CEL** pour l’historique, **AMI/ARI** pour les événements programmatiques, et l’exportateur **`res_prometheus`** vers Grafana pour les tableaux de bord et les alertes — tout en gardant AMI/ARI hors d’Internet public. Pour **rester en ligne**, exécutez une configuration active/standby avec une **IP flottante** (en acceptant que le basculement coupe les appels en cours) ; pour **grandir**, externalisez l’état avec **PJSIP Realtime**, placez un pool de serveurs médias devant **OpenSIPS**, et minimisez le transcodage car **les médias — et non les enregistrements — sont ce qui limite un serveur**. Enfin, dans le **cloud**, considérez la VM comme derrière NAT (`external_media_address`, `local_net`), ouvrez le pare‑feu selon le chapitre Sécurité à la fois sur l’hôte et dans le groupe de sécurité du fournisseur, choisissez une région à faible latence, et n’exposez jamais Asterisk brut — placez un **SBC** à la périphérie.
+Le déploiement est l'étape où un dialplan fonctionnel devient un service fiable. Sur une VM, exécutez Asterisk sous **systemd** en tant qu'utilisateur **non-root**, en laissant le `Restart=` de l'unité le maintenir actif (safe_asterisk est obsolète) et en utilisant `core reload` plutôt que `systemctl restart` pour les changements de configuration. La **conteneurisation** avec Docker — comme le fait le laboratoire de ce livre — vous offre une image immuable et figée avec une configuration **bind-mounted** depuis un `/etc/asterisk` versionné par git ; le piège réside dans les médias, utilisez donc soit le **host networking**, soit publiez une plage de ports RTP qui **correspond exactement à `rtp.conf`**, et montez des **persistent volumes** pour le spool/voicemail/astdb afin que l'état survive à un redéploiement. Traitez la configuration comme du code et **sauvegardez l'état** que la configuration ne capture pas : voicemail, enregistrements, `astdb.sqlite3` et CDR/CEL. **Observez** le système à quatre niveaux — la CLI (`core show channels`, `pjsip show endpoints`) pour une vue en temps réel, **CDR/CEL** pour l'historique, **AMI/ARI** pour les événements programmatiques, et l'exportateur **`res_prometheus`** vers Grafana pour les tableaux de bord et les alertes — tout en gardant AMI/ARI hors de l'internet public. Pour **rester opérationnel**, exécutez en mode actif/veille avec une **floating IP** (en acceptant que le basculement interrompe les appels en cours) ; pour **évoluer**, externalisez l'état avec **PJSIP Realtime**, placez un pool de serveurs média derrière **OpenSIPS**, et minimisez le transcodage car **ce sont les médias — et non les enregistrements — qui limitent la capacité d'un serveur**. Enfin, dans le **cloud**, considérez la VM comme étant derrière un NAT (`external_media_address`, `local_net`), ouvrez le pare-feu conformément au chapitre sur la sécurité à la fois sur l'hôte et dans le groupe de sécurité du fournisseur, choisissez une région à faible latence, et n'exposez jamais Asterisk directement — placez un **SBC** en périphérie.
 
 ## Quiz
 
-1. Sur un hôte systemd, qu’est‑ce qui remplace le rôle de l’ancien wrapper `safe_asterisk` consistant à redémarrer un Asterisk planté ?
+1. Sur un hôte systemd, qu'est-ce qui remplace le rôle de l'ancien wrapper `safe_asterisk` pour redémarrer un Asterisk ayant planté ?
    - A. Une tâche cron
-   - B. La directive `Restart=` du fichier d’unité
+   - B. La directive `Restart=` du fichier unit
    - C. `systemctl enable`
-   - D. L’astdb
-2. Pour appliquer une modification de configuration à un Asterisk en cours d’exécution **sans interrompre les appels**, vous devez :
+   - D. L'astdb
+2. Pour appliquer un changement de configuration à un Asterisk en cours d'exécution **sans interrompre les appels**, vous devez :
    - A. `systemctl restart asterisk`
    - B. Redémarrer le serveur
    - C. `asterisk -rx 'core reload'`
-   - D. Reconstruire l’image du conteneur
-3. Un Asterisk conteneurisé (réseau pont) établit les appels mais n’a **pas d’audio**. La cause la plus probable est :
+   - D. Reconstruire l'image du conteneur
+3. Un Asterisk conteneurisé (réseau en mode bridge) connecte les appels mais n'a **pas d'audio**. La cause la plus probable est :
    - A. Le dialplan est incorrect
    - B. La plage de ports UDP RTP publiée ne correspond pas à `rtpstart`/`rtpend` dans `rtp.conf`
    - C. Le CDR est désactivé
    - D. Le CLI est inaccessible
-4. Quels répertoires doivent être montés comme **volumes persistants** afin qu’un redéploiement de conteneur ne perde pas l’état ? (cochez tout ce qui s’applique)
-   - A. `/var/spool/asterisk` (voicemail, recordings)
+4. Quels répertoires doivent être montés en tant que **volumes persistants** afin qu'un redéploiement de conteneur ne perde pas l'état ? (cochez toutes les réponses valides)
+   - A. `/var/spool/asterisk` (voicemail, enregistrements)
    - B. `/var/lib/asterisk` (astdb)
-   - C. `/etc/asterisk` (déjà bind‑mounté depuis l’hôte)
+   - C. `/etc/asterisk` (déjà monté depuis l'hôte)
    - D. `/usr/sbin`
-5. Quelle commande CLI donne le nombre en temps réel d’appels actifs ?
+5. Quelle commande CLI donne le nombre en temps réel d'appels actifs ?
    - A. `cdr show status`
    - B. `core show channels`
    - C. `pjsip show transports`
    - D. `module show like prometheus`
-6. Dans Asterisk 22, la méthode prise en charge pour exposer les métriques d’appels/canaux à une pile Prometheus/Grafana est :
-   - A. Analyser le fichier journal `full`
+6. Dans Asterisk 22, la méthode prise en charge pour exposer les métriques d'appels/canaux à une pile Prometheus/Grafana est :
+   - A. L'analyse du fichier journal `full`
    - B. Le module `res_prometheus.so`
    - C. Les scripts AGI
-   - D. Il n’y en a pas
-7. Quelle est la condition préalable à la fois pour le basculement HA et le dimensionnement horizontal sur plusieurs nœuds Asterisk ?
-   - A. S’exécuter en tant que root
-   - B. Externaliser l’état (par ex. les enregistrements Realtime PJSIP dans une base de données partagée)
+   - D. Il n'y en a aucune
+7. Quel est le prérequis à la fois pour le basculement HA et pour la mise à l'échelle horizontale sur plusieurs nœuds Asterisk ?
+   - A. Exécuter en tant que root
+   - B. Externaliser l'état (par exemple, les enregistrements PJSIP Realtime dans une base de données partagée)
    - C. Désactiver le CDR
-   - D. Utiliser un réseau ponté
-8. Quelle ressource limite le plus directement le nombre d’appels simultanés qu’un serveur Asterisk peut gérer ?
-   - A. Le nombre d’utilisateurs enregistrés
-   - B. Le traitement média, en particulier le transcodage
+   - D. Utiliser le réseau en mode bridge
+8. Quelle ressource limite le plus directement le nombre d'appels simultanés qu'un serveur Asterisk peut gérer ?
+   - A. Le nombre d'utilisateurs enregistrés
+   - B. Le traitement des médias, en particulier le transcodage
    - C. La taille de `/etc/asterisk`
-   - D. Le backend du CDR
-9. Sur une VM cloud, quels paramètres de transport `pjsip.conf` font qu’Asterisk annonce son adresse publique afin que l’audio distant fonctionne ? (cochez tout ce qui s’applique)
+   - D. Le backend CDR
+9. Sur une machine virtuelle cloud, quels paramètres de transport `pjsip.conf` permettent à Asterisk d'annoncer son adresse publique afin que l'audio distant fonctionne ? (cochez toutes les réponses valides)
    - A. `external_media_address`
    - B. `external_signaling_address`
    - C. `local_net`
    - D. `qualify_frequency`
-10. Pour un déploiement cloud exposé à Internet, la règle principale du chapitre Sécurité est :
-    - A. Toujours utiliser deux NIC
-    - B. Ne jamais exposer Asterisk brut à Internet ; placer un SBC (ou un proxy renforcé + Fail2Ban) en périphérie
+10. Pour un déploiement cloud exposé sur internet, la règle fondamentale du chapitre sur la sécurité est :
+    - A. Toujours utiliser deux cartes réseau (NIC)
+    - B. Ne jamais exposer Asterisk directement sur internet ; placer un SBC (ou un proxy durci + Fail2Ban) en périphérie
     - C. Utiliser uniquement UDP
     - D. Désactiver TLS
 
-**Answers:** 1 — B · 2 — C · 3 — B · 4 — A, B · 5 — B · 6 — B · 7 — B · 8 — B · 9 — A, B, C · 10 — B
+**Réponses :** 1 — B · 2 — C · 3 — B · 4 — A, B · 5 — B · 6 — B · 7 — B · 8 — B · 9 — A, B, C · 10 — B

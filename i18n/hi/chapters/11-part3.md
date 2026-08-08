@@ -1,5 +1,5 @@
-# Part III — Dialplan & Call Features {.unnumbered}
+# भाग III — Dialplan और कॉल फीचर्स {.unnumbered}
 
-Part III वह हिस्सा है जहाँ Asterisk केवल एक SIP switch न रहकर एक phone system बन जाता है। dialplan इस परिवर्तन का केंद्र है: वह logic जो यह तय करती है कि हर call के साथ क्या होगा। हम इसे बुनियादी बातों से लेकर उन्नत patterns तक कवर करते हैं — pattern matching, subroutines, time conditions, और database lookups।
+भाग III वह स्थान है जहाँ Asterisk एक SIP स्विच होने से आगे बढ़कर एक फोन सिस्टम बन जाता है। Dialplan इस परिवर्तन का केंद्र है: वह तर्क (logic) जो यह तय करता है कि प्रत्येक कॉल के साथ क्या होगा। हम इसमें बुनियादी बातों से लेकर उन्नत पैटर्न तक सब कुछ कवर करते हैं — पैटर्न मैचिंग, सबरूटीन, समय की शर्तें, और डेटाबेस लुकअप।
 
-dialplan के साथ, हम उन सुविधाओं को जोड़ते हैं जिनकी उपयोगकर्ता वास्तव में एक PBX से अपेक्षा करते हैं — transfer, parking, pickup, ConfBridge के साथ conferencing, और voicemail — और अंत में एक basic contact center के लिए call queues के साथ समाप्त करते हैं।
+Dialplan के साथ, हम उन फीचर्स को जोड़ते हैं जिनकी उपयोगकर्ता वास्तव में एक PBX से अपेक्षा करते हैं — ट्रांसफर, पार्किंग, पिकअप, ConfBridge के साथ कॉन्फ्रेंसिंग, और voicemail — और अंत में एक बुनियादी कांटेक्ट सेंटर के लिए कॉल कतारों (call queues) को शामिल करते हैं।

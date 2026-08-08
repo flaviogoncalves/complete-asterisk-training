@@ -1,135 +1,135 @@
-# Asterisk Security
+# Asteriskのセキュリティ
 
-最初から、Asterisk のセキュリティ問題は重要です。SIP（Session Initiation Protocol）は、CERT.BR によるとインターネット上で最も攻撃を受けるプロトコルです。ハニーポットを運用している人なら誰でも確認できます。インターネット収益分配詐欺（Internet Revenue Share Fraud）の問題は非常に深刻で、数十万ドルを超える損失につながる可能性があります。適切なセキュリティ対策なしにインターネットに接続された Asterisk Server をインストールしてはいけません。この章では、受ける可能性のある主な攻撃タイプを特定し、適切なセキュリティポリシーでそれらを防止する方法を学びます。最後に、提案されたセキュリティポリシーを実装する方法も学びます。
+当初より、Asteriskにおけるセキュリティの問題は極めて重要です。CERT.BRによると、SIP（Session Initiation Protocol）はインターネット上で最も攻撃を受けているプロトコルです。ハニーポットを運用している人であれば誰でもそれを確認できるでしょう。インターネットにおける収益分配詐欺（Revenue Share Fraud）の問題は非常に深刻であり、数十万ドルを超える損失につながる可能性があります。適切なセキュリティ対策を講じずに、インターネットに接続されたAsteriskサーバーをインストールすることは決して避けるべきです。本章では、受ける可能性のある主な攻撃の種類を特定する方法と、適切なセキュリティポリシーを用いてそれらを防ぐ方法を学びます。最後に、提案されたセキュリティポリシーを実装する方法を学びます。
 
-この章は **Asterisk 22 LTS** を対象としており、PJSIP（`res_pjsip` / `chan_pjsip`）が唯一の SIP チャネルです。（古い`chan_sip`ドライバは Asterisk 21 で削除されました — 以前のシステムを移行する場合は *Legacy Channels* 章を参照してください。）1 つのセキュリティ上重要な結果として、認証失敗は現在 Asterisk **security event framework** と専用の`security`ロガーチャネルを通じて出力され、Fail2Ban の設定方法が変更されます（この章の後半で説明します）。
+本章は **Asterisk 22 LTS** を対象としており、PJSIP（`res_pjsip` / `chan_pjsip`）が唯一のSIPチャネルとなっています。（古い `chan_sip` ドライバは Asterisk 21 で削除されました。古いシステムから移行する場合は *Legacy Channels* の章を参照してください。）セキュリティに関連する重要な変更点として、認証失敗が Asterisk の **security event framework** および専用の `security` ロガーチャネルを通じて出力されるようになりました。これにより、Fail2Banの設定方法が変更されています（本章の後半で解説します）。
 
-## 目的
+## Objectives
 
-- Asterisk サーバーに頻繁に行われる主な攻撃タイプを特定する
+この章を読み終えることで、以下のことができるようになります。
+
+- Asteriskサーバーに対して頻繁に行われる主な攻撃の種類を特定する
 - 効果的なセキュリティポリシーを定義する
 - セキュリティポリシーを実装する
-- Asterisk 用に IPTABLES をインストールおよび設定する
-- Asterisk 用に Fail2Ban をインストールおよび設定する
-- 暗号化のために TLS と SRTP をインストールおよび設定する
+- Asteriskのために IPTABLES をインストールおよび設定する
+- Asteriskのために Fail2Ban をインストールおよび設定する
+- 暗号化のために TLS および SRTP をインストールおよび設定する
 
-## IPテレフォニーへの主な攻撃
+## IP電話に対する主な攻撃
 
-IPテレフォニーに対する主な攻撃は、DOS/DDOS、サービス窃盗/料金詐欺、そして盗聴に分類できます。名称が紛らわしいことがあり、同じ攻撃でも情報源によって異なる呼び方がされることがあります。サービス窃盗、料金詐欺、インターネット収益分配詐欺、電話詐欺は、ハッカーが自分のPBXを利用してプレミアムレート番号へトラフィックを流し、プロバイダーからリベートを受け取る行為の異なる呼称です。
+IP電話に対する主な攻撃は、DOS/DDOS、サービス窃取/Toll Fraud（通話料金詐欺）、および盗聴に分類できます。名称が紛らわしい場合があり、情報源によって同じ攻撃を指していても呼び方が異なることがあります。サービス窃取、Toll Fraud、インターネット収益分配詐欺（Internet Revenue Share Fraud）、電話詐欺などは、ハッカーがあなたのPBXを悪用してプレミアムレート番号へトラフィックを流し、プロバイダーからリベートを得る行為を指す異なる名称です。
 
 ### DDoS/DOS
 
-Denial of Service と Distributed Denial of Service は、あらゆる IT インフラストラクチャに対する一般的な攻撃です。SIP やその他の Voice over IP プロトコルでも例外ではありません。Distributed denial of service は通常ボットネットによって実行され、DOS は単一のコンピュータによって行われます。2011 年 2 月、Sality ボットネットは IPv4 アドレス空間全体を対象に、脆弱な SIP サーバーを探すステルスかつ協調的なスキャンを実施しました。UCSD Network Telescope を観測していた研究者は、UDP ポート 5060 をプローブする約 300 万個の異なる送信元 IP が、主にトール詐欺のために SIP アカウントを総当たり攻撃しようとしていると特定しました。[^sality]
+Denial of Service（サービス拒否）およびDistributed Denial of Service（分散型サービス拒否）は、あらゆるITインフラに対する一般的な攻撃です。SIPやその他のVoice over IPプロトコルにおいても状況は変わりません。Distributed denial of serviceは通常ボットネットによって実行されますが、DOSは単一のコンピュータによって行われます。2011年2月、Salityボットネットは、脆弱なSIPサーバーを探し出すためにIPv4アドレス空間全体を対象とした隠密かつ組織的なスキャンを実行しました。UCSD Network Telescopeで観測した研究者は、約300万の異なるソースIPがUDPポート 5060を調査していたと結論付けており、そのほとんどがToll Fraudを目的としたSIPアカウントへのブルートフォース攻撃であったと推測されています。[^sality]
 
 [^sality]: A. Dainotti et al., "Analysis of a '/0' Stealth Scan from a Botnet," *IEEE/ACM Transactions on Networking*, 2015 (DOI 10.1109/TNET.2013.2297678).
 
-![ピアツーピアのボットネットがサーバーに対して数千件のSIP登録試行を行っている](../images/19-security-fig01.png)
+![数千件のSIP登録試行をサーバーに向けるピア・ツー・ピアのボットネット](../images/19-security-fig01.png)
 
-The DOS is applied usually thru techniques such as fuzzing and flooding. Flooding can use SIP, IAX, RTP and other protocols. They can stop the service completely or degrade the voice quality. They are very hard to mitigate if the ports are open to the Internet. Below are some of the tools used by attackers
+DOSは通常、ファジングやフラッディングといった手法を通じて行われます。フラッディングにはSIP、IAX、RTPなどのプロトコルが使用されます。これらはサービスを完全に停止させるか、音声品質を低下させます。ポートがインターネットに公開されている場合、これらの攻撃を緩和することは非常に困難です。以下に、攻撃者が使用するツールの一部を挙げます。
 
 **ファジング:**
 
-- **PROTOS Test Suite (c07-sip)** — オウル大学 OUSPG から。何千もの不正なパケットを送信し、バッファオーバーフローなどのソフトウェアを停止させる不具合を引き起こします。  
-- **Voiper** — すべての SIP 属性を網羅した 200,000 以上のテストを生成し、サーバーがメッセージを効果的に処理できるかを検証します。 <http://voiper.sourceforge.net/>
+- **PROTOS Test Suite (c07-sip)** — オウル大学OUSPGによるツール。数千の不正なパケットを送信し、ソフトウェアを停止させるバッファオーバーフローなどの誤作動を引き起こします。
+- **Voiper** — すべてのSIP属性を網羅する20万以上のテストを生成し、サーバーがメッセージを効果的に処理できるかを検証します。<http://voiper.sourceforge.net/>
 
 **フラッディング:**
 
-- **INVITE Flooder** — サーバーにSIP INVITE リクエストを大量に送信します。 <http://www.hackingvoip.com/tools/inviteflood.tar.gz>
-- **IAX Flooder** — サーバーに IAX2 トラフィックを大量に送信します。 <http://www.hackingvoip.com/tools/iaxflood.tar.gz>
-- **RTP Flooder** — アクティブなメディアセッションに RTP パケットを大量に送信し、音声品質を低下させます。 <http://www.hackingvoip.com/tools/rtpflood.tar.gz>
+- **INVITE Flooder** — SIP INVITEリクエストでサーバーをフラッド攻撃します。<http://www.hackingvoip.com/tools/inviteflood.tar.gz>
+- **IAX Flooder** — IAX2トラフィックでサーバーをフラッド攻撃します。<http://www.hackingvoip.com/tools/iaxflood.tar.gz>
+- **RTP Flooder** — RTPパケットでアクティブなメディアセッションをフラッド攻撃し、音声品質を低下させます。<http://www.hackingvoip.com/tools/rtpflood.tar.gz>
 
-### DoS/DDoS に対する緩和技術
+### DoS/DDoSに対する緩和策
 
-私の推奨は
+私からの推奨事項は以下の通りです。
 
-1. Asteriskサーバーをインターネットに公開しないでください、必要な場合は適切な保護（SBC）を行うこと。  
-2. 内部ネットワークでは、特に大学やカレッジなど利用者が多い場合、音声用にVirtual LANを使用してください。  
+1. 適切な保護（SBC）を伴う必要性がない限り、Asteriskサーバーをインターネットに公開しないでください。
+2. 内部ネットワークでは、特にユーザー数が多い大学やカレッジなどの環境では、音声用にVirtual LANを使用してください。
 3. 外部アクセスにはVPNまたはTLSを使用してください。
 
-### インターネット収益分配詐欺
+### インターネット収益分配詐欺（Internet Revenue Share Fraud）
 
-この詐欺は少し理解しにくいです。鍵は、International premium rate number (IPRN) の概念を理解することです。
+この詐欺は理解するのが少し厄介です。鍵となるのは、International premium rate number (IPRN) という概念を理解することです。
 
-![インターネット収益分配詐欺の3つのステップ：プレミアムレート番号を購入し、脆弱なVoIPデバイスを見つけて番号に発信し、支払いを受け取る](../images/19-security-fig02.png)
+![インターネット収益分配詐欺の3つのステップ：プレミアムレート番号を購入し、脆弱なVoIPデバイスを見つけてその番号へ発信し、報酬を受け取る](../images/19-security-fig02.png)
 
-IPRN は、特定のインターネット電話会社で無料で割り当てられる番号です。Internet Premium Rate Number Providers を検索すれば、さまざまなプロバイダーが見つかります。この種のオペレーターでは、例として Iridium のような衛星ネットワーク上の番号を割り当てることができ、発信者にとっては 1 分あたり数十セントの料金がかかります。IPRN プロバイダーは、受信した分に対して収益の一定割合（収入の 10〜20%）を支払ってくれます。
+IPRNとは、特定のインターネット電話会社で無料で割り当てることができる番号です。Internet Premium Rate Number Providersを検索すれば、多くのプロバイダーが見つかります。この種の事業者では、例えばIridiumのような衛星ネットワーク上の番号を割り当てることができ、発信者には1分あたり数十ドルのコストがかかります。IPRNプロバイダーは、着信した通話1分ごとに収益の一定割合（収入の10〜20%）をあなたに還元します。
 
-![国別の支払率とテスト番号を示すIPRNプロバイダーの価格表](../images/19-security-fig03.png)
+![国別の支払いレートとテスト番号を示すIPRNプロバイダーの価格表](../images/19-security-fig03.png)
 
-割り当てフェーズの後、ハッカーは割り当てられた IPRN をダイヤルできるオープンな Asterisk サーバーを探そうとします。ハッカーが制御する被害者側の PBX は、IPRN 番号に対して何百もの通話を発信し、ハッカーに大きなリターンをもたらすと同時に、被害者には莫大な電話料金が請求されます。週末だけで数十万ドルを超えることも多くあります。
+割り当てフェーズの後、ハッカーは割り当てられたIPRNに発信可能な、公開されているAsteriskサーバーを探します。ハッカーに制御された被害者のPBXは、IPRN番号に対して数百回の通話を行い、ハッカーには多額の報酬を、被害者には莫大な電話料金を発生させます。多くの場合、週末だけで数十万ドルを超える請求が発生することもあります。
 
-ハッカーがPBXを攻撃する際に使用する主なツール：
+ハッカーがPBXを攻撃するために使用する主なツール：
 
-1. **SIPVicious**: http://code.google.com/p/sipvicious/. Sipvicious は使いやすいセキュリティツールセットです。その主な目的は脆弱な PBX を検出し、ブルートフォース攻撃で SIP パスワードをクラックすることです。最も使用されているツールは svcrack です。このツールは 1 秒間に数千のパスワードをテストすることが可能です。  
-2. **Phone vulnerabilities**. ハッカーが攻撃ベクターとして頻繁に利用する別のポイントは電話機そのものです。Asterisk をインストールした多くの人は、電話機のウェブインターフェースのデフォルトパスワードを変更していません。これらの電話機がインターネット上に公開されると、ハッカーはデフォルトのインターフェースパスワードを使って設定をダウンロードし、そこから SIP のシークレットパスワードを見つけ出すことがしばしばあります。
+1. **SIPVicious**: http://code.google.com/p/sipvicious/。Sipviciousは使いやすいセキュリティツールセットです。主な目的は、脆弱なPBXを特定し、ブルートフォース攻撃を使用してSIPパスワードをクラックすることです。最も使用されるツールはsvcrackです。このツールは1秒間に数千のパスワードをテストできます。
+2. **電話機の脆弱性**。ハッカーが攻撃ベクトルとして頻繁に使用するもう一つのポイントは、電話機そのものです。Asteriskをインストールする多くの人が、電話機のWebインターフェースのデフォルトパスワードを変更していません。これらの電話機がインターネットに公開されると、ハッカーはデフォルトのインターフェースパスワードを使用して設定をダウンロードし、多くの場合、そこに記載されているSIPのシークレットパスワードを入手できます。
 
-#### TFTP盗難:
+#### TFTPTheft:
 
-If you are using auto provisioning of phones using TFTP, you are probably open to this type of attack. TFTP is a simple and insecure form of a File Transfer Protocol.
+TFTPを使用して電話機の自動プロビジョニングを行っている場合、おそらくこの種の攻撃に対して無防備です。TFTPは、File Transfer Protocolの単純で安全ではない形式です。
 
-![攻撃者がTFTPサーバーから推測可能な.cfgファイルをダウンロードし、設定ファイルから平文の認証情報を収集する](../images/19-security-fig04.png)
+![TFTPサーバーから推測可能な.cfgファイルをダウンロードし、設定ファイルから平文の認証情報を収集する攻撃者](../images/19-security-fig04.png)
 
-設定ファイルの名前は、mac アドレスに .cfg を付けたもの（例: 001A2B3C4D5E.cfg）で簡単に推測できます。賢いハッカーは、すべての MAC アドレスを順に試すユーティリティを簡単に作成できるか、あるいはそれを行うツールをダウンロードするだけです。設定ファイルは通常暗号化されておらず、内部にシークレット SIP パスワードが含まれています。
+設定ファイルの名前は、MACアドレスの後に.cfgを付けることで簡単に推測できます（例: 001A2B3C4D5E.cfg）。賢いハッカーであれば、すべてのMACアドレスを順番に試すユーティリティを簡単に作成するか、単にそれを行うためのツールをダウンロードするでしょう。設定ファイルは通常暗号化されておらず、内部にSIPのシークレットパスワードが含まれています。
 
-#### ブルートフォース攻撃とtftp窃盗への対策
+#### ブルートフォース攻撃およびTFTPTheftの緩和策
 
-これらの攻撃を緩和するために、以下の対策を適用できます。  
-Brute force: ブルートフォース攻撃を緩和する最善の策は、連続した不正試行を防止することです。ほとんどすべての Asterisk インストーラは fail2ban ユーティリティを使用します。fail2ban は、パスワードやユーザー名が間違っている試行が複数検出されると、攻撃者の IP を一定時間ブロックします。ブルートフォースに対する第2の対策は、12 文字以上で少なくとも 1 つの特殊文字を含む強力なパスワードを使用することです。  
-Tftptheft: TFTPTheft を防止するには、プロビジョニングを https 経由で名前とパスワードを使用するように設定します。ファイルは暗号化されて転送され、名前とパスワードにより攻撃者がファイルをダウンロードしようとすることを防げます。
+これらの攻撃を緩和するために、以下の解決策を適用できます。ブルートフォース攻撃：ブルートフォース攻撃を緩和する最善の解決策は、連続した不正な試行を防ぐことです。ほぼすべてのAsteriskインストーラーは、この目的のためにfail2banユーティリティを使用しています。fail2banは、パスワードやユーザー名の間違いによる複数回の試行を検出すると、攻撃者のIPを一定時間ブロックします。ブルートフォースに対する2つ目の対策は、12文字以上で少なくとも1つの特殊文字を含む強力なパスワードを使用することです。TFTPTheft：TFTPTheftを防ぐには、プロビジョニングで名前とパスワードを伴うhttpsを使用するように設定してください。ファイルは暗号化されて送信され、名前とパスワードによって攻撃者がファイルをダウンロードしようとするのを防ぐことができます。
 
 ### 盗聴
 
-これらのタイプの攻撃は、ほとんどの場合検出されないため、あまり目にすることはありません。IP 環境において盗聴は非常に検出が困難です。UCsniff のような無料で入手できるユーティリティを使用すれば、ほとんどのネットワークで VoIP 通話を盗聴することが可能です。主な手法は ARP スプーフィングを利用して、トラフィックを UCsniff を実行しているコンピュータに流し込み、通話を記録することです。
+これらの攻撃は多くの場合単に検出されないため、あまり目にすることはありません。IP環境において盗聴を検出することは非常に困難です。UCsniffのような無料で利用可能なユーティリティは、ほとんどのネットワークでVoIP通話を盗聴することが可能です。主な手法は、ARPスプーフィングを使用してトラフィックをUCsniffを実行しているコンピュータ経由で強制的に流し、通話を記録することです。
 
-#### 盗聴対策
+#### 盗聴に対する緩和策
 
-VoIP トラフィックを暗号化することで盗聴を防止できます。もう一つの方法は、ネットワーク上での中間者（MITM）攻撃を防ぐことです。ARP インスペクションは、レイヤー 2 ネットワークにおける MITM を防止するのに非常に効果的です。実装方法を理解するために、ネットワークの技術サポートに確認してください。本書の後半では、TLS と SRTP に基づく暗号化のインストール方法を学びます。また、ARPWatch を使用して、誰かが ARP プロトコルを悪用してネットワークを攻撃していないかを検出することもできます。
+VoIPトラフィックを暗号化することで盗聴を防ぐことができます。もう一つの方法は、ネットワーク上での中間者攻撃（MITM）を防ぐことです。ARPインスペクションは、レイヤー2ネットワークにおけるMITMを防ぐのに非常に効果的です。実装方法については、ネットワークの技術サポートに確認してください。本書の後半では、TLSとSRTPに基づいた暗号化のインストール方法を学びます。また、ARPWatchを使用して、誰かがネットワークを攻撃するためにARPプロトコルを悪用していないかを確認することもできます。
 
-## Asterisk のセキュリティポリシー
+## Asteriskのセキュリティポリシー
 
-The best way to implement security is to create a security policy. For this training I will suggest a security policy for most Asterisk installations. Use it as the base starting point and change it according to your needs. The suggested security policy follows below:
+セキュリティを実装する最善の方法は、セキュリティポリシーを作成することです。このトレーニングでは、ほとんどのAsteriskインストールに適したセキュリティポリシーを提案します。これをベースラインとして使用し、必要に応じて変更してください。推奨されるセキュリティポリシーは以下の通りです。
 
-1. 不要な UDP/TCP ポートを開放しない
-2. インターネット上で管理インターフェース（SSH/HTTPS）へのアクセスを開放しない。
-3. SSH および/または HTTP/HTTPS にアクセスするには、IPTABLES ファイアウォールで明示的な例外を設定する必要がある。
-4. 12 文字以上で少なくとも 1 つの特殊文字を含む強力なパスワード
-5. Fail2ban を使用して認証に 10 回以上失敗した IP アドレスを禁止する
-6. 国際電話に対するパスワード確認
-7. SIP ポートへのアクセスを既知の IP アドレス範囲に限定する
+1. 不要なUDP/TCPポートを開放しない
+2. インターネット上に管理インターフェース（SSH/HTTPS）へのアクセスを公開しない
+3. SSHやHTTP/HTTPSにアクセスする場合は、IPTABLESファイアウォールで明示的な例外を設定する
+4. 12文字以上で、少なくとも1つの特殊文字を含む強力なパスワードを使用する
+5. Fail2banを使用して、認証に10回以上失敗したIPアドレスを禁止する
+6. 国際電話の発信にはパスワード確認を必須とする
+7. SIPポートへのアクセスを、既知のIPアドレス範囲に制限する
 
-If you require to have external access to your PBX, there are two possibilities. Use a SBC (Session Border Controller) to protect your server against DOS/DDOS or use a VPN whenever you want external access. If you leave the port 5060 open on the Internet without a SBC or VPN, you are open to a DOS/DDOS attack. The risk is yours。
+PBXへの外部アクセスが必要な場合は、2つの可能性があります。SBC（Session Border Controller）を使用してサーバーをDOS/DDOS攻撃から保護するか、外部アクセスが必要なときは常にVPNを使用してください。SBCやVPNなしでポート5060をインターネットに開放したままにすると、DOS/DDOS攻撃に対して無防備になります。リスクは自己責任となります。
 
-### PJSIP時代のハードニング (Asterisk 22)
+### PJSIP時代の強化（Asterisk 22）
 
-Beyond the firewall and Fail2Ban, Asterisk 22's PJSIP stack provides several configuration-level controls that should be part of your security policy. These complement (not replace) the network controls above:
+ファイアウォールやFail2Banに加え、Asterisk 22のPJSIPスタックには、セキュリティポリシーの一部として組み込むべき設定レベルの制御がいくつか用意されています。これらは上記のネットワーク制御を補完するものであり、置き換えるものではありません。
 
-- **エンドポイントごとの認証。** すべてのエンドポイントは、強力で一意な`password`（`auth_type=digest`）を持つ専用の`type=auth`セクションを参照すべきです。エンドポイント間で認証情報を再利用しないでください。  
-- **匿名処理は組み込みです。** PJSIP は認証失敗時にユーザー名が存在するかどうかを明かしません。匿名呼び出しを受け入れるには、`anonymous`という名前のエンドポイントを明示的に作成し、`type=identify`セクション（送信元 IP でマッチ）を使用して既知のピアをエンドポイントにマッピングします。匿名呼び出しを不要とする場合は、`anonymous`エンドポイントを作成せず、マッチしないリクエストはチャレンジ/拒否されます。  
-- **ACL。** エンドポイントに対して`/etc/asterisk/acl.conf`で名前付けされた ACL を設定し、エンドポイントから`acl=`（シグナリング/ソース ACL）および`contact_acl=`（コンタクト/登録アドレスを制限）で参照します。エンドポイント自体に permit/deny を直接設定することもできます。  
-- **`qualify`。** AOR に`qualify_frequency`（および`qualify_timeout`）を設定し、Asterisk が登録コンタクトの到達可能性を能動的に監視し、死んだコンタクトを除去できるようにします。  
-- **PJSIP トランスポートのハードニング / DoS 保護。** `type=transport`はトランスポートごとのクライアント上限を公開しないため、接続フラッド保護はファイアウォール（本章の iptables/Fail2Ban ルール）から提供されます。トランスポートが提供するのは TCP キープアライブ調整（`tcp_keepalive_enable`、`tcp_keepalive_idle_time`、`tcp_keepalive_interval_time`、`tcp_keepalive_probe_count`）で、死んだ/半開状態の接続を除去し、正しい NAT 処理のための`local_net`/`external_*`設定です。これらをファイアウォールルールと組み合わせて接続フラッド攻撃を緩和してください。  
-- **TLS + SRTP によるメディア暗号化。** エンドポイントで TLS トランスポートを使用してシグナリングを暗号化し、メディアは`media_encryption=sdes`（WebRTC の場合は`dtls`）で暗号化します—本章の後半で詳しく説明します。  
-- **AMI/ARI アクセス制御。** Asterisk Manager Interface（`manager.conf`）と ARI（`ari.conf` / `http.conf`）へのアクセスを localhost または信頼できる管理ネットワークに制限し、強力で一意なシークレットを使用し、HTTP サーバーをプライベートインターフェースにバインドし、インターネットに公開しないでください。
+- **エンドポイントごとの認証。** すべてのエンドポイントは、強力で一意な`password`（`auth_type=digest`）を持つ専用の`type=auth`セクションを参照する必要があります。エンドポイント間で認証情報を再利用しないでください。
+- **匿名呼び出しの処理は組み込み済み。** PJSIPは、認証失敗時にユーザー名が存在するかどうかを明かしません。匿名呼び出しを完全に受け入れるには、明示的に`anonymous`という名前のエンドポイントを作成し、`type=identify`セクション（送信元IPで一致）を使用して既知のピアをエンドポイントにマッピングする必要があります。匿名呼び出しを許可したくない場合は、単に`anonymous`エンドポイントを作成しなければ、一致しないリクエストはチャレンジまたは拒否されます。
+- **ACL。** `/etc/asterisk/acl.conf`という名前のACLを使用してエンドポイントへの到達範囲を制限し、エンドポイントから`acl=`（シグナリング/送信元ACL）および`contact_acl=`（連絡先/登録アドレスを制限）で参照します。エンドポイントに対して直接permit/denyを設定することも可能です。
+- **`qualify`。** AORに`qualify_frequency`（および`qualify_timeout`）を設定することで、Asteriskが登録済み連絡先の到達可能性を能動的に監視し、無効なものを削除するようにします。
+- **PJSIPトランスポートの強化 / DoS保護。** `type=transport`にはトランスポートごとのクライアント上限設定がないため、接続フラッド攻撃からの保護はPJSIPオプションではなくファイアウォール（本章のiptables/Fail2Banルール）によって行われます。トランスポートが提供するのは、無効または半開きの接続を回収するためのTCPキープアライブ調整（`tcp_keepalive_enable`、`tcp_keepalive_idle_time`、`tcp_keepalive_interval_time`、`tcp_keepalive_probe_count`）と、適切なNAT処理のための`local_net`/`external_*`設定です。これらをファイアウォールルールと組み合わせることで、接続フラッド攻撃を緩和します。
+- **メディア用のTLS + SRTP。** エンドポイント上でTLSトランスポートによるシグナリングの暗号化と、`media_encryption=sdes`（WebRTCの場合は`dtls`）によるメディアの暗号化を行います。これについては本章の後半で説明します。
+- **AMI/ARIのアクセス制御。** Asterisk Manager Interface（`manager.conf`）およびARI（`ari.conf` / `http.conf`）へのアクセスをlocalhostまたは信頼できる管理ネットワークに制限し、強力で一意なシークレットを使用し、HTTPサーバーをプライベートインターフェースにバインドしてください。これらをインターネットに公開してはいけません。
 
-All of the option names above are confirmed against Asterisk 22.10: the `type=transport` section exposes `tcp_keepalive_enable`, `tcp_keepalive_idle_time`, `tcp_keepalive_interval_time`, `tcp_keepalive_probe_count`, `tos`, `cos`, `local_net`, and the `external_*` family, but it has **no** `max_clients` option — connection-flood protection comes from the firewall, not from the transport. The `acl` and `contact_acl` endpoint options take section names from `acl.conf`, and source-IP matching for unauthenticated peers is done with `type=identify` sections (`match=`).
+上記のオプション名はすべてAsterisk 22.10で確認済みです。`type=transport`セクションは`tcp_keepalive_enable`、`tcp_keepalive_idle_time`、`tcp_keepalive_interval_time`、`tcp_keepalive_probe_count`、`tos`、`cos`、`local_net`および`external_*`ファミリーを公開していますが、`max_clients`オプションは**ありません**。接続フラッド保護はトランスポートではなくファイアウォールによって行われます。`acl`および`contact_acl`エンドポイントオプションは`acl.conf`からセクション名を取得し、認証されていないピアの送信元IP一致は`type=identify`セクション（`match=`）で行われます。
 
 ### 不要なポートの削除
 
-Instead of discovering all vulnerabilities associated with all Asterisk protocols, let us simplify the problem removing the unnecessary ports. To list all ports open by the Asterisk server use:
+Asteriskのすべてのプロトコルに関連する脆弱性をすべて発見する代わりに、不要なポートを削除して問題を単純化しましょう。Asteriskサーバーによって開かれているすべてのポートをリストするには、以下を使用します。
 
 ```
 netstat -pantu |grep asterisk
 ```
 
-The output of the command is shown below.
+コマンドの出力は以下の通りです。
 
-![netstat output showing the many ports bound by Asterisk, including 4569 (IAX) and 2727 (MGCP)](../images/19-security-fig05.png)
+![4569 (IAX) や 2727 (MGCP) を含む、Asteriskによってバインドされた多数のポートを示すnetstatの出力](../images/19-security-fig05.png)
 
-If you look at the output, you will discover that many ports are open. Do we need them? Not necessarily, 2727 is the MGCP protocol (chan_mgcp), 4569 is the IAX (chan_iax2). If you are not using these protocols, you can simply remove the module in the configuration file modules.conf.
+出力を見ると、多くのポートが開いていることがわかります。これらは必要でしょうか？必ずしもそうではありません。2727はMGCPプロトコル（chan_mgcp）、4569はIAX（chan_iax2）です。これらのプロトコルを使用していない場合は、設定ファイルmodules.confでモジュールを削除するだけで済みます。
 
-You may notice Asterisk binding a high-numbered UDP port. This comes from `res_pjsip`'s resolver making outbound DNS queries (the source port is ephemeral, like any client DNS lookup), not from an inbound listener — your firewall only needs to allow **established/related** return traffic for it (the iptables `conntrack ESTABLISHED,RELATED` rule shown below already covers this). You do **not** need to open a wide inbound high-UDP range just for PJSIP DNS.
+Asteriskが大きな番号のUDPポートをバインドしていることに気づくかもしれません。これは`res_pjsip`のリゾルバーがアウトバウンドのDNSクエリを行うため（送信元ポートはクライアントのDNSルックアップと同様にエフェメラルです）であり、インバウンドのリスナーによるものではありません。ファイアウォールでは、これに対する**確立済み/関連（established/related）**の戻りトラフィックのみを許可すれば十分です（以下に示すiptablesの`conntrack ESTABLISHED,RELATED`ルールで既にカバーされています）。PJSIPのDNSのためだけに、広範囲のインバウンド高UDPポートを開放する必要は**ありません**。
 
-To remove the unnecessary ports, disable the modules you don't use. Edit the file modules.conf and add `noload` lines for the channels and protocols you are not using. **Do not** noload `res_pjsip`, `res_pjproject`, or `chan_pjsip` — those are required for SIP in Asterisk 22.
+不要なポートを削除するには、使用しないモジュールを無効にします。modules.confファイルを編集し、使用していないチャネルやプロトコルの`noload`行を追加します。`res_pjsip`、`res_pjproject`、または`chan_pjsip`をnoloadしないでください。これらはAsterisk 22のSIPに必要です。
 
 ```
 ; res_pjsip / res_pjproject / chan_pjsip are REQUIRED in Asterisk 22 - keep them loaded
@@ -137,153 +137,175 @@ noload => chan_iax2.so
 noload => chan_unistim.so
 ```
 
-(In Asterisk 22 you no longer need to noload `chan_mgcp` or `chan_skinny` — those drivers were *removed* in Asterisk 21 and are not part of a stock 22 build.) With the instructions above, I have removed all unnecessary channels keeping only PJSIP. You can choose whatever protocol modules you want, just remove the unused ones. The result is shown in the screenshot below — only the SIP port (5060) bound by your PJSIP transport is now exposed inbound.
+（Asterisk 22では、`chan_mgcp`や`chan_skinny`をnoloadする必要はもうありません。これらのドライバーはAsterisk 21で*削除*されており、標準の22ビルドには含まれていません。）上記の手順により、PJSIPのみを残してすべての不要なチャネルを削除しました。使用したいプロトコルモジュールは自由に選択できますが、使用しないものは削除してください。結果は以下のスクリーンショットの通りです。PJSIPトランスポートによってバインドされたSIPポート（5060）のみがインバウンドとして公開されています。
 
-![netstat output after disabling the unused modules: only UDP port 5060 remains bound by Asterisk](../images/19-security-fig06.png)
+![未使用のモジュールを無効にした後のnetstat出力：AsteriskによってバインドされているのはUDPポート5060のみ](../images/19-security-fig06.png)
 
-### IPTABLES でセキュリティポリシーを実装する
+### IPTABLESによるセキュリティポリシーの実装
 
-IPTABLES または netfilter は、ほとんどの Linux ディストリビューションに標準で搭載されているファイアウォールです。このラボでは iptables と fail2ban を設定します。目的は、Asterisk に推奨されるセキュリティポリシーを実装し、不要なトラフィックをすべてブロックすることです。以下の手順に従ってください。
+IPTABLESまたはnetfilterは、ほとんどのLinuxディストリビューションに存在する標準的なファイアウォールです。このラボでは、iptablesとfail2banを設定します。目的は、Asteriskに推奨されるセキュリティポリシーを実装し、すべての不要なトラフィックをブロックすることです。以下の手順に従ってください。
 
 1. すべての外部トラフィックをブロックする
-2. 内部ネットワークまたは単一ホストからの SSH トラフィックを許可する
-3. UDP と TCP のポート 5060 で SIP トラフィックを許可する
-4. UDP メディアポート範囲で RTP トラフィックを許可する。デフォルトの単一設定はなく、Asterisk の独自 `rtp.conf` は何も設定されていない場合 5000–31000 にフォールバックしますが、同梱の `rtp.conf.sample` は `rtpstart=10000` / `rtpend=20000` を設定しているため、ここではその例の範囲を使用します。ファイアウォールルールは、実際に `rtp.conf` で設定した `rtpstart`/`rtpend` に合わせてください。
+2. 内部ネットワークまたは単一ホストからのSSHトラフィックを許可する
+3. UDPおよびTCPのポート5060でのSIPトラフィックを許可する
+4. UDPメディアポート範囲でのRTPトラフィックを許可する。組み込みのデフォルト値は単一ではありません。Asterisk自身の`rtp.conf`は何も設定されていない場合5000–31000のポートにフォールバックしますが、同梱の`rtp.conf.sample`は`rtpstart=10000` / `rtpend=20000`を設定しているため、ここではその例の範囲を使用します。ファイアウォールルールを、実際に`rtp.conf`で設定した`rtpstart`/`rtpend`に合わせてください。
 
-サーバーへのコンソールアクセスがあることを確認してください。自分自身をシステムから締め出さないように注意が必要です。
+サーバーへのコンソールアクセス権があることを確認してください。システムから締め出されないように注意が必要です。慎重に行ってください。
 
-1. パッケージ net-persistent をインストールする。```
+1. パッケージnet-persistentをインストールします。
+
+   ```
    sudo apt-get install iptables-persistent
    ```
 
-2. ループバックからのすべてのトラフィックを許可する```
+2. ループバックからのすべてのトラフィックを許可します。
+
+   ```
    sudo iptables -I INPUT -i lo -j ACCEPT
    sudo iptables -I OUTPUT -o lo -j ACCEPT
    ```
 
-3. 確立された接続を許可する```
+3. 確立された接続を許可します。
+
+   ```
    sudo iptables -I INPUT -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
    ```
 
-ネットワーク 192.168.0.0 からの SSH/HTTPS トラフィックを許可する```
+4. ネットワーク192.168.0.0からのSSH/HTTPSトラフィックを許可します。
+
+   ```
    sudo iptables -I INPUT -p tcp -s 192.168.0.0/16 --dport 22 -m conntrack --ctstate
    NEW,ESTABLISHED -j ACCEPT
    sudo iptables -I INPUT -p tcp -s 192.168.0.0/16 --dport 443 -m conntrack --ctstate
    NEW,ESTABLISHED -j ACCEPT
    ```
 
-5. Asterisk のルールを挿入する```
+5. Asteriskルールを挿入します。
+
+   ```
    sudo iptables -I INPUT -p udp -m udp --dport 5060 -j ACCEPT
    sudo iptables -I INPUT -p tcp -m tcp --dport 5060 -j ACCEPT
    sudo iptables -I INPUT -p tcp -m tcp --dport 5061 -j ACCEPT
    sudo iptables -I INPUT -p udp -m udp --dport 10000:20000 -j ACCEPT
    ```
 
-   ポート 5061（TLS 上の SIP）は **TCP** であり、UDP ではありません。上記のルールは 5060 を UDP と TCP の両方で、5061 を TCP で開きます。TLS のみを使用する場合は、プレーンな 5060 のルールを完全に削除できます。実際にバインドしている PJSIP トランスポートが使用するポートだけを開放してください。
+   ポート5061（TLS経由のSIP）はUDPではなく**TCP**であることに注意してください。上記のルールは5060をUDPとTCPの両方で、5061をTCPで開放します。TLSのみを実行する場合は、通常の5060ルールを完全に削除できます。PJSIPトランスポートが実際にバインドしているポートのみを開放してください。
 
-   `-I` は PREPEND を意味します
+   `-I`はPREPEND（先頭への挿入）を意味します。
 
-6. 最後のルールはドロップでなければなりません```
+6. 最後のルールはドロップ（破棄）である必要があります。
+
+   ```
    sudo iptables -A INPUT -j DROP
    ```
 
-`-A` は APPEND を意味します。注意: 新しいルールを管理する際は、DROP の前にルールを追加する必要があります。新しいルールには PREPEND を使用してください `-I`
+   `-A`はAPPEND（末尾への追加）を意味します。注意：新しいルールを維持する際は、DROPの前にルールを追加する必要があります。新しいルールにはPREPENDを使用してください`-I`。
 
-7. ルールを保存して iptables を再起動します```
+7. ルールを保存し、iptablesを再起動します。
+
+   ```
    sudo iptables-save >/etc/iptables/rules.v4
    sudo /etc/init.d/netfilter-persistent restart
    ```
 
-### Fail2Ban を使用して複数の認証失敗をブロックする
+### Fail2Banを使用して複数回の認証失敗をブロックする
 
-Fail2Ban は Asterisk においてほぼ標準的な存在です。ほとんどのユーザーがセキュリティ強化のために導入しています。このユーティリティは Asterisk のログをスキャンし、認証失敗を検出して攻撃者の IP アドレスをブロックします。以下に Fail2Ban のインストール手順を示します。
+Fail2BanはAsteriskにとってほぼ標準的なツールです。ほとんどのユーザーがセキュリティを強化するために実装しています。このユーティリティはAsteriskのログをスキャンし、認証に失敗した攻撃者のIPアドレスを禁止します。以下にFail2Banのインストール手順を示します。
 
-Asterisk 22 では、PJSIP が認証失敗やその他のセキュリティイベントを Asterisk **security event framework** を通じて報告し、専用の **`security`** ロガーチャネルに書き込みます。Fail2Ban を機能させるには次のことが必要です。
+Asterisk 22では、PJSIPは認証失敗やその他のセキュリティイベントを、専用の**`security`ロガーチャネル**に書き込まれるAsteriskの**セキュリティイベントフレームワーク**を通じて報告します。Fail2Banを機能させるには、以下を行う必要があります。
 
-1. `/etc/asterisk/logger.conf`でセキュリティチャネルを有効にします。構文は`<filename> => <levels>`で、セキュリティレベルを`security`という名前のファイルに送るには次のように記述します：
+1. `/etc/asterisk/logger.conf`でセキュリティチャネルを有効にします。構文は`<filename> => <levels>`であるため、セキュリティレベルを`security`という名前のファイルに送信するには以下のように記述します。
 
 ```
 [logfiles]
 security => security
 ```
 
-次に CLI から `logger reload` を実行します。これにより、1 行につき 1 つのセキュリティイベントが含まれる `/var/log/asterisk/security` が生成され、形式は次のとおりです:
+次に、CLIから`logger reload`を実行します。これにより、セキュリティイベントごとに1行ずつ、以下の形式で`/var/log/asterisk/security`が生成されます。
 
 ```
 [2026-01-15 10:23:45] SECURITY[1234] res_security_log.c: SecurityEvent="InvalidPassword",...,RemoteAddress="IPV4/UDP/203.0.113.7/5060",...
 ```
 
-The events Fail2Ban cares about are `InvalidPassword`, `ChallengeResponseFailed`, `InvalidAccountID`, and `FailedACL`, each carrying a `RemoteAddress="IPV4/UDP/<ip>/<port>"` field that identifies the offender. (Note the address is wrapped as `IPV4/UDP/.../...`, not a bare IP — your filter must extract the host from inside that string.)
+Fail2Banが監視するイベントは`InvalidPassword`、`ChallengeResponseFailed`、`InvalidAccountID`、および`FailedACL`であり、それぞれが攻撃者を特定する`RemoteAddress="IPV4/UDP/<ip>/<port>"`フィールドを持っています。（アドレスは単なるIPではなく`IPV4/UDP/.../...`のようにラップされていることに注意してください。フィルターは、その文字列内からホストを抽出する必要があります。）
 
-2. Point the `asterisk` jail at that file (`logpath = /var/log/asterisk/security`) and use a filter that parses this security-event format.
+2. `asterisk`ジェイルをそのファイル（`logpath = /var/log/asterisk/security`）に向け、このセキュリティイベント形式を解析するフィルターを使用します。
 
-Modern Fail2Ban ships an `asterisk` filter whose `failregex` already matches the events above and extracts `<HOST>` from the `RemoteAddress` field, for example:
+最新のFail2Banには`asterisk`フィルターが同梱されており、その`failregex`は既に上記のイベントと一致し、`RemoteAddress`フィールドから`<HOST>`を抽出します。例：
 
 ```
 failregex = ^SecurityEvent="(?:FailedACL|InvalidAccountID|ChallengeResponseFailed|InvalidPassword)".*,RemoteAddress="IPV[46]/[^/"]+/<HOST>/\d+"
 ```
 
-PBX ディストリビューション（FreePBX/Sangoma）は同等のフィルタを提供します。正確なイベント文字列はバージョン依存であるため、手動で作成するよりもパッケージ化されたフィルタを使用してください。注意すべき点として、現在パッチが適用されたアドバイザリ（GHSA-5743-x3p5-3rg7）により、細工された PJSIP トラフィックが偽のログ行を注入できることが示されました — Asterisk と Fail2Ban フィルタの両方を最新の状態に保ちましょう。
+PBXディストリビューション（FreePBX/Sangoma）には同等のフィルターが同梱されています。正確なイベント文字列はバージョンに依存するため、自作するよりもパッケージ化されたフィルターを優先してください。注意すべき点として、修正済みの勧告（GHSA-5743-x3p5-3rg7）で示されたように、細工されたPJSIPトラフィックが偽のログ行を注入する可能性があるため、AsteriskとFail2Banフィルターの両方を最新の状態に保ってください。
 
-以下に Fail2Ban をインストールする手順を示します
+以下にFail2Banのインストール手順を示します。
 
-1. Linux に fail2ban をインストールする```
+1. Linuxにfail2banをインストールします。
+
+   ```
    sudo apt-get install fail2ban
    ```
 
-2. Asterisk と SSH のために fail2ban を有効化する```
+2. AsteriskおよびSSH用のfail2banを有効にします。
+
+   ```
    sudo vi /etc/fail2ban/jails.d/defaults-debian.conf
    ```
 
-Add the following lines to activate fail2ban for ssh and asterisk
+   sshおよびasterisk用のfail2banを有効にするために、以下の行を追加します。
 
-ssh と asterisk 用に fail2ban を有効にするには、以下の行を追加してください```
+   ```
    [sshd]
    enabled = true
    [asterisk]
    enabled=true
    ```
 
-3. fail2ban の再起動```
+3. fail2banを再起動します。
+
+   ```
    /etc/init.d/fail2ban restart
    ```
 
-4. Verify. Change the secret from your softphone and try to re-register 10 times. Using `iptables -L`, check if the softphone address was included as a blocked address.
-5. Remove the address from the ban (suppose the address is 192.168.0.5)```
+4. 検証します。ソフトフォンからシークレットを変更し、10回再登録を試みます。`iptables -L`を使用して、ソフトフォンのアドレスがブロックされたアドレスとして含まれているか確認します。
+5. 禁止リストからアドレスを削除します（アドレスが192.168.0.5であると仮定）。
+
+   ```
    sudo fail2ban-client set asterisk unbanip 192.168.0.5
    ```
 
-Note: In the command replace 192.168.0.5 by the ip address of your phone
+注意：コマンド内の192.168.0.5は、お使いの電話のIPアドレスに置き換えてください。
 
-### Implementing TLS and SRTP
+### TLSとSRTPの実装
 
-I will split this section in two. In the first part we will cover TLS to encrypt signaling and in the second part SRTP to encrypt media. The objective here is to configure Asterisk for these resources.
+このセクションを2つに分けます。前半ではシグナリングを暗号化するためのTLSを、後半ではメディアを暗号化するためのSRTPを扱います。ここでの目的は、これらのリソースのためにAsteriskを設定することです。
 
 #### TLS
 
-TLS (Transport Layer Security) is the encryption mechanism defined to protect the SIP signaling. The table below summarizes which attacks TLS protects against:
+TLS（Transport Layer Security）は、SIPシグナリングを保護するために定義された暗号化メカニズムです。以下の表は、TLSがどの攻撃から保護するかをまとめたものです。
 
-| Type of attack | Protected? | Notes |
+| 攻撃の種類 | 保護対象か | 備考 |
 |----------------|-----------|-------|
-| Signaling attacks | Yes | TLS assures the integrity of the messages |
-| Man in the middle | Yes | TLS checks the server certificate |
-| Eavesdropping | No | TLS encrypts signaling, not media |
+| シグナリング攻撃 | はい | TLSはメッセージの整合性を保証します |
+| 中間者攻撃 | はい | TLSはサーバー証明書をチェックします |
+| 盗聴 | いいえ | TLSはシグナリングを暗号化しますが、メディアは暗号化しません |
 
-For media (voice/video) encryption use SRTP.
+メディア（音声/ビデオ）の暗号化にはSRTPを使用してください。
 
-#### Self-signed digital certificates
+#### 自己署名デジタル証明書
 
-There are two types of certificates you can use self-signed and commercial. Self-signed certificates are signed by your own server while commercial certificates are signed by an external authority. For VoIP, you can be your own certificate authority. There is no need for an external certificate such as GoDaddy and Verisign, this is an unnecessary expense. We will generate our own certificates using ast_tls_cert.
+使用できる証明書には、自己署名証明書と商用証明書の2種類があります。自己署名証明書は自身のサーバーによって署名され、商用証明書は外部の認証局によって署名されます。VoIPの場合、自分自身が認証局になることができます。GoDaddyやVerisignのような外部証明書は不要であり、無駄な出費です。ast_tls_certを使用して独自の証明書を生成します。
 
-#### Configuring TLS with self signed certificates
+#### 自己署名証明書によるTLSの設定
 
-Below is a step-by-step guide on how to implement TLS. We first generate the certificates, then configure the PJSIP TLS transport (see "Configuring TLS with chan_pjsip"), and finally point the softphone at it. We will use the SipPulse Softphone, which supports TLS and SRTP natively. (Any TLS/SRTP-capable SIP softphone works the same way.)
+以下はTLSを実装するためのステップバイステップガイドです。まず証明書を生成し、次にPJSIP TLSトランスポートを設定し（「chan_pjsipによるTLSの設定」を参照）、最後にソフトフォンをそれらに向けます。ここでは、TLSとSRTPをネイティブでサポートするSipPulse Softphoneを使用します。（TLS/SRTP対応のSIPソフトフォンであれば同様の手順で動作します。）
 
-**Step 1.** Create a private RSA key using 3DES encryption with length of 4096 bits for our certification authority. The command below present in /usr/src/asterisk-22.x.y/contrib/scripts will create the Certification Authority and The Asterisk Certificate. As usual adapt the instructions if required, versions change, directories change. Please, pay attention on what you are doing. Use your domain or IP address in the –C option. The command ast_tls_cert has three options.
+**ステップ 1.** 認証局のために、4096ビットの長さの3DES暗号化を使用したプライベートRSAキーを作成します。/usr/src/asterisk-22.x.y/contrib/scriptsにある以下のコマンドは、認証局とAsterisk証明書を作成します。通常通り、必要に応じて手順を適応させてください。バージョンやディレクトリは変更される可能性があります。作業内容に注意してください。–CオプションにはドメインまたはIPアドレスを使用してください。ast_tls_certコマンドには3つのオプションがあります。
 
-- -C host or IP address (I have used 192.168.0.74, the IP address of my VM)
-- -O Organizational name
-- -d Directory where to store the keys
+- -C ホストまたはIPアドレス（私はVMのIPアドレスである192.168.0.74を使用しました）
+- -O 組織名
+- -d キーを保存するディレクトリ
 
 ```
 mkdir /etc/asterisk/keys
@@ -316,29 +338,29 @@ Combining key and crt into /etc/asterisk/keys/asterisk.pem
 root@asterisk:/usr/src/asterisk-22.0.0/contrib/scripts#
 ```
 
-I’m not going to generate a client certificate because we are not going to use the certificate to authenticate the client. The client is not required to present its own certificate.
+クライアントの認証に証明書を使用するわけではないため、クライアント証明書は生成しません。クライアントが独自の証明書を提示する必要はありません。
 
-**Step 2.** Configure Asterisk to support our client over TLS. This is done in `pjsip.conf` (a TLS transport plus the endpoint settings) — the full configuration is shown in the next section, "Configuring TLS with chan_pjsip." We are not authenticating using certificates, just encrypting the traffic.
+**ステップ 2.** TLS経由でクライアントをサポートするようにAsteriskを設定します。これは`pjsip.conf`で行われます（TLSトランスポートとエンドポイント設定）。完全な設定は次のセクション「chan_pjsipによるTLSの設定」で示します。ここでは証明書を使用した認証は行わず、トラフィックの暗号化のみを行います。
 
-**Step 3.** Install a TLS-capable SIP softphone (the author uses the SipPulse Softphone).
+**ステップ 3.** TLS対応のSIPソフトフォンをインストールします（著者はSipPulse Softphoneを使用しています）。
 
-**Step 4.** Copy the certificate authority to the computer running the softphone. After installing it, copy the file `/etc/asterisk/keys/ca.crt` to the computer running the softphone (use scp, or WinSCP on Windows) if you are using a self-signed certificate.
+**ステップ 4.** 認証局の証明書をソフトフォンを実行しているコンピュータにコピーします。インストール後、自己署名証明書を使用している場合は、ファイル`/etc/asterisk/keys/ca.crt`をソフトフォンを実行しているコンピュータにコピーします（scp、またはWindowsの場合はWinSCPを使用）。
 
-**Step 5.** Create the account in the softphone. In the account screen add the account normally like any other sip account. Use the right password, the authentication is still based on the password.
+**ステップ 5.** ソフトフォンでアカウントを作成します。アカウント画面で、他のSIPアカウントと同様に通常通りアカウントを追加します。正しいパスワードを使用してください。認証は依然としてパスワードに基づいています。
 
-**Step 6.** Set TLS as the transport in the account settings. In the SipPulse Softphone account screen (below), choose **TLS** as the transport and use port 5061. Adjust your firewall to open TCP port 5061.
+**ステップ 6.** アカウント設定でトランスポートとしてTLSを設定します。SipPulse Softphoneのアカウント画面（下記）で、トランスポートとして**TLS**を選択し、ポート5061を使用します。ファイアウォールを調整してTCPポート5061を開放してください。
 
-![The SipPulse Softphone account screen — enter the Server (your Asterisk IP or domain), Username, Password, and Display Name, then choose the Transport (UDP, TCP, or TLS).](../images/softphone/sipphone-account.png){width=35%}
+![SipPulse Softphoneのアカウント画面 — サーバー（AsteriskのIPまたはドメイン）、ユーザー名、パスワード、表示名を入力し、トランスポート（UDP、TCP、またはTLS）を選択します。](../images/softphone/sipphone-account.png){width=35%}
 
-**Step 7.** Trust the certificate authority. If your Asterisk TLS certificate is signed by a public CA (for example Let's Encrypt — see the *Deployment* chapter), a modern softphone such as the SipPulse Softphone trusts it automatically through the system certificate store, with no manual import. If you use a self-signed certificate, import its CA (`/etc/asterisk/keys/ca.crt`) into the client or the operating-system trust store, or accept it when prompted.
+**ステップ 7.** 認証局を信頼します。AsteriskのTLS証明書がパブリックCA（Let's Encryptなど — *展開*の章を参照）によって署名されている場合、SipPulse Softphoneのような最新のソフトフォンは、手動インポートなしでシステム証明書ストアを通じて自動的に信頼します。自己署名証明書を使用する場合は、そのCA（`/etc/asterisk/keys/ca.crt`）をクライアントまたはオペレーティングシステムの信頼ストアにインポートするか、プロンプトが表示されたら受け入れてください。
 
-**Step 8.** You do **not** need a client certificate. A common misconception is that each phone needs its own certificate to authenticate — it does not. At this point Asterisk only *encrypts* the session; authentication is still username and password. Asterisk does not verify client certificates by default, so there is no need to distribute a per-client certificate.
+**ステップ 8.** クライアント証明書は**不要**です。各電話機が認証のために独自の証明書を必要とするというのは一般的な誤解ですが、そうではありません。この時点でAsteriskはセッションを*暗号化*するだけであり、認証は依然としてユーザー名とパスワードで行われます。Asteriskはデフォルトでクライアント証明書を検証しないため、クライアントごとに証明書を配布する必要はありません。
 
-**Step 9.** After changing the certificate or transport, fully restart the softphone (quit and relaunch, not just close the window) so it reconnects over the new transport.
+**ステップ 9.** 証明書やトランスポートを変更した後は、ソフトフォンを完全に再起動してください（ウィンドウを閉じるだけでなく、終了して再起動します）。これにより、新しいトランスポート経由で再接続されます。
 
-### Configuring TLS with chan_pjsip
+### chan_pjsipによるTLSの設定
 
-Now let’s learn how to configure PJSIP for TLS. PJSIP is the only SIP channel in Asterisk 22, so there is nothing to switch — just make sure `res_pjsip`, `res_pjproject` and `chan_pjsip` are loaded. Step 1: Confirm PJSIP is enabled in /etc/asterisk/modules.conf.
+次に、PJSIPをTLS用に設定する方法を学びます。PJSIPはAsterisk 22における唯一のSIPチャネルであるため、切り替える必要はありません。`res_pjsip`、`res_pjproject`および`chan_pjsip`がロードされていることを確認するだけです。ステップ1：/etc/asterisk/modules.confでPJSIPが有効になっていることを確認します。
 
 ```
 ; res_pjsip / res_pjproject / chan_pjsip must be loaded (do NOT noload them)
@@ -346,7 +368,7 @@ noload => chan_iax2.so
 noload => chan_unistim.so
 ```
 
-ステップ2: PJSIP を TLS 対応に設定します。ファイル /etc/asterisk/pjsip.conf に TLS トランスポート用のセクションを追加します。
+ステップ2：TLSをサポートするようにPJSIPを設定します。/etc/asterisk/pjsip.confファイルにTLSトランスポート用のセクションを追加します。
 
 ```
 [transport-tls]
@@ -358,9 +380,9 @@ priv_key_file=/etc/asterisk/keys/asterisk.key
 method=tlsv1_2
 ```
 
-Use `method=tlsv1_2` (or `tlsv1_3` if your OpenSSL/PJSIP build supports it) — TLS 1.0/1.1 are obsolete and insecure and should not be used.
+`method=tlsv1_2`（またはOpenSSL/PJSIPビルドがサポートしていれば`tlsv1_3`）を使用してください。TLS 1.0/1.1は廃止されており安全ではないため、使用すべきではありません。
 
-ステップ 3: Configure the endpoint for blink. Edit `pjsip.conf` and edit the section for blink. Let PJSIP choose the transport automatically.
+ステップ3：blink用のエンドポイントを設定します。`pjsip.conf`を編集し、blink用のセクションを編集します。PJSIPが自動的にトランスポートを選択するようにします。
 
 ```
 [blink]
@@ -383,7 +405,7 @@ username=blink
 password=supersecret
 ```
 
-Step 4: Verifying. TLS を使用して登録が行われたことを確認するには、Asterisk コンソールで次のコマンドを使用します。
+ステップ4：検証。登録がTLS経由で行われたことを確認するには、Asteriskコンソールで以下のコマンドを使用します。
 
 ```text
 asterisk*CLI> pjsip show aor blink
@@ -408,9 +430,9 @@ asterisk*CLI> pjsip show aor blink
  support_path         : false
 ```
 
-### Making secure calls using SRTP
+### SRTPを使用したセキュアな通話
 
-メディア暗号化を担当するプロトコルは、RFC3711で定義された Secure Real Time Protocol (SRTP) です。このプロトコルの短所の一つは、鍵交換の標準化された方法がないことです。Asterisk は、TLS によって保護されたシグナリング暗号化を利用し、SDP プロトコル上で SDES による鍵交換を行います。他にも MIKEY や ZRTP といった方法があります。Philipp Zimmermann が開発した ZRTP は、鍵交換とメディア暗号化のための最も高度な手法の一つです。一部のソフトフォンやハードフォンは ZRTP に対応しています。しかし、標準的な方法は依然として SDES であり、市場に出回っているほぼすべての電話でこの方式が採用されています。以下は、SDP の a=crypto:1 および a=crypto:2 行で暗号鍵が定義されたリクエストの例です。
+メディア暗号化を担当するプロトコルは、RFC3711で定義されているSecure Real Time Protocol（SRTP）です。このプロトコルの欠点の1つは、鍵交換の方法が標準化されていないことです。Asteriskは、TLSによって提供されるシグナリング暗号化で保護されたSDPプロトコル上でSDES交換鍵を使用します。MIKEYやZRTPなどの他の方法もあります。Philipp Zimmermannによって開発されたZRTPは、鍵交換とメディア暗号化のための最も洗練された方法の1つです。一部のソフトフォンやハードフォンはZRTPを許可しています。しかし、標準的な方法は依然としてSDESであり、市場に出回っているほぼすべての電話機でこの方法を見つけることができます。以下は、SDPのa=crypto:1およびa=crypto:2行で定義された暗号鍵を含むリクエストの例です。
 
 ```
 INVITE sip:8000@192.168.1.237 SIP/2.0
@@ -458,13 +480,13 @@ inline:4Ma9jJOCEEGMPzzkmgyf6ttp1qhN16yumdXB7eRv
 a=sendrecv
 ```
 
-#### AsteriskでのSRTP設定
+#### AsteriskでのSRTPの設定
 
-AsteriskでSRTPを設定するのは非常に簡単です。エンドポイントで`media_encryption=sdes`を設定します；`media_encryption_optimistic=no`を使用して暗号化されていないメディアを静かに許可するのではなく、拒否するように要求することもできます。SDESはシグナリングをTLS上で実行する必要があるため、キーが平文で送信されないことに注意してください。
+AsteriskでのSRTPの設定は非常に簡単です。エンドポイントで`media_encryption=sdes`を設定します。また、`media_encryption_optimistic=no`を使用して必須にすることで、暗号化されていないメディアを黙認するのではなく拒否することもできます。SDESはシグナリングがTLS経由で実行されることを必要とするため、鍵が平文で送信されることはありません。
 
-**Step 1.** Asterisk設定
+**ステップ 1.** Asteriskの設定
 
-`pjsip.conf`の`type=endpoint`セクションに以下を設定します：
+`pjsip.conf`の`type=endpoint`セクションに以下を設定します。
 
 ```
 [blink]
@@ -479,15 +501,15 @@ media_encryption=sdes
 media_encryption_optimistic=no
 ```
 
-**Step 2.** ソフトフォンの設定
+**ステップ 2.** ソフトフォンの設定
 
-In the softphone, enable SRTP for the account media (set the **SRTP (Media Encryption)** option to *Mandatory*) so that voice is encrypted.
+ソフトフォンで、アカウントメディアのSRTPを有効にします（**SRTP (Media Encryption)** オプションを *Mandatory* に設定）。これにより音声が暗号化されます。
 
-![SipPulse ソフトフォンのアカウント設定（下部） — **Transport** を TLS に、**SRTP (Media Encryption)** を *Mandatory* に設定し、シグナリングとメディアの両方を暗号化します](../images/softphone/sipphone-config.png){width=35%}
+![SipPulse Softphoneのアカウント設定（下部） — **Transport** を TLS に、**SRTP (Media Encryption)** を *Mandatory* に設定し、シグナリングとメディアの両方が暗号化されるようにします。](../images/softphone/sipphone-config.png){width=35%}
 
-## 国際電話のための二要素認証の有効化
+## 国際電話に対する二要素認証の有効化
 
-国際ルートを持たないことが最善の場合もあります。しかし、どうしても国際電話をかける必要がある場合は、追加のパスワードを使用します。国際電話をかける前にボイスメールのパスワードを要求するために、Asterisk アプリケーション **vmauthenticate** を使用します。これは `extensions.conf` のダイヤルプランで設定します。以下の例をご参照ください。これにより、ハッカーがピアパスワードを取得したり電話を侵害したとしても、この宛先に電話をかけるにはボイスメールのパスワードが必要になります。
+国際電話のルートを設けないことが最善策である場合もあります。しかし、どうしても国際電話をかける必要がある場合は、追加のパスワードを使用してください。ここでは、国際電話をかける前に voicemail のパスワードを要求するために、Asterisk のアプリケーションである vmauthenticate を使用します。これは extensions.conf 内の dialplan で設定します。以下の例を参照してください。これにより、ハッカーが peer のパスワードを発見したり、電話機を乗っ取ったりした場合でも、この宛先に発信するには voicemail のパスワードが必要となります。
 
 ```
 exten=_9011.,1,Playback(pleasedialyourvmpassword)
@@ -496,61 +518,61 @@ exten=_9011.,3,Dial(PJSIP/${EXTEN:1}@my_trunk,20,tT)
 exten=_9011.,4,Hangup()
 ```
 
-`VMAuthenticate`は Asterisk 22 でも引き続き標準アプリケーションです。上記の`Dial()`は SIP/PJSIP トランク（`PJSIP/<number>@<trunk>`）経由で通話をルーティングします。これはほとんどの最新インストールが PSTN に接続する方法です — `my_trunk`を自分のトランク名に合わせて変更し、実際に DAHDI スパンがある場合のみ`DAHDI/g1/...`を使用してください。ダイヤルプランにおけるトラブル防止策 — このような第二要素を、アウトバウンドおよび国際ルートに到達できるコンテキストを制限することと組み合わせることは、展開できる最も重要な保護策の一つです。
+`VMAuthenticate` は Asterisk 22 においても標準的なアプリケーションです。上記の `Dial()` は SIP/PJSIP trunk (`PJSIP/<number>@<trunk>`) を経由して通話をルーティングします。これは、現代のほとんどのインストール環境で PSTN に接続するための方法です。ご自身の trunk 名に合わせて `my_trunk` を調整し、実際に DAHDI span を持っている場合にのみ `DAHDI/g1/...` を使用してください。dialplan における通話詐欺対策として、このような二要素認証を、どの context がアウトバウンドルートや国際ルートにアクセスできるかを制限することと組み合わせることは、導入可能な最も重要な保護策の一つであり続けます。
 
-## 要約
+## まとめ
 
-この章では、IP PBX をインターネットに接続することのリスクについて学びました。その後、セキュリティポリシーを実装して PBX を保護する方法を学びました。このセキュリティポリシーでは、iptables、fail2ban、TLS、SRTP、そして国際通話向けの双方向認証を実装しました。この章を楽しんでいただけたことを願っています。
+本章では、インターネットに接続された IP PBX が抱えるリスクについて学びました。続いて、セキュリティポリシーを実装することで PBX を保護する方法を学習しました。このセキュリティポリシーでは、iptables、fail2ban、TLS、SRTP、および国際電話に対する双方向認証を実装しました。本章を楽しんでいただけたなら幸いです。
 
-## Quiz
+## クイズ
 
-1. インターネット収益分配詐欺に対する最も重要な対策は何ですか？
-   - A. SRTP を実装する
-   - B. Asterisk を最新の状態に保つ
-   - C. TLS を実装する
+1. インターネット収益分配詐欺（Internet Revenue Share Fraud）に対する最も重要な対策は何ですか？
+   - A. SRTPを実装する
+   - B. Asteriskを最新の状態に保つ
+   - C. TLSを実装する
    - D. 強力なパスワードを使用する
-2. SIP ファジングは次のように定義されます：
-   - A. 不正なリクエストやレスポンスを用いた DoS 攻撃
-   - B. パスワードを総当たりで試すサービス窃盗
+2. SIPファジング（SIP fuzzing）の定義は次のうちどれですか？
+   - A. 不正な形式の要求と応答を使用したDoS攻撃
+   - B. パスワードを総当たり攻撃（ブルートフォース）してサービスを盗用すること
    - C. 現在の通話を盗聴すること
-   - D. SIP リクエストの洪水による DDoS
-3. TFTPTheft はサーバーが TFTP 経由で設定ファイルを提供する際に発生します。これを回避する方法は次のうちどれですか？
+   - D. SIP要求を大量に送りつけるDDoS攻撃
+3. TFTPによる盗難（TFTPTheft）は、サーバーがTFTP経由で設定ファイルを提供する場合に発生します。これを回避する方法は次のうちどれですか？
    - A. FTP
    - B. HTTP
-   - C. ユーザー名とパスワード付き HTTPS
+   - C. ユーザー名とパスワードを使用したHTTPS
    - D. SCP
-4. 中間者攻撃で使用される手法は次のどれですか？
-   - A. TFTP theft
-   - B. ARP スプーフィング
-   - C. MAC ポイズニング
+4. 中間者攻撃（Man-in-the-middle attacks）で使用される手法は次のうちどれですか？
+   - A. TFTP盗難
+   - B. ARPスプーフィング
+   - C. MACポイズニング
    - D. dsniff
-5. SRTP では、Asterisk はキー交換に次のシステムを使用します：
+5. SRTPのために、Asteriskは鍵交換にどのシステムを使用しますか？
    - A. MIKEY
    - B. SDES
    - C. ZRTP
    - D. Pluto
-6. `/usr/src/asterisk-22.x.y/contrib/scripts`にある、認証局と証明書を生成するユーティリティはどれですか？
+6. `/usr/src/asterisk-22.x.y/contrib/scripts`にあり、認証局と証明書を生成するユーティリティはどれですか？
    - A. ast_tls_cert
    - B. gen_tls
    - C. gen_ast_tls
    - D. tls_generator
-7. 盗聴防止の有効な戦略（該当するものすべてにチェック）：
+7. 盗聴を防ぐための有効な戦略はどれですか（該当するものすべてを選択してください）：
    - A. アナログ盗聴検知器を実装する
-   - B. ARPwatch ユーティリティで ARP スプーフィングを検出する
-   - C. スイッチで ARP スプーフィング検出を有効にする
-   - D. SRTP を使用する
-8. Asterisk はクライアント証明書を検証することで強力な認証をサポートしています。（PJSIP TLS トランスポートはクライアントの証明書を要求・検証できます。）
-   - A. 正しい
-   - B. 誤り
-9. Asterisk 22 で、SDES キーを使用したイン SDP による SRTP メディア暗号化を有効にする PJSIP エンドポイント設定はどれですか？
+   - B. ARPwatchユーティリティを使用してARPスプーフィングを検知する
+   - C. スイッチでARPスプーフィング検知を有効にする
+   - D. SRTPを使用する
+8. Asteriskはクライアント証明書を検証することで強力な認証をサポートしています。（PJSIP TLSトランスポートは、クライアントの証明書を要求および検証できます。）
+   - A. 正
+   - B. 誤
+9. Asterisk 22において、in-SDP (SDES) 鍵を使用してSRTPメディア暗号化を有効にするPJSIP endpoint設定はどれですか？
    - A. `encryption=yes`
    - B. `media_encryption=sdes`
    - C. `srtp=mandatory`
    - D. `transport=tls`
-10. Asterisk 22 では、Fail2Ban が専用の ________ ロガーチャネル（`logger.conf`で有効化）から PJSIP の認証失敗イベントを読み取る必要があります。
+10. Asterisk 22において、Fail2BanはPJSIPの認証失敗イベントを専用の ________ ロガーチャネル（`logger.conf`で有効化）から読み取る必要があります。
    - A. `console`
    - B. `messages`
    - C. `security`
    - D. `verbose`
 
-**Answers:** 1 — D · 2 — A · 3 — C · 4 — B · 5 — B · 6 — A · 7 — B, C, D · 8 — A · 9 — B · 10 — C
+**回答:** 1 — D · 2 — A · 3 — C · 4 — B · 5 — B · 6 — A · 7 — B, C, D · 8 — A · 9 — B · 10 — C

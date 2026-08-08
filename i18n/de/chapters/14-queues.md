@@ -1,73 +1,73 @@
-# Anrufwarteschlangen
+# Call Queues
 
-Call queues, also known as ACD (Automatic Call Distribution) are becoming increasingly important for answering customer calls efficiently. An automatic call distributor can help reduce costs, increase service, and improve sales as call distributors affect how your business works—not for a few days, but for many years. In a call center environment, the number one factor is people; they are the most expensive resource. It takes time, money, and patience to hire, train, and motivate agents. With an ACD, you can maximize agents’ productivity by precisely dimensioning the number of agents required, controlling good and bad attendants, and analyzing the call flow.
+Call Queues, auch bekannt als ACD (Automatic Call Distribution), werden immer wichtiger, um Kundenanrufe effizient zu beantworten. Ein automatischer Anrufverteiler kann dazu beitragen, Kosten zu senken, den Service zu verbessern und den Umsatz zu steigern, da Anrufverteiler die Arbeitsweise Ihres Unternehmens beeinflussen – nicht nur für ein paar Tage, sondern für viele Jahre. In einer Call-Center-Umgebung ist der wichtigste Faktor der Mensch; er ist die teuerste Ressource. Es kostet Zeit, Geld und Geduld, Agenten einzustellen, zu schulen und zu motivieren. Mit einer ACD können Sie die Produktivität der Agenten maximieren, indem Sie die Anzahl der benötigten Agenten präzise dimensionieren, gute und schlechte Mitarbeiter steuern und den Anruffluss analysieren.
 
 ## Ziele
 
 Am Ende dieses Kapitels sollten Sie in der Lage sein:
 
-- Verstehen, warum und wie Anrufwarteschlangen verwendet werden
-- Die Grundtheorie von Anrufwarteschlangen verstehen
-- Das Warteschlangensystem installieren und konfigurieren
+- Zu verstehen, warum und wie man Warteschlangen verwendet
+- Die grundlegende Theorie von Warteschlangen zu verstehen
+- Das Warteschlangensystem zu installieren und zu konfigurieren
 
 ## Wie funktionieren Warteschlangen?
 
-Call queues sind nicht gerade eine Neuheit. Wenn Sie einen hohen eingehenden Anrufverkehr haben, ist es schwierig, Anrufe angemessen zu verteilen. Eine Gruppenstrategie, bei der das Telefon gleichzeitig bei allen Agenten klingelt, scheint nicht zu funktionieren, es sei denn, Sie haben nur wenige Agenten. Eine Call Queue liefert jedoch jedes Mal nur einen einzelnen verfügbaren Agenten den Anruf und legt den Kunden bei fehlenden Agenten in die Warteschleife mit Musik. Die Warteschlange funktioniert, indem sie den Anruf behält, während ein freier Agent gesucht wird, der den Anruf annimmt. Einer der größten Vorteile der Queue ist, dass Anrufe nicht verloren gehen und gleichzeitig die Möglichkeit besteht, Statistiken zu erzeugen.
+Warteschlangen sind keine wirkliche Neuheit. Wenn Sie ein hohes Aufkommen an eingehenden Anrufen haben, ist es schwierig, diese angemessen zu verteilen. Die Verwendung einer Gruppenstrategie, bei der die Telefone aller Agenten gleichzeitig klingeln, scheint nicht zu funktionieren, es sei denn, Sie haben nur wenige Agenten. Eine Warteschlange hingegen stellt Anrufe jeweils nur an einen einzigen verfügbaren Agenten zu und versetzt den Kunden in die Warteschleife mit Musik, wenn keine Agenten verfügbar sind. Die Warteschlange funktioniert, indem sie den Anruf hält, während sie einen freien Agenten findet, der den Anruf entgegennimmt. Einer der größten Vorteile der Warteschlange besteht darin, Anrufe nicht zu verlieren und gleichzeitig die Möglichkeit zu bieten, Statistiken zu erstellen.
 
-![A call queue: incoming 1-800 calls enter the queue and an ACD strategy (ringall, rrmemory, leastrecent, priority, and others) distributes them to the available agents](../images/14-queues-fig01.png)
+![Eine Warteschlange: Eingehende 1-800-Anrufe gelangen in die Warteschlange und eine ACD-Strategie (ringall, rrmemory, leastrecent, priority und andere) verteilt sie an die verfügbaren Agenten](../images/14-queues-fig01.png)
 
-In der Regel funktioniert eine Call Queue so:
+Normalerweise funktioniert eine Warteschlange wie folgt:
 
-- Agenten melden sich bei der Queue an.
-- Eingehende Anrufe werden in die Warteschlange gestellt.
-- Eine Warteschlangen‑Strategie zur Verteilung der Anrufe wird verwendet, um Anrufe zu den Agenten zu senden.
-- Musik in der Warteschleife wird abgespielt, während der Anrufer wartet.
-- Durchsagen können an die Anrufer gesendet werden, um sie über die Wartezeit zu informieren
-- Der Anruf wird vom Agenten beantwortet und Statistiken werden erstellt.
+- Agenten melden sich in der Warteschlange an.
+- Eingehende Anrufe werden in die Warteschlange eingereiht.
+- Eine Warteschlangenstrategie zur Verteilung der Anrufe wird verwendet, um Anrufe an Agenten weiterzuleiten.
+- Während der Anrufer wartet, wird Musik in der Warteschleife abgespielt.
+- Anrufern können Ansagen gemacht werden, die sie über die Wartezeit informieren.
+- Der Anruf wird vom Agenten entgegengenommen und Statistiken werden generiert.
 
-Die Hauptanwendung für Queues ist der Kundenservice. Durch den Einsatz von Queues vermeiden Sie den Verlust von Anrufen, wenn Ihre Agenten beschäftigt sind. Sie können neue Agenten zur Queue hinzufügen, wenn Sie feststellen, dass die Zahl der Anrufer in der Warteschlange steigt. Ein weiterer Vorteil von Queues ist, dass Sie nun Statistiken wie Abbruchrate, durchschnittliche Gesprächsdauer und Ziel für die Anrufbeantwortung erhalten. Diese Statistiken helfen Ihnen zu bestimmen, wie viele Agenten Sie einsetzen müssen, um Ihren Kunden einen besseren Service zu bieten.
+Der Haupteinsatzbereich für Warteschlangen ist der Kundenservice. Durch die Verwendung von Warteschlangen vermeiden Sie es, Anrufe zu verlieren, wenn Ihre Agenten beschäftigt sind. Sie können der Warteschlange neue Agenten hinzufügen, wenn Sie feststellen, dass die Anzahl der Anrufer in der Warteschlange wächst. Ein weiterer Vorteil von Warteschlangen ist, dass Sie nun Statistiken wie die Abbruchrate, die durchschnittliche Anrufdauer und das Anrufannahmeziel erhalten können. Diese Statistiken helfen Ihnen dabei zu bestimmen, wie viele Agenten Sie einsetzen müssen, um Ihren Kunden einen besseren Service zu bieten.
 
-### ACD‑Architektur
+### ACD-Architektur
 
-Die ACD‑Architektur besteht aus Queues und Agenten. Ein Agent kann gleichzeitig in zwei Queues sein. Eine Queue kann Agenten, Channels und Agentengruppen enthalten.
+Die ACD-Architektur besteht aus Warteschlangen und Agenten. Ein Agent kann gleichzeitig in zwei Warteschlangen sein. Eine Warteschlange kann Agenten, Kanäle und Agentengruppen enthalten.
 
-![ACD architecture: each queue (Customer Service, Inside Sales) is fed by a phone number and delivers calls to agents, who are in turn bound to physical channels](../images/14-queues-fig02.png)
+![ACD-Architektur: Jede Warteschlange (Kundenservice, Vertrieb) wird durch eine Telefonnummer gespeist und leitet Anrufe an Agenten weiter, die wiederum an physische Kanäle gebunden sind](../images/14-queues-fig02.png)
 
 ## Queues
 
-Queues are defined in the queues.conf configuration file. Agents are attendants who log in and are members of queues. Agents are defined in the agents.conf file. The queue system has grown significantly over many releases, making the configuration file extensive. We will explain some of the major parameters. One general parameter worth highlighting is `autofill`:
+Queues werden in der Konfigurationsdatei queues.conf definiert. Agents sind Mitarbeiter, die sich anmelden und Mitglieder von Queues sind. Agents werden in der Datei agents.conf definiert. Das Queue-System ist über viele Versionen hinweg erheblich gewachsen, was die Konfigurationsdatei umfangreich macht. Wir werden einige der wichtigsten Parameter erläutern. Ein allgemeiner Parameter, der hervorzuheben ist, ist `autofill`:
 
 ```
 autofill=yes
 ```
 
-The old behavior for the queue was serial type. The queue waited for a call to be dispatched before sending the succeeding call to the next agent. If an agent takes 15 seconds to answer a call, the other calls in the queue had to wait until that call was answered. For high-volume queues, this behavior was inefficient. The new behavior autofill=yes does not wait until a call is answered, but rather works in parallel. You can record the calls in the queue using the option mixmonitor. In this mode, calls are recorded and mixed at the same time.
+Das alte Verhalten der Queue war vom Typ serial. Die Queue wartete darauf, dass ein Anruf zugestellt wurde, bevor der nachfolgende Anruf an den nächsten Agenten gesendet wurde. Wenn ein Agent 15 Sekunden brauchte, um einen Anruf anzunehmen, mussten die anderen Anrufe in der Queue warten, bis dieser Anruf beantwortet wurde. Für Queues mit hohem Anrufaufkommen war dieses Verhalten ineffizient. Das neue Verhalten autofill=yes wartet nicht, bis ein Anruf beantwortet wurde, sondern arbeitet parallel. Sie können die Anrufe in der Queue mit der Option mixmonitor aufzeichnen. In diesem Modus werden Anrufe gleichzeitig aufgezeichnet und gemischt.
 
-### Queue configuration file
+### Queue-Konfigurationsdatei
 
-Queues are configured in the queues.conf file. In the figure, you will find a working example of a queue.
+Queues werden in der Datei queues.conf konfiguriert. In der Abbildung finden Sie ein funktionierendes Beispiel einer Queue.
 
-![A working example of the queues.conf file, showing the general section and a customerservice queue with strategy, service level, announcements, recording, and members](../images/14-queues-fig03.png)
+![Ein funktionierendes Beispiel der Datei queues.conf, das den allgemeinen Abschnitt und eine customerservice-Queue mit Strategie, Service-Level, Ankündigungen, Aufzeichnung und Mitgliedern zeigt](../images/14-queues-fig03.png)
 
 ### Agents
 
-You can configure your agents in the file agents.conf. Agents can log in from any extension to receive calls. You can dial an agent using:
+Sie können Ihre Agents in der Datei agents.conf konfigurieren. Agents können sich von jeder extension aus anmelden, um Anrufe entgegenzunehmen. Sie können einen Agenten anrufen mit:
 
 ```
 Dial(agent/<name>)
 ```
 
-#### Agent login
+#### Agent-Anmeldung
 
-The login flow for Agent 300 works like this:
+Der Anmeldevorgang für Agent 300 funktioniert wie folgt:
 
-- The user dials an extension that runs the `AgentLogin()` application.
-- `AgentLogin()` is executed and the agent is associated with the current channel.
-- You can check the status of the agents using the command `agent show all`.
+- Der Benutzer wählt eine extension, die die Anwendung `AgentLogin()` ausführt.
+- `AgentLogin()` wird ausgeführt und der Agent wird mit dem aktuellen Kanal verknüpft.
+- Sie können den Status der Agents mit dem Befehl `agent show all` überprüfen.
 
-![Agents: a user logs in by dialing an extension that runs the agentlogin application, which binds Agent 300 to the current channel; you can check agent status with `agent show all`](../images/14-queues-fig04.png)
+![Agents: Ein Benutzer meldet sich an, indem er eine extension wählt, die die Anwendung agentlogin ausführt, welche Agent 300 an den aktuellen Kanal bindet; Sie können den Agent-Status mit `agent show all` überprüfen](../images/14-queues-fig04.png)
 
-You can define the agents in the file agents.conf
+Sie können die Agents in der Datei agents.conf definieren
 
 ```
 ; Agent configuration
@@ -89,55 +89,56 @@ agent => 300,300
 agent => 301,301
 ```
 
-### Members
+### Mitglieder
 
-Members are active channels responding to the queue. Members can be direct channels (PJSIP, DAHDI) or agents who log in before receiving calls.
+Mitglieder sind aktive Kanäle, die auf die Queue reagieren. Mitglieder können direkte Kanäle (PJSIP, DAHDI) oder Agents sein, die sich anmelden, bevor sie Anrufe entgegennehmen.
 
-### Strategies
 
-Calls are distributed among members according to one of these strategies:
+### Strategien
 
-- ringall: Plays all channels available until someone answers.
-- leastrecent: Distributes to the least recent member.
-- fewestcalls: Distributes to the member with fewest calls.
-- random: Ring random interface.
-- wrandom: Ring random interface, but use the member’s penalty as a weight when calculating their metric.
-- rrmemory: Uses round robin with memory; it remembers where it left off with the call in the last pass.
-- rrordered: Same as rrmemory, except the queue member order from the config file is preserved.
-- linear: Rings members in the order they are listed in queues.conf; for dynamic members, in the order they were added.
+Anrufe werden gemäß einer dieser Strategien unter den Mitgliedern verteilt:
 
-The older `roundrobin` strategy was deprecated back in Asterisk 1.4. It is no longer a documented strategy and should not be used: in Asterisk 22 the parser still accepts the word `roundrobin`, but only as a backward-compatibility alias that maps to `rrmemory`. Use `rrmemory` (or `rrordered`) explicitly instead. The list above is the set of documented strategies for the `strategy` option in the Asterisk 22 `queues.conf`.
+- ringall: Lässt alle verfügbaren Kanäle klingeln, bis jemand abhebt.
+- leastrecent: Verteilt an das Mitglied, das am längsten keinen Anruf erhalten hat.
+- fewestcalls: Verteilt an das Mitglied mit den wenigsten Anrufen.
+- random: Lässt eine zufällige Schnittstelle klingeln.
+- wrandom: Lässt eine zufällige Schnittstelle klingeln, verwendet jedoch die Strafe (penalty) des Mitglieds als Gewichtung bei der Berechnung der Metrik.
+- rrmemory: Verwendet Round Robin mit Speicher; es merkt sich, wo es beim letzten Durchgang mit dem Anruf aufgehört hat.
+- rrordered: Dasselbe wie rrmemory, außer dass die Reihenfolge der Queue-Mitglieder aus der Konfigurationsdatei beibehalten wird.
+- linear: Lässt Mitglieder in der Reihenfolge klingeln, in der sie in queues.conf aufgelistet sind; bei dynamischen Mitgliedern in der Reihenfolge, in der sie hinzugefügt wurden.
+
+Die ältere Strategie `roundrobin` wurde bereits in Asterisk 1.4 als veraltet markiert. Sie ist keine dokumentierte Strategie mehr und sollte nicht verwendet werden: In Asterisk 22 akzeptiert der Parser zwar noch das Wort `roundrobin`, aber nur als Alias zur Abwärtskompatibilität, der auf `rrmemory` verweist. Verwenden Sie stattdessen explizit `rrmemory` (oder `rrordered`). Die obige Liste ist die Menge der dokumentierten Strategien für die Option `strategy` in der Asterisk 22 `queues.conf`.
 
 ## Agents
 
-Agents werden als Proxy‑Kanäle implementiert. Sie können innerhalb von Queues verwendet werden. Ein weiterer Verwendungszweck für die Agent‑Kanäle ist Extension Mobility. Der Benutzer kann sich an jedem Telefon anmelden und dessen Anrufe entgegennehmen. Das ermöglicht es einem Benutzer, in jeden Raum zu gehen und ihn zu einem Büro zu machen. Man kann einen Agenten im Dialplan mit dial(agent/<name>) anrufen. Agenten werden in der Datei agents.conf definiert.
+Agents werden als Proxy-Channels implementiert. Sie können innerhalb von Queues verwendet werden. Eine weitere Verwendung für Agent-Channels ist die Extension Mobility. Der Benutzer kann sich an einem beliebigen Telefon anmelden und seine Anrufe empfangen. Dies ermöglicht es einem Benutzer, in jeden beliebigen Raum zu gehen und diesen als Büro zu nutzen. Sie können einen Agenten im dialplan mit `dial(agent/<name>)` anrufen. Sie definieren Agenten in der Datei `agents.conf`.
 
-![Agent mobility: the user picks up any phone, dials a login extension, and passes the agent number and password; after agentlogin() succeeds the agent (Agent 300) is ready to take calls, and you can check status with the CLI command `agent show all`](../images/14-queues-fig05.png)
+![Agent Mobility: Der Benutzer nimmt ein beliebiges Telefon ab, wählt eine Login-Extension und gibt die Agentennummer sowie das Passwort ein; nachdem `agentlogin()` erfolgreich war, ist der Agent (Agent 300) bereit, Anrufe entgegenzunehmen, und Sie können den Status mit dem CLI-Befehl `agent show all` überprüfen](../images/14-queues-fig05.png)
 
 ### Agent Groups
 
-Sie können Agent‑Gruppen verwenden. Diese Funktion berücksichtigt keine ACD‑Strategien. Wahrscheinlich listen Sie lieber alle Agenten einzeln auf. Wenn Sie zu einer Agent‑Gruppe weiterleiten möchten, können Sie `queues.conf` verwenden:
+Sie können sich für die Verwendung von Agent Groups entscheiden. Diese Funktion berücksichtigt keine ACD-Strategien. Sie werden es wahrscheinlich vorziehen, alle Agenten einzeln aufzulisten. Wenn Sie an eine Agent Group weiterleiten möchten, können Sie `queues.conf` verwenden:
 
 ```
 member => agent/@1    ; any agent in group 1
 member => agent/:1,1  ; any agent in group 1, wait for first available
 ```
 
-### The configuration file for agents
+### Die Konfigurationsdatei für Agenten
 
-Agents werden in der Datei agents.conf definiert. Nachfolgend ein funktionierendes Beispiel der Datei.
+Agenten werden in der Datei `agents.conf` definiert. Nachfolgend finden Sie ein funktionierendes Beispiel für die Datei.
 
-![A working example of the agents.conf file: a general section with persistentagents, an agents section with the default parameters (autologoff, ackcall, endcall, wrapuptime, musiconhold), and two agent definitions (300 and 301)](../images/14-queues-fig06.png)
+![Ein funktionierendes Beispiel der Datei agents.conf: ein allgemeiner Abschnitt mit persistentagents, ein agents-Abschnitt mit den Standardparametern (autologoff, ackcall, endcall, wrapuptime, musiconhold) und zwei Agentendefinitionen (300 und 301)](../images/14-queues-fig06.png)
 
 ## ACD-bezogene Anwendungen
 
-Das Asterisk-Warteschlangensystem stellt mehrere Anwendungen zur Verfügung, um die Warteschlangen im Dialplan zu implementieren. Im Folgenden zeigen wir einige davon.
+Das Asterisk-Warteschlangensystem stellt verschiedene Anwendungen zur Verfügung, um Warteschlangen im dialplan zu implementieren. Nachfolgend zeigen wir einige davon.
 
 ### Die Anwendung queue()
 
-Diese Anwendung legt eingehende Anrufe in eine bestimmte Anrufwarteschlange, wie in queues.conf definiert, ein. Die Optionszeichenkette kann null oder mehr einbuchstabige Optionen enthalten (siehe Abbildung unten). Zusätzlich zum Weiterleiten des Anrufs kann ein Anruf geparkt und anschließend von einem anderen Benutzer abgeholt werden. Die optionale URL wird an die angerufene Partei gesendet, wenn der Kanal dies unterstützt. Der optionale AGI‑Parameter richtet ein AGI‑Skript ein, das auf dem Kanal der anrufenden Partei ausgeführt wird, sobald sie mit einem Warteschlangenmitglied verbunden ist. Der Timeout führt dazu, dass die Warteschlange nach einer angegebenen Anzahl von Sekunden fehlschlägt, geprüft zwischen jedem Timeout‑ und Wiederholungszyklus. Diese Anwendung setzt die STATUS‑Variable QUEUE bei Abschluss:
+Diese Anwendung reiht eingehende Anrufe in eine bestimmte Warteschlange ein, wie sie in queues.conf definiert ist. Die Optionszeichenfolge kann null oder mehr einbuchstabige Optionen enthalten (in der Abbildung unten dargestellt). Zusätzlich zur Weiterleitung des Anrufs kann ein Anruf geparkt und anschließend von einem anderen Benutzer übernommen werden. Die optionale URL wird an den angerufenen Teilnehmer gesendet, sofern der Kanal dies unterstützt. Der optionale AGI-Parameter richtet ein AGI-Skript ein, das auf dem Kanal des anrufenden Teilnehmers ausgeführt wird, sobald dieser mit einem Warteschlangenmitglied verbunden ist. Der timeout bewirkt, dass die Warteschlange nach einer festgelegten Anzahl von Sekunden abbricht; dies wird zwischen jedem timeout- und retry-Zyklus überprüft. Diese Anwendung setzt nach Abschluss die Statusvariable QUEUE:
 
-![The queue() application: its syntax `Queue(queuename,options,URL,announceoverride,timeout,AGI)` — Asterisk 22 separates the arguments with commas (the older pipe `|` form is gone) — and the available single-letter options (d, h, H, n, i, r, t, T, w, W)](../images/14-queues-fig07.png)
+![Die Anwendung queue(): ihre Syntax `Queue(queuename,options,URL,announceoverride,timeout,AGI)` — Asterisk 22 trennt die Argumente mit Kommas (die ältere Pipe-Form `|` ist entfallen) — und die verfügbaren einbuchstabigen Optionen (d, h, H, n, i, r, t, T, w, W)](../images/14-queues-fig07.png)
 
 - TIMEOUT
 - FULL
@@ -148,13 +149,13 @@ Diese Anwendung legt eingehende Anrufe in eine bestimmte Anrufwarteschlange, wie
 
 ### Die Anwendung agentlogin()
 
-Diese Anwendung fordert den Agenten auf, sich im System anzumelden. Sie gibt immer -1 zurück. Während der Anmeldung hört der Agent, der Anrufe entgegennimmt, einen Signalton, wenn ein neuer Anruf eingeht. Der Agent kann den Anruf durch Drücken der *‑Taste auflegen.
+Diese Anwendung fordert den Agenten auf, sich am System anzumelden. Sie gibt immer -1 zurück. Während der Anmeldung hört der Agent, der Anrufe entgegennimmt, einen Signalton, wenn ein neuer Anruf eingeht. Der Agent kann den Anruf durch Drücken der *-Taste beenden.
 
-![The agentlogin() application: its syntax `AgentLogin([AgentNo][|options])` and the `s` option for a silent login that does not announce the login confirmation](../images/14-queues-fig08.png)
+![Die Anwendung agentlogin(): ihre Syntax `AgentLogin([AgentNo][|options])` und die Option `s` für eine stille Anmeldung, bei der die Anmeldebestätigung nicht angesagt wird](../images/14-queues-fig08.png)
 
 ### Die Anwendung addQueueMember()
 
-Diese Anwendung fügt einem Queue dynamisch ein Gerät hinzu (z. B. PJSIP/3000). Existiert das Gerät bereits, wird ein Fehler zurückgegeben.
+Diese Anwendung fügt dynamisch ein Gerät (z. B. PJSIP/3000) zu einer Warteschlange hinzu. Wenn das Gerät bereits existiert, wird ein Fehler zurückgegeben.
 
 ```
 AddQueueMember(queuename[|interface][|penalty]):
@@ -162,25 +163,25 @@ AddQueueMember(queuename[|interface][|penalty]):
 
 #### Die Anwendung removeQueueMember()
 
-Diese Anwendung entfernt ein Gerät dynamisch aus der Warteschlange. Gehört das Gerät nicht zur Warteschlange, wird ein Fehler zurückgegeben.
+Diese Anwendung entfernt dynamisch ein Gerät aus der Warteschlange. Wenn das Gerät nicht zur Warteschlange gehört, wird ein Fehler zurückgegeben.
 
 ```
 RemoveQueueMember(queuename[|interface])
 ```
 
-### Unterstützende Anwendungen und CLI‑Befehle
+### Unterstützende Anwendungen und CLI-Befehle
 
-Einige Anwendungen und Konsolenbefehle können bei der Arbeit mit Warteschlangen helfen. Das Folgende gibt einen Überblick darüber, was jede Anwendung tut:
+Einige Anwendungen und Konsolenbefehle sind hilfreich bei der Arbeit mit Warteschlangen. Im Folgenden wird beschrieben, was die jeweilige Anwendung bewirkt:
 
-![Support applications (AddQueueMember, RemoveQueueMember) and CLI commands (agent show all, queue show, queue show <name>) used to manage queues at runtime](../images/14-queues-fig09.png)
+![Unterstützende Anwendungen (AddQueueMember, RemoveQueueMember) und CLI-Befehle (agent show all, queue show, queue show <name>), die zur Verwaltung von Warteschlangen zur Laufzeit verwendet werden](../images/14-queues-fig09.png)
 
-## Configuration tasks
+## Konfigurationsaufgaben
 
-The figure below summarizes the major tasks to create a working queue system.
+Die folgende Abbildung fasst die wichtigsten Aufgaben zur Erstellung eines funktionierenden Warteschlangensystems zusammen.
 
-![Die ACD-Konfigurationsaufgaben: (1) Anlegen der Anrufwarteschlange (erforderlich), (2) Definieren von Agentenparametern (optional), (3) Anlegen von Agenten (optional), (4) Einbinden der Warteschlange in den Dialplan (erforderlich), (5) Konfigurieren der Agentenaufnahme (optional) und (6) Verifizieren mit „agent show all“ und „queue show“ (optional)](../images/14-queues-fig10.png)
+![Die ACD-Konfigurationsaufgaben: (1) Erstellen der Anrufwarteschlange (erforderlich), (2) Definieren der Agentenparameter (optional), (3) Erstellen von Agenten (optional), (4) Einfügen der Warteschlange in den dialplan (erforderlich), (5) Konfigurieren der Agentenaufzeichnung (optional) und (6) Überprüfung mit agent show all und queue show (optional)](../images/14-queues-fig10.png)
 
-Step 1: Create the call queue In the file queues.conf:
+Schritt 1: Erstellen der Anrufwarteschlange in der Datei queues.conf:
 
 ```
 [telemarketing]
@@ -203,7 +204,7 @@ member => Agent/600
 member => Agent/601
 ```
 
-Step 2: Define agent parameters In the file agents.conf:
+Schritt 2: Definieren der Agentenparameter in der Datei agents.conf:
 
 ```
 debian:/etc/asterisk# cat agents.conf
@@ -253,7 +254,7 @@ autologoff=15
 ;group=
 ```
 
-Step 3: Create the agents In the file agents.conf:
+Schritt 3: Erstellen der Agenten in der Datei agents.conf:
 
 ```
 ;agent => agentid,agentpassword,name
@@ -264,7 +265,7 @@ agent => 600,600,Test Ver - 600
 agent => 601,601,Test Ver . 601
 ```
 
-Step 4: Insert the queue in the dial plan, in the file `extensions.conf`:
+Schritt 4: Einfügen der Warteschlange in den dialplan, in der Datei `extensions.conf`:
 
 ```
 ; Telemarketing queue.
@@ -283,11 +284,11 @@ exten => 9000,1,Wait(1)
 exten => 9000,2,AgentLogin()
 ```
 
-### Configure queue recording
+### Konfiguration der Warteschlangenaufzeichnung
 
-Calls may be recorded using Asterisk's MixMonitor application. (The standalone Monitor application was removed in Asterisk 22, and the queues.conf `monitor-type` option now accepts only MixMonitor.) Recording can be enabled from within the queue application, beginning when the call is actually picked up. Only successful calls are recorded, and no recordings are performed while people are listening to MOH. To enable monitoring, simply specify monitor-format. This feature is otherwise disabled. You can set the filename for the recording using `Set(MONITOR_FILENAME=<filename>)`; otherwise it will use `MONITOR_FILENAME=${UNIQUEID}`.
+Anrufe können mithilfe der MixMonitor-Anwendung von Asterisk aufgezeichnet werden. (Die eigenständige Monitor-Anwendung wurde in Asterisk 22 entfernt, und die Option `monitor-type` in queues.conf akzeptiert nun nur noch MixMonitor.) Die Aufzeichnung kann innerhalb der Warteschlangenanwendung aktiviert werden und beginnt, sobald der Anruf tatsächlich entgegengenommen wird. Es werden nur erfolgreiche Anrufe aufgezeichnet, und es finden keine Aufzeichnungen statt, während Anrufer MOH hören. Um die Überwachung zu aktivieren, geben Sie einfach monitor-format an. Diese Funktion ist ansonsten deaktiviert. Sie können den Dateinamen für die Aufzeichnung mithilfe von `Set(MONITOR_FILENAME=<filename>)` festlegen; andernfalls wird `MONITOR_FILENAME=${UNIQUEID}` verwendet.
 
-In the file queues.conf:
+In der Datei queues.conf:
 
 ```
 monitor-format = wav
@@ -295,28 +296,28 @@ monitor-type = MixMonitor
 monitor-join = yes
 ```
 
-## Warteschlangenbetrieb
+## Queue-Betrieb
 
-Die folgenden Beispiele erklären, wie man die Warteschlange verwendet.
+Die folgenden Beispiele erläutern die Verwendung der Queue.
 
-1. Agent-Anmeldung. Beispiel: Ein Agent in der Telemarketing-Warteschlange nimmt den Hörer ab und wählt #9000. Der Agent hört eine ungültige Anmeldemeldung und wird nach seinem/ihrem Namen und Passwort gefragt. Die Prüfungswarteschlange folgt dem gleichen Verfahren.
-2. Warteschlange. Sobald er in der Warteschlange ist, hört der Agent MOH, falls definiert. Wenn ein Anruf in die Telemarketing-Warteschlange kommt, hört der Agent einen Piepton und wird mit diesem Anruf verbunden.
-3. Anruf beenden. Wenn der Agent den Anruf beendet, kann er/sie:
-   - ‘*’ drücken, um die Verbindung zu trennen und in der Warteschlange zu bleiben.
-   - Das Telefon auflegen, wodurch die Verbindung zur Warteschlange getrennt wird.
-   - #8000 drücken, um den Anruf zur Prüfung zu übertragen.
+1. Agenten-Anmeldung. Beispiel: Ein Agent in der Telemarketing-Queue hebt den Hörer ab und wählt #9000. Der Agent hört eine Nachricht über eine ungültige Anmeldung und wird nach seinem Namen und Passwort gefragt. Die Auditing-Queue folgt dem gleichen Verfahren.
+2. Queue. Sobald sich der Agent in der Queue befindet, hört er MOH, sofern definiert. Wenn ein Anruf in der Telemarketing-Queue eingeht, hört der Agent einen Signalton und wird mit diesem Anruf verbunden.
+3. Anruf beenden. Wenn der Agent das Gespräch beendet, kann er:
+   - ‘*’ drücken, um die Verbindung zu trennen und in der Queue zu bleiben.
+   - Den Hörer auflegen und sich dadurch von der Queue abmelden.
+   - #8000 drücken, um den Anruf für das Auditing weiterzuleiten.
 
-## Advanced resources
+## Erweiterte Ressourcen
 
-Das Asterisk-Warteschlangensystem verfügt über einige erweiterte Funktionen, um bestimmte Kunden und Agenten zu priorisieren sowie ein Benutzermenü zu aktivieren.
+Das Asterisk-Warteschlangensystem verfügt über einige erweiterte Funktionen, um bestimmte Kunden und Agenten zu priorisieren sowie ein Benutzermenü zu ermöglichen.
 
-### User menu
+### Benutzermenü
 
-Sie können ein Menü für einen Benutzer definieren, während er in der Warteschlange wartet, indem Sie einstellige Nebenstellen verwenden. Um diese Option zu aktivieren, definieren Sie einen Kontext in der Warteschlangen‑Konfiguration `queues.conf`.
+Sie können ein Menü für einen Benutzer definieren, während dieser in der Warteschlange wartet, indem Sie einstellige extension verwenden. Um diese Option zu aktivieren, definieren Sie einen context in der Warteschlangenkonfiguration queues.conf.
 
 ### Penalty
 
-Agenten können mit einer Penalty konfiguriert werden. Eine Warteschlange sendet die Anrufe zuerst an Benutzer mit niedrigeren Penalty‑Werten. Da wir zum Beispiel wissen, dass unsere Kunden Susan und ihre sanfte Stimme lieben, können wir ihr die Priorität 0 zuweisen. Alternativ wird dem Agenten namens Uber, der weniger Erfahrung hat, eine geringere Präferenz für den Kundendienst eingeräumt; daher weisen wir diesem Agenten die Priorität 10 zu. In der Datei `queues.conf`:
+Agenten können mit einer Penalty konfiguriert werden. Eine Warteschlange leitet die Anrufe zuerst an Benutzer mit niedrigeren Penalty-Werten weiter. Da wir zum Beispiel wissen, dass unsere Kunden Susan und ihre sanfte Stimme lieben, könnten wir ihr die Priorität 0 zuweisen. Alternativ wird der Agent namens Uber, der weniger Erfahrung hat, für den Kundenservice weniger bevorzugt; daher weisen wir diesem Agenten die Priorität 10 zu. In der Datei queues.conf:
 
 ```
 [customerservice]
@@ -324,9 +325,9 @@ member=300,0,Susan the excellent agent
 member=300,10,Uber the new guy
 ```
 
-### Priority
+### Priorität
 
-Warteschlangen arbeiten im FIFO‑Modus (first in first out). Wenn Sie bestimmten Kunden (Platin, Gold) Vorrang geben möchten, können Sie differenzierte Prioritäten einrichten. Für Platin‑ oder Gold‑Kunden:
+Warteschlangen arbeiten im FIFO-Modus (First In, First Out). Wenn Sie speziellen Kunden (Platin, Gold) Vorrang einräumen möchten, können Sie differenzierte Prioritäten einrichten. Für Platin- oder Gold-Kunden:
 
 ```
 exten=>111,1,Playback(welcome)
@@ -344,13 +345,13 @@ exten=>112,3,Queue(customerservice)
 
 ## Die Anwendung agentcallbacklogin() wurde entfernt
 
-Die Anwendung `agentcallbacklogin()` wurde von Digium in Asterisk 1.4 (Juli 2006) veraltet erklärt und ist in Asterisk 22 nicht mehr verfügbar. Der empfohlene Ansatz ist die Verwendung von `AddQueueMember()` mit einer PJSIP‑Schnittstelle, um callback‑artige Mitglieder dynamisch zu einer Warteschlange hinzuzufügen. Das Dokument `queues-with-callback-members.txt` war in älteren Asterisk `/doc`‑Verzeichnissen für Migrationshinweise enthalten.
+Die Anwendung `agentcallbacklogin()` wurde von Digium in Asterisk 1.4 (Juli 2006) als veraltet markiert und ist in Asterisk 22 nicht mehr verfügbar. Der empfohlene Ansatz ist die Verwendung von `AddQueueMember()` mit einer PJSIP-Schnittstelle, um dynamisch Mitglieder im Callback-Stil zu einer Queue hinzuzufügen. Das Dokument `queues-with-callback-members.txt` war in älteren Asterisk `/doc` Verzeichnissen als Migrationshilfe enthalten.
 
-Der alte `chan_agent`‑Kanaltreiber wurde ebenfalls entfernt; seine Funktionalität wurde als das `app_agent_pool`‑Modul neu implementiert, das `AgentLogin()`, `AgentRequest()` und die `AGENT()`‑Dialplan‑Funktion in Asterisk 22 bereitstellt (diese sind weiterhin vorhanden — `app_agent_pool.so` wird mit einem Standard‑22‑Build ausgeliefert). Für moderne Call‑Center ist jedoch das gängige Muster, Agent‑Kanäle vollständig zu überspringen und das PJSIP‑Gerät des Agenten direkt mit `AddQueueMember()`/`RemoveQueueMember()` zur Warteschlange hinzuzufügen (statisch in `queues.conf` oder dynamisch aus dem Dialplan oder AMI). Das ist einfacher, integriert sich sauber in den PJSIP‑Gerätestatus und ist das im gesamten Kapitel verwendete Vorgehen.
+Der alte `chan_agent` Kanaltreiber wurde ebenfalls entfernt; seine Funktionalität wurde als `app_agent_pool` Modul neu geschrieben, welches in Asterisk 22 `AgentLogin()`, `AgentRequest()` und die `AGENT()` dialplan Funktion bereitstellt (diese sind weiterhin vorhanden — `app_agent_pool.so` wird mit einem Standard-Build von 22 ausgeliefert). Für moderne Callcenter ist es jedoch das Standardmuster, Agentenkanäle komplett zu überspringen und das PJSIP-Gerät des Agenten direkt mit `AddQueueMember()`/`RemoveQueueMember()` zur Queue hinzuzufügen (statisch in `queues.conf` oder dynamisch über den dialplan oder AMI). Dies ist einfacher, lässt sich sauber in den PJSIP-Gerätestatus integrieren und ist der Ansatz, der in diesem Kapitel durchgehend verwendet wird.
 
-## Queue statistics
+## Warteschlangen-Statistiken
 
-All events from queues are logged to /var/log/asterisk/queue_log. The format of the queue log is published in the document queuelog.txt in the /doc directory of the Asterisk documentation. Below are some of the most important events logged.
+Alle Ereignisse von Warteschlangen werden in /var/log/asterisk/queue_log protokolliert. Das Format des Warteschlangen-Protokolls ist im Dokument queuelog.txt im Verzeichnis /doc der Asterisk-Dokumentation veröffentlicht. Nachfolgend sind einige der wichtigsten protokollierten Ereignisse aufgeführt.
 
 - ABANDON(position|origposition|waittime)
 - AGENTDUMP
@@ -370,59 +371,59 @@ All events from queues are logged to /var/log/asterisk/queue_log. The format of 
 - RINGNOANSWER(ringtime)
 - SYSCOMPAT
 
-You can build your own utility to process these events or use a ready-to-run statistics package:
+Sie können Ihr eigenes Dienstprogramm zur Verarbeitung dieser Ereignisse erstellen oder ein fertiges Statistikpaket verwenden:
 
-- **QueueMetrics** (<https://www.queuemetrics.com/>) – a commercial, actively maintained package that parses `queue_log` and remains one of the most complete reporting tools for Asterisk call centers.
-- **Roll your own** – because the `queue_log` format above is stable and well documented, it is straightforward to parse it with a small script (Python, etc.) and feed the events into a database or dashboard.
+- **QueueMetrics** (<https://www.queuemetrics.com/>) – ein kommerzielles, aktiv gepflegtes Paket, das `queue_log` analysiert und eines der vollständigsten Reporting-Tools für Asterisk-Callcenter bleibt.
+- **Eigenentwicklung** – da das oben genannte `queue_log` Format stabil und gut dokumentiert ist, ist es unkompliziert, es mit einem kleinen Skript (Python usw.) zu parsen und die Ereignisse in eine Datenbank oder ein Dashboard einzuspeisen.
 
-For a more event-driven approach than tailing `queue_log`, the **Asterisk REST Interface (ARI)** and the **AMI** `QueueSummary`/`QueueStatus` actions let you build live queue dashboards and custom integrations against real-time queue state rather than after-the-fact log parsing. ARI is the modern, supported integration surface for this kind of work in Asterisk 22.
+Für einen ereignisgesteuerten Ansatz, der über das Auslesen von `queue_log` hinausgeht, ermöglichen Ihnen die **Asterisk REST Interface (ARI)** und die **AMI** `QueueSummary`/`QueueStatus` Aktionen den Aufbau von Live-Warteschlangen-Dashboards und benutzerdefinierten Integrationen basierend auf dem Echtzeit-Status der Warteschlange, anstatt Protokolle im Nachhinein zu analysieren. ARI ist die moderne, unterstützte Integrationsschnittstelle für diese Art von Arbeit in Asterisk 22.
 
 ## Zusammenfassung
 
-In diesem Kapitel haben Sie gelernt, wie man ein ACD verwendet, seine Architektur und wie man es konfiguriert. Einige erweiterte Funktionen wie Prioritäten und Strafpunkte wurden ebenfalls vorgestellt.
+In diesem Kapitel haben Sie gelernt, wie man eine ACD verwendet, wie deren Architektur aufgebaut ist und wie man sie konfiguriert. Einige fortgeschrittene Funktionen wie Prioritäten und Penalties wurden ebenfalls vorgestellt.
 
 ## Quiz
 
-1. Welche der folgenden sind gültige Queue‑Verteilungsstrategien in `queues.conf` (alle zutreffenden auswählen)?
+1. Welche der folgenden Optionen sind gültige Strategien für die Anrufverteilung in `queues.conf` (wählen Sie alle zutreffenden aus)?
    - A. ringall
    - B. roundrobin
    - C. leastrecent
    - D. fewestcalls
    - E. rrmemory
    - F. linear
-2. Sie können ein Gespräch zwischen einem Agenten und einem Kunden innerhalb der Queue aufzeichnen, indem Sie die ___‑Option in der `queues.conf`‑Datei setzen.
-3. Welche `strategy` ruft Mitglieder in exakt der Reihenfolge an, in der sie in `queues.conf` aufgeführt sind?
+2. Sie können ein Gespräch zwischen einem Agenten und einem Kunden innerhalb der Warteschlange aufzeichnen, indem Sie die Option ___ in der Datei `queues.conf` festlegen.
+3. Welche `strategy` lässt die Mitglieder in der exakten Reihenfolge klingeln, in der sie in `queues.conf` aufgelistet sind?
    - A. random
    - B. wrandom
    - C. linear
    - D. fewestcalls
-4. Wenn der Agent im Telemarketing‑Beispiel einen Anruf beendet, welche Aktionen kann er ausführen (alle zutreffenden auswählen)?
-   - A. Drücken Sie `*`, um die Verbindung zu trennen und in der Queue zu bleiben
-   - B. Legen Sie auf und trennen Sie die Verbindung zur Queue
-   - C. Drücken Sie `#8000`, um den Anruf zur Prüfung zu übertragen
-   - D. Drücken Sie `#`, um sich sofort von allen Queues abzumelden
-5. Welche beiden Aufgaben sind *erforderlich*, um eine funktionierende Queue zu erhalten (alle zutreffenden auswählen)?
-   - A. Die Queue erstellen
-   - B. Die Agenten erstellen
-   - C. Agenten‑Parameter konfigurieren
-   - D. Aufnahme konfigurieren
-   - E. Die Queue in den Dialplan einbinden
-6. In einer Call‑Queue können Sie ein einstellungs‑menü mit einer einzigen Ziffer anbieten, das der Anrufer während des Wartens wählen kann. Dies wird aktiviert, indem ein(e) ___ im `queues.conf`‑Abschnitt der Queue definiert wird:
+4. Welche Aktionen kann ein Agent im Telemarketing-Beispiel ausführen, nachdem er ein Gespräch beendet hat (wählen Sie alle zutreffenden aus)?
+   - A. Drücken von `*`, um die Verbindung zu trennen und in der Warteschlange zu bleiben
+   - B. Auflegen des Telefons und Trennen der Verbindung zur Warteschlange
+   - C. Drücken von `#8000`, um den Anruf zur Überprüfung weiterzuleiten
+   - D. Drücken von `#`, um sich sofort von allen Warteschlangen abzumelden
+5. Welche zwei Aufgaben sind *erforderlich*, um eine funktionierende Warteschlange zu erhalten (wählen Sie alle zutreffenden aus)?
+   - A. Erstellen der Warteschlange
+   - B. Erstellen der Agenten
+   - C. Konfigurieren der Agentenparameter
+   - D. Konfigurieren der Aufzeichnung
+   - E. Einbinden der Warteschlange in den dialplan
+6. In einer Anrufwarteschlange können Sie dem Anrufer ein einstelliges Menü anbieten, das er während der Wartezeit wählen kann. Dies wird durch die Definition eines/einer ___ im Abschnitt `queues.conf` der Warteschlange aktiviert:
    - A. agent
    - B. menu
    - C. context
    - D. application
-7. Die Support‑Anwendungen `AddQueueMember()` und `RemoveQueueMember()` werden im ___ verwendet, um Mitglieder zur Laufzeit hinzuzufügen oder zu entfernen:
+7. Die Support-Anwendungen `AddQueueMember()` und `RemoveQueueMember()` werden im ___ verwendet, um Mitglieder zur Laufzeit hinzuzufügen oder zu entfernen:
    - A. dial plan
    - B. command-line interface
    - C. queues.conf
    - D. agents.conf
-8. Da chan_sip in Asterisk 21 entfernt wurde, muss ein statisches Queue‑Mitglied einen Kanal wie ___ referenzieren statt `SIP/1001`.
-9. Der Parameter `wrapuptime` ist die minimale Zeit, die nach dem Trennen eines Anrufs durch einen Agenten vergehen muss, bevor die Queue diesem Agenten einen neuen Anruf sendet.
-   - A. True
-   - B. False
-10. Ein Anrufer kann in derselben Queue eine höhere Position erhalten, indem die Kanal‑Variable `QUEUE_PRIO` vor dem Aufruf von `Queue()` gesetzt wird.
-    - A. True
-    - B. False
+8. Da chan_sip in Asterisk 21 entfernt wurde, muss ein statisches Warteschlangenmitglied einen Kanal wie ___ anstelle von `SIP/1001` referenzieren.
+9. Der Parameter `wrapuptime` ist die Mindestzeit, die vergehen muss, nachdem ein Agent ein Gespräch beendet hat, bevor die Warteschlange diesem Agenten einen neuen Anruf sendet.
+   - A. Wahr
+   - B. Falsch
+10. Einem Anrufer kann eine höhere Position in derselben Warteschlange zugewiesen werden, indem die Kanalvariable `QUEUE_PRIO` vor dem Aufruf von `Queue()` gesetzt wird.
+    - A. Wahr
+    - B. Falsch
 
-**Answers:** 1 — A, C, D, E, F (roundrobin ist keine dokumentierte Strategie; in Asterisk 22 existiert sie nur noch als veralteter Alias für rrmemory) · 2 — `monitor-format` (Aufzeichnung aus der Queue wird aktiviert, indem `monitor-format` angegeben wird; in Asterisk 22 unterstützt `monitor-type` nur MixMonitor) · 3 — C (linear) · 4 — A, B, C (`*` trennt und bleibt; `#` ist keine Log‑off‑All‑Taste) · 5 — A, E · 6 — C (die `context`‑Option) · 7 — A (der dial plan) · 8 — `PJSIP/1001` (beliebige `PJSIP/`‑Schnittstelle) · 9 — True · 10 — True
+**Antworten:** 1 — A, C, D, E, F (roundrobin ist keine dokumentierte Strategie; in Asterisk 22 existiert sie nur noch als veralteter Alias für rrmemory) · 2 — `monitor-format` (die Aufzeichnung aus der Warteschlange wird durch Angabe von `monitor-format` aktiviert; in Asterisk 22 unterstützt `monitor-type` nur MixMonitor) · 3 — C (linear) · 4 — A, B, C (`*` trennt die Verbindung und bleibt in der Warteschlange; `#` ist keine Taste zur Abmeldung von allen Warteschlangen) · 5 — A, E · 6 — C (die Option `context`) · 7 — A (der dial plan) · 8 — `PJSIP/1001` (jede beliebige `PJSIP/` Schnittstelle) · 9 — Wahr · 10 — Wahr

@@ -1,40 +1,40 @@
 # SIP trunking, DID & the PSTN
 
-自分自身にしか電話できない PBX ではあまり役に立ちません。遅かれ早かれ、すべてのシステムは世界の残りの部分――公衆交換電話網（PSTN）、SIP プロバイダー、または別の PBX に接続しなければなりません。その通話を運ぶリンクが **trunk** です。TDM 時代には trunk は物理回線、すなわち T1/E1 PRI やアナログ FXO 回線のバンドルでした。現在ではほとんどの場合 **SIP trunk** であり、インターネットテレフォニーサービスプロバイダー（ITSP）への論理接続が、他のすべてと同じ IP ネットワーク上で運ばれます。
+自分自身としか通話できないPBXは、あまり役に立ちません。遅かれ早かれ、すべてのシステムは外部の世界、つまり公衆交換電話網（PSTN）、SIPプロバイダー、あるいは別のPBXと接続する必要があります。それらの通話を運ぶリンクを**trunk**と呼びます。TDM時代において、trunkとは物理的な回線、すなわちT1/E1 PRIやアナログFXO回線の束のことでした。今日では、それはほぼ例外なく**SIP trunk**、つまり他のあらゆる通信と同じIPネットワーク上で運ばれる、インターネット電話サービスプロバイダー（ITSP）への論理的な接続を指します。
 
-この章では、PJSIP を使用して Asterisk 22 を ITSP に接続する方法、登録ベースと IP ベースの trunk の選択方法、着信 DID 番号を適切な宛先へルーティングする方法、正しい発信者番号と E.164 形式で外部発信を行う方法、そして複数の trunk にまたがるフェイルオーバーと最小コストルーティングの構築方法を示します。最後に trunk の NAT 対応と、モック ITSP として第2の Asterisk（および SIPp）を立ち上げ、trunk を介して実際の通話を行うラボを紹介します。
+本章では、PJSIPを使用してAsterisk 22をITSPに接続する方法、登録ベースのtrunkとIPベースのtrunkのどちらを選択すべきか、着信したDID番号を適切な宛先にルーティングする方法、正しいcaller-IDとE.164形式で発信する方法、そして複数のtrunkをまたいでフェイルオーバーや最小コストルーティングを構築する方法を解説します。最後に、trunkにおけるNATの取り扱いと、2台目のAsterisk（およびSIPp）を模擬ITSPとして立ち上げ、実際にtrunkを介して通話を行うラボを実施します。
 
-ここに記載されたすべては、書籍の Asterisk 22.10.0 ラボで検証済みです。trunk オブジェクトのパターンは、*Building your first PBX with PJSIP* および *SIP & PJSIP in depth* で導入されたものと同じです。
+ここに記載されている内容はすべて、本書のAsterisk 22.10.0ラボ環境で検証済みです。trunkオブジェクトのパターンは、『Building your first PBX with PJSIP』および『SIP & PJSIP in depth』で紹介したものと同じです。
 
 ## Objectives
 
-この章の終わりまでに、次のことができるようになります。
+この章を読み終えることで、以下のことができるようになります。
 
-- PJSIP を使用して Asterisk 22 を ITSP に接続する
-- 登録ベースと IP ベース（静的）トランクのどちらかを選択する
-- 着信 DID を適切なエクステンション、IVR、またはキューにルーティングする
-- 発信時に正しい発信者 ID と E.164 形式でコールをルーティングする
-- `${DIALSTATUS}` を使用してトランクのフェイルオーバーと最小コストルーティングを構築する
-- トランクのトランスポートとエンドポイントで NAT を処理する
+- PJSIPを使用して Asterisk 22 を ITSP に接続する
+- レジストレーションベースのトランクと IP ベース（固定）のトランクを選択する
+- 着信した DID を適切な extension、IVR、またはキューにルーティングする
+- 発信者番号と E.164 フォーマットを適切に設定して外線通話をルーティングする
+- `${DIALSTATUS}`を使用してトランクのフェイルオーバーと最小コストルーティングを構築する
+- トランスポートおよび endpoint におけるトランクの NAT を処理する
 
-## What is a SIP trunk
+## SIP trunkとは何か
 
-SIPトランクは、PBXと別のSIPシステムとの間の論理的な音声経路です。実際にはその「別システム」は次の2つのうちのどちらかです。
+SIP trunkとは、あなたのPBXと別のSIPシステムとの間の論理的な音声パスのことです。実際には、その「別のシステム」は以下の2つのいずれかです。
 
-- **ITSP（Internet Telephony Service Provider）。** 通話の発信と終端、そして通常は電話番号ブロック（DID）を販売する商用キャリアです。Asteriskをプロバイダーのシグナリングホストにポイントし、プロバイダーが通話を広域PSTNに接続します。これがほとんどの最新システムが電話ネットワークに到達する方法で、電話機器は不要です。
-- **PSTNゲートウェイ。** 物理的なPSTNインターフェース（PRIカード、アナログFXOポート、またはGSM/4Gゲートウェイ）を持ち、それらをPBXにSIPとして提示するデバイス（または別のAsterisk）です。ゲートウェイがTDMからSIPへの変換を行い、Asteriskから見ると単なる別のSIPトランクになります。
+- **ITSP (Internet Telephony Service Provider)。** 通話の発着信サービスや、通常は電話番号のブロック（DID）を販売する商用キャリアです。Asteriskをプロバイダーのシグナリングホストに向けることで、プロバイダーがあなたの通話を広範なPSTNへと接続します。これが、現代のシステムのほとんどが電話網に接続する方法であり、電話用ハードウェアは不要です。
+- **PSTN gateway。** 物理的なPSTNインターフェース（PRIカード、アナログFXOポート、またはGSM/4G gatewayなど）を持ち、それらをSIPとしてあなたのPBXに提示するデバイス（または別のAsterisk）です。gatewayがTDMからSIPへの変換を行い、Asteriskの観点からは、それは単なる別のSIP trunkとして扱われます。
 
-どちらの場合でも、PJSIPではトランクは**単なるエンドポイント**です。電話用に使用したのと同じオブジェクトファミリー—`endpoint`、`auth`、`aor`、オプションで`identify`と`registration`—がトランクを構築します。違いは詳細にあります。トランクは*アウトバウンド*を認証します（クライアント側なので認証情報は`outbound_auth`に入れ、`auth`ではありません）、通常はユーザーエージェントを登録しません（*あなたが*それに登録するか、既知のIPからトラフィックが送られます）、そして着信呼び出しは`from-pstn`のような専用コンテキストに着地し、`from-internal`ではありません。
+いずれの場合も、PJSIPにおいてtrunkは**単なるendpoint**です。電話機に使用したものと同じオブジェクトファミリー（`endpoint`、`auth`、`aor`、オプションで`identify`および`registration`）がtrunkを構築します。違いは詳細部分にあります。trunkは*アウトバウンド*で認証を行います（あなたがクライアントであるため、資格情報は`outbound_auth`に入力し、`auth`ではありません）。また、通常はユーザーエージェントをあなたに対して登録させることはありません（あなたが*相手*に登録するか、相手が既知のIPからトラフィックを送信してきます）。そして、インバウンドの通話は`from-internal`ではなく`from-pstn`のような専用のcontextに着信します。
 
-> **旧TDMトランクとの比較。** PRIは固定数のBチャネル（T1では23、E1では30）と専用Dチャネルでの呼制御信号（*Legacy channels*章参照）を提供しましたが、SIPトランクには固定チャネル数はありません—容量は帯域幅、プロバイダーのポリシー、そして任意の`max_contacts`/同時通話制限によって決まります。かつてISDN情報要素で運ばれていた発信者番号、DID、通話進行情報は、現在はSIPヘッダーとSDPで運ばれます。
+> **従来のTDM trunkとの比較。** PRIでは固定数のB-channel（T1で23、E1で30）が提供され、専用のD-channel上で通話設定のシグナリングが行われていました（*Legacy channels*の章を参照）。SIP trunkには固定のチャンネル数はなく、容量は帯域幅、プロバイダーのポリシー、および任意の`max_contacts`/同時通話制限によって決まります。かつてISDNの情報要素で伝送されていたCaller-ID、DID、および通話進行状況は、現在ではSIPヘッダーとSDPで伝送されます。
 
-ITSPがトラフィックの交換に同意する方法は2つあり、トランクの構築方法を決定します：**登録ベース**と**IPベース（静的）**です。これらを順に説明します。
+ITSPがあなたとトラフィックを交換する方法には2通りあり、それによってtrunkの構築方法が決まります。それは**登録ベース（registration-based）**と**IPベース（static）**です。それぞれについて順に説明します。
 
 ## Registration-based trunks
 
-登録ベースのトランクは、プロバイダーが*あなた*に対して*自分*にログインすることを期待するモデルです。Asterisk は定期的に SIP `REGISTER` をプロバイダーに送信し、ユーザー名とパスワードで認証します。これは、電話が PBX に登録するのと同じ方法です。パブリック IP が動的である場合や、NAT の背後にいる場合、またはプロバイダーが顧客を IP アドレスではなく SIP 資格情報で識別する場合に一般的です。
+Registration-based trunk（登録ベースのトランク）は、プロバイダーが*あなた*からのログインを待機している場合に使用されるモデルです。Asteriskは定期的にSIP `REGISTER`をプロバイダーへ送信し、ユーザー名とパスワードで認証を行います。これは、電話機がPBXに登録するのと全く同じ仕組みです。このモデルは、パブリックIPが動的である場合、NATの背後にいる場合、あるいはプロバイダーがIPアドレスではなくSIP認証情報によって顧客を識別する場合に一般的です。
 
-PJSIP では、アウトバウンドログインは専用の `registration` オブジェクトにあります。これは、削除された `chan_sip` ドライバーが `sip.conf` で使用していた単一の `register =>` 行に取って代わります。以下は、前章で検証されたパターンに従った架空のプロバイダーへの完全な登録トランクです — `outbound_auth`（`auth` ではなく）、`server_uri`/`client_uri`（`server`/`client` ではなく）、エンドポイント上の `from_user`/`from_domain`、そして `dtmf_mode=rfc4733` に注意してください。
+PJSIPでは、アウトバウンドのログイン情報は専用の `registration` オブジェクトに保持されます。これは、廃止された `chan_sip` ドライバーが `sip.conf` で使用していた単一の `register =>` 行を置き換えるものです。以下に、本書の以前の章で検証されたパターンに従った、架空のプロバイダーへの完全な登録トランクの設定例を示します。なお、endpointにおける `outbound_auth` （`auth` ではない）、`server_uri`/`client_uri` （`server`/`client` ではない）、`from_user`/`from_domain` 、および `dtmf_mode=rfc4733` に注意してください。
 
 ```
 [itsp]
@@ -69,15 +69,15 @@ contact_user=4830001000
 retry_interval=60
 ```
 
-いくつかのポイント:
+いくつか注意すべき点があります：
 
-- **`auth_type=digest`、`userpass` ではありません。** 両方とも同じダイジェスト認証を生成しますが、Asterisk 22 では `userpass`（および古い `md5`）は **非推奨となり、静かに `digest` に変換されます**。新しい設定では `digest` を使用してください；古いファイルや本書の前章では依然として `userpass` が見られます。
-- **エンドポイントと登録の両方で `outbound_auth` を使用。** 登録は `REGISTER` の認証に使用し、エンドポイントはプロバイダーがアウトバウンド `INVITE` に対して返す `407 Proxy Authentication Required` に応答するために使用します。これらは 1 つの `auth` オブジェクトを共有できます。
-- **`from_user` / `from_domain`。** 多くのプロバイダーは、`From` ヘッダーに自分のアカウント番号とドメインが含まれていない呼び出しを拒否します。この 2 つのオプションはまさにそれを設定します。
-- **`contact_user=4830001000`。** これは登録する `Contact` のユーザー部分となり、プロバイダーはどの番号に着信呼び出しを配信すべきかを把握します。これは古い `register =>` 行の `/9999` サフィックスの現代的な等価物です。
-- **`retry_interval=60`。** 登録が失敗した場合、60 秒ごとに再試行します。
+- **`auth_type=digest` （`userpass` ではない）。** どちらも同じダイジェスト認証を生成しますが、Asterisk 22では `userpass` （および古い `md5`）は **非推奨となり、警告なしで `digest` に変換されます**。新しい設定では `digest` を使用することを推奨します。古いファイルや本書の以前の章では、依然として `userpass` が見られるはずです。
+- **endpointとregistrationの両方における `outbound_auth`。** registrationはこれを使用して `REGISTER` を認証し、endpointはこれを使用してプロバイダーがアウトバウンドの `INVITE` に対して送り返してくる `407 Proxy Authentication Required` に応答します。これらは一つの `auth` オブジェクトを共有できます。
+- **`from_user` / `from_domain`。** 多くのプロバイダーは、その `From` ヘッダーにアカウント番号とプロバイダーのドメインが含まれていない通話を拒否します。これら2つのオプションは、まさにその値を設定するものです。
+- **`contact_user=4830001000`。** これは登録する `Contact` のユーザー部分となるため、プロバイダーはどの番号に着信を配信すべきかを認識できます。これは、古い `register =>` 行における `/9999` サフィックスの現代的な代替手段です。
+- **`retry_interval=60`。** 登録に失敗した場合、60秒ごとに再試行します。
 
-リロード後、`pjsip show registrations` で登録を確認します。ラボ環境では `itsp.example.com` が実際に応答しないため、テーブルは次のようになります:
+リロード後、 `pjsip show registrations` で登録状況を確認します。ラボ環境（`itsp.example.com` が実際には応答しない環境）では、テーブルは以下のようになります：
 
 ```
 *CLI> pjsip show registrations
@@ -90,15 +90,15 @@ retry_interval=60
 Objects found: 1
 ```
 
-`(exp. Ns)` サフィックスは次の試行までの秒数をカウントダウンし、ゼロを越えると一瞬 `(exp. Ns ago)` と表示されてから再試行が開始されます。実際のプロバイダーに対しては `Status` 列が `Registered` と表示され、次のリフレッシュまでの残り秒数が示されます。`Rejected`（または `Unregistered`）はプロバイダーがログインを受け付けなかったことを意味します — `pjsip set logger on` を有効にし、`401`/`403` の応答を確認してください。ほとんどの場合、ユーザー名、パスワード、または `client_uri` ドメインが間違っています。
+`(exp. Ns)` サフィックスは、次の試行までの秒数をカウントダウンします。ゼロになると、再試行が実行される直前に一時的に `(exp. Ns ago)` と表示されます。実際のプロバイダーに対しては、 `Status` カラムに次のリフレッシュまでの残り秒数が `Registered` と表示されます。 `Rejected` （または `Unregistered`）は、プロバイダーがログインを受け入れなかったことを意味します。 `pjsip set logger on` を有効にして `401`/`403` の応答を確認してください。ほとんどの場合、ユーザー名、パスワード、または `client_uri` ドメインの誤りが原因です。
 
 ## IPベース（静的）トランク
 
-2番目のモデルは登録が全く不要です。プロバイダーはあなたのパブリックIPアドレスを把握しており、直接そこへ呼び出しを送ります。あなたは代わりに、プロバイダーが既知のシグナリングIPへ呼び出しを送ります。認証は **ソースIPアドレス** によって行われ、SIPクレデンシャルではありません。これは、あなたが管理する2つのサーバー間のトランクや、両側が静的アドレスを持つエンタープライズトランクで典型的です。
+2番目のモデルでは、登録は一切不要です。プロバイダーはあなたのパブリックIPアドレスを把握しており、そこに直接通話を送信します。あなたも同様に、プロバイダーの既知のシグナリングIPへ通話を送信します。認証はSIP認証情報ではなく、**送信元IPアドレス**によって行われます。これは、自身で管理する2つのサーバー間のトランクや、両端が静的アドレスを持つ企業向けトランクで一般的です。
 
-キーオブジェクトは`identify`です。Asteriskに対し「*この* IPから来たすべてのSIPリクエストは*あの* エンドポイントに属する」と指示します。これがなければ、PJSIPは`From`ユーザーでインバウンドリクエストをエンドポイントにマッチさせようとしますが、キャリアのトラフィックはそれを満たさないため、呼び出しは拒否されるか`anonymous`エンドポイントにフォールバックします。
+重要なオブジェクトは `identify` です。これはAsteriskに対して「*この*IPから到着するSIPリクエストはすべて*あの*endpointに属する」と伝えます。これがない場合、PJSIPはインバウンドリクエストを `From` ユーザーによってendpointにマッチさせようとしますが、キャリアのトラフィックはこれを満たさないため、通話は拒否されるか、あるいは `anonymous` endpointにフォールバックしてしまいます。
 
-静的トランクは`registration`オブジェクトを削除し、`identify`を追加します：
+静的トランクでは `registration` オブジェクトを削除し、 `identify` を追加します。
 
 ```
 [itsp]
@@ -122,7 +122,7 @@ endpoint=itsp
 match=203.0.113.10
 ```
 
-`match`はIPアドレス、CIDRレンジ、またはホスト名を受け取ります。**ホスト名は設定ロード時に一度だけ解決されます**。したがって、プロバイダーのIPが変更された場合はリロードが必要です。複数のメディアゲートウェイを公開しているキャリアの場合、シグナリングIPをそれぞれ列挙します—`match`を繰り返すか、CIDRを指定できます：
+`match` はIPアドレス、CIDR範囲、またはホスト名を受け入れます。**ホスト名は設定読み込み時に一度だけ解決される**ため、プロバイダーのIPが変更された場合はリロードが必要です。複数のメディアゲートウェイを公開しているキャリアの場合、各シグナリングIPをリストアップします。 `match` を繰り返すか、CIDRを指定することができます。
 
 ```
 [itsp-identify]
@@ -133,7 +133,7 @@ match=203.0.113.11
 match=198.51.100.0/24
 ```
 
-Asteriskが受け入れる内容は`pjsip show identifies`で確認してください。ラボから取得したものです（`sipp-identify`行はラボの既存SIPpエンドポイントです）：
+Asteriskが何を受け入れるかは `pjsip show identifies` で確認してください。ラボからキャプチャした結果です（ `sipp-identify` 行はラボの既存のSIPp endpointです）。
 
 ```
 *CLI> pjsip show identifies
@@ -151,12 +151,12 @@ Asteriskが受け入れる内容は`pjsip show identifies`で確認してくだ�
 Objects found: 2
 ```
 
-### セキュリティ上の意味
+### セキュリティへの影響
 
-認証なしのIPベーストランクはドアに例えられ、`identify`/`match`が唯一のロックです。範囲を`match`しすぎると、あるいは攻撃者がソースIPを偽装できると、呼び出しは認証されずに`from-pstn`コンテキストに着地します。併用すべき2つの防御策：
+認証のないIPベースのトランクはドアのようなものであり、 `identify` / `match` が唯一の鍵となります。もし `match` を広範囲に設定しすぎた場合、あるいは攻撃者が送信元IPを偽装できた場合、通話は認証なしであなたの `from-pstn` contextに着信してしまいます。以下の2つの防御策を併用してください。
 
-- **できるだけ狭くマッチさせる。** 広いCIDRよりも特定のホストIPを優先します。プロバイダーの実際のシグナリングIPだけを`match`に含めます。
-- **ACLと組み合わせる。** PJSIPは`type=acl`オブジェクト（または`acl.conf`）を使用して、エンドポイントに到達する前にSIP層でトラフィックをドロップできます：
+- **可能な限り限定的にマッチさせる。** 広範なCIDRよりも特定のホストIPを優先してください。プロバイダーの実際のシグナリングIPのみを `match` に含めるべきです。
+- **ACLと組み合わせる。** PJSIPは、 `type=acl` オブジェクト（または `acl.conf` ）を使用することで、トラフィックがendpointに到達する前にSIP層で破棄できます。
 
 ```
 [itsp-acl]
@@ -166,19 +166,19 @@ permit=203.0.113.10
 permit=203.0.113.11
 ```
 
-`type=acl`セクションは参照不要です：`res_pjsip_acl`はそのようなすべてのオブジェクトを*すべての*インバウンドSIPトラフィックに適用し、エンドポイントに到達する前に処理します。（オブジェクトの`acl`および`contact_acl`オプションは、上記のようにインラインで`permit`/`deny`を列挙する代わりに、`acl.conf`から名前付きルールリストを取得します。）原則はSIP章と同じで、すべてを拒否し、信頼できるものだけを許可します。そして、トランクコンテキストが何であれ、**認証された明示的なルールなしにPSTNへ再ダイヤルできるコンテキストに到達させてはいけません**—これが古典的な課金詐欺の穴です。
+`type=acl` セクションは参照を必要としません。 `res_pjsip_acl` は、すべてのインバウンドSIPトラフィックがendpointに到達する前に、そのようなすべてのオブジェクトを適用します。（オブジェクト上の `acl` および `contact_acl` オプションは、上記のように `permit` / `deny` をインラインでリストする代わりに、 `acl.conf` から名前付きルールリストを取得します。）原則はSIPの章と同じです。すべてを拒否し、信頼できるものだけを許可してください。また、トランクのcontextが何をするにしても、**意図的かつ認証されたルールなしでPSTNへ発信できるcontextに到達させないでください**。それが典型的な国際電話詐欺の入り口となります。
 
-> **どのモデルを使うべきです
+> **どちらのモデルを使うべきか？** プロバイダーがユーザー名とパスワードを提供している場合は、**登録（registration）**トランクを使用してください。プロバイダーがあなたのIPアドレスを要求し、彼らのIPアドレスを提示してきた場合は、**識別（identify）**トランクを使用してください。一部のプロバイダーは両方をサポートしています。多くの実際のトランクでは、登録（プロバイダーがあなたを見つけられるようにするため）と識別（プロバイダーのメディアゲートウェイからのインバウンドINVITEが、レジストラ以外のIPから到着した場合でもマッチするようにするため）を組み合わせています。
 
-## Inbound routing and DID handling
+## インバウンドルーティングとDIDの処理
 
-一度インバウンドコールが到着すると、エンドポイントの `context` に着地します — ここが `from-pstn` です。**DID**（Direct Inward Dialing number）とは、プロバイダーがリクエスト URI で渡すダイヤルされた番号のことです。ダイヤルプランでのあなたの仕事は、各 DID を宛先にマッピングすることです：単一のエクステンション、IVR、キュー、またはリンググループです。
+インバウンドコールが到着すると、その呼び出しはendpointの`context`に着信します。ここで`from-pstn`が行われます。**DID**（Direct Inward Dialing number：ダイヤルイン番号）とは、プロバイダーがリクエストURIで渡してくるダイヤルされた番号のことです。dialplanにおけるあなたの役割は、各DIDを特定の宛先（単一のextension、IVR、キュー、またはリンググループ）にマッピングすることです。
 
-プロバイダーが送信する番号は `${EXTEN}` として `from-pstn` にマッチします。どれだけの情報が見えるかはプロバイダー次第です — 完全な E.164 番号（`+4830001000`）を送る場合もあれば、国内番号、あるいは最後の数桁だけを送る場合もあります。実際のインバウンドコールを `pjsip set logger on` で確認し、パターンを書く前にリクエスト URI を確認してください。
+プロバイダーから送られてくる番号は、`from-pstn`内の`${EXTEN}`としてマッチングされます。どの程度まで番号が見えるかはプロバイダーによって異なります。完全なE.164番号（`+4830001000`）を送るプロバイダーもあれば、国内番号を送るプロバイダー、あるいは末尾の数桁のみを送るプロバイダーもあります。パターンを記述する前に、`pjsip set logger on`を使用して実際のインバウンドコールを調査し、リクエストURIを確認してください。
 
-### One DID to one extension
+### 1つのDIDを1つのextensionへ
 
-最もシンプルなケース — 単一の DID をそのまま電話にルーティングする場合:
+最も単純なケースとして、1つのDIDを直接電話機にルーティングする場合です：
 
 ```
 [from-pstn]
@@ -187,9 +187,9 @@ exten => 4830001000,1,NoOp(Inbound DID: ${EXTEN} from ${CALLERID(num)})
  same =>             n,Hangup()
 ```
 
-### One DID to an IVR (auto attendant)
+### 1つのDIDをIVR（自動応答）へ
 
-電話が鳴る代わりにメニューで応答すべきメイン番号:
+電話機を鳴らすのではなく、メニューで応答すべき代表番号の場合：
 
 ```
 [from-pstn]
@@ -198,11 +198,11 @@ exten => 4830001000,1,Answer()
  same =>             n,Goto(ivr-main,s,1)
 ```
 
-`ivr-main` はダイヤルプラン章（`Background()` + `WaitExten()`）で構築したオートアテンダントコンテキストです。DID のルーティングは単なる `Goto` です。
+`ivr-main`は、dialplanの章で構築した自動応答用contextです（`Background()` + `WaitExten()`）。DIDのルーティングは単なる`Goto`です。
 
-### One DID to a queue
+### 1つのDIDをキューへ
 
-サポートラインをコールキューに流す場合:
+コールキューに着信させるべきサポート回線の場合：
 
 ```
 [from-pstn]
@@ -211,9 +211,9 @@ exten => 4830002000,1,Answer()
  same =>             n,Hangup()
 ```
 
-### Many DIDs at once
+### 複数のDIDを一度に処理する
 
-番号ブロックを購入したとき、パターンを使うことでダイヤルプランを小さく保てます。例えば DID 範囲が `4830003000`–`4830003099` で、プロバイダーが完全な番号を送る場合、各 DID の最後の二桁をエクステンション `60xx` にマップします:
+番号ブロックを購入した場合、パターンを使用することでdialplanを簡潔に保てます。DIDの範囲が`4830003000`～`4830003099`で、プロバイダーが完全な番号を送ってくるものと仮定します。各DIDの末尾2桁をextension`60xx`にマッピングします：
 
 ```
 [from-pstn]
@@ -222,27 +222,22 @@ exten => _48300030XX,1,NoOp(DID ${EXTEN} -> extension 60${EXTEN:-2})
  same =>             n,Hangup()
 ```
 
-`${EXTEN:-2}` は最後の二桁を取得します（負のオフセットは右から数えます）。したがって `4830003007` は `PJSIP/6007` を鳴らします。`did => extension` ルックアップテーブルを `GoSub` もしくは Asterisk データベース（`AstDB`/`func_odbc`）で構築すればさらにスケールしますが、数件の番号であれば明示的なパターンが最も分かりやすいです。
+`${EXTEN:-2}`は末尾2桁を取得します（負のオフセットは右からカウントされます）。そのため、`4830003007`は`PJSIP/6007`を呼び出します。`GoSub`やAsteriskデータベース（`AstDB`/`func_odbc`）を使用して構築された`did => extension`ルックアップテーブルはさらに拡張性がありますが、少数の番号であれば明示的なパターンが最も明確です。
 
-> **Catch the unmatched DID.** `from-pstn` に `i`（無効）エクステンションを追加し、誤ってルーティングされたインバウンド番号がアナウンスを再生したり、オペレーターに転送されたりして、黙って切れないようにします:
-> 
+> **マッチしないDIDの捕捉。** `from-pstn`に`i`（無効）extensionを追加することで、ルーティングが外れたインバウンド番号に対して、無音で切断する代わりにアナウンスを流したり、オペレーターを呼び出したりすることができます：
+>
 > ```
 > exten => i,1,Playback(ss-noservice)
 >  same =>  n,Hangup()
 > ```
 
-## Outbound routing, caller-ID and E.164
+## アウトバウンドルーティング、発信者番号、および E.164
 
-Outbound calls flow the other way: an internal phone dials a number, your dialplan
-matches it, strips any access prefix, sets the caller-ID the provider expects, and
-hands the call to the trunk endpoint with `Dial(PJSIP/<number>@itsp)`.
+アウトバウンド通話は逆方向に流れます。内線電話が番号をダイヤルすると、dialplanがそれを照合し、アクセスプレフィックスを取り除き、プロバイダーが期待する発信者番号を設定し、その通話を `Dial(PJSIP/<number>@itsp)` を使用してtrunkのendpointへ渡します。
 
-### Sending the call to the trunk
+### trunkへの通話の送信
 
-The channel syntax for a trunk is `PJSIP/<number>@<endpoint>`: the part before the
-`@` becomes the user portion of the outbound request URI, and the part after the
-`@` names the endpoint whose `aor` `contact` supplies the destination host. A
-classic "dial 9 for an outside line" rule:
+trunkのチャネル構文は `PJSIP/<number>@<endpoint>` です。 `@` より前の部分はアウトバウンドリクエストURIのユーザー部分となり、 `@` より後の部分は、その `aor` `contact` が宛先ホストを提供するendpointを指名します。典型的な「外線発信のために9をダイヤルする」ルールは以下の通りです。
 
 ```
 [from-internal]
@@ -252,45 +247,29 @@ exten => _9NXXXXXXXXX,1,NoOp(Outbound to ${EXTEN:1} via itsp)
  same =>             n,Hangup()
 ```
 
-`${EXTEN:1}` strips the leading `9` access code before the number is sent. The
-pattern `_9NXXXXXXXXX` matches `9` plus a 10-digit number whose first digit is
-2–9; adjust it to your dial plan.
+`${EXTEN:1}` は、番号が送信される前に先頭の `9` アクセスコードを取り除きます。パターン `_9NXXXXXXXXX` は、 `9` に続く10桁の番号（最初の桁は2〜9）に一致します。これを自身のdialplanに合わせて調整してください。
 
-### Caller-ID on outbound calls
+### アウトバウンド通話の発信者番号
 
-Most ITSPs ignore — or actively reject — a caller-ID that is not a number you own.
-Set the outbound caller-ID number to one of your DIDs with the `CALLERID(num)`
-function before `Dial()`, as shown above. You can also set the name:
+ほとんどのITSPは、所有していない番号の発信者番号を無視するか、積極的に拒否します。アウトバウンドの発信者番号は、上記のように `Dial()` の前に `CALLERID(num)` 関数を使用して、所有するDIDのいずれかに設定してください。名前を設定することも可能です。
 
 ```
  same => n,Set(CALLERID(num)=4830001000)
  same => n,Set(CALLERID(name)=ACME Corp)
 ```
 
-If the provider still strips or overrides your caller-ID name, that is their
-policy — many carriers source the displayed name from their own CNAM database
-keyed on the number, not from your `From` header.
+プロバイダーが依然として発信者番号の名前を取り除いたり上書きしたりする場合、それは彼らのポリシーです。多くの通信事業者は、表示名をあなたの `From` ヘッダーからではなく、番号をキーとした独自のCNAMデータベースから取得しています。
 
-Two endpoint options interact with this:
+これに関連するendpointオプションが2つあります。
 
-- **`from_user`** sets the user part of the `From` header at the SIP level, which
-  some providers use to identify your account regardless of `CALLERID(num)`.
-- **`trust_id_outbound`** (default `no`) controls whether Asterisk will send
-  privacy-sensitive identity headers (`P-Asserted-Identity`/`P-Preferred-Identity`)
-  outbound. Leave it off unless your provider documents that they want PAI, in
-  which case set `trust_id_outbound=yes` and `send_pai=yes`.
+- **`from_user`** は、SIPレベルで `From` ヘッダーのユーザー部分を設定します。一部のプロバイダーは、 `CALLERID(num)` に関係なくこれを使用してアカウントを識別します。
+- **`trust_id_outbound`** （デフォルトは `no`）は、Asteriskがプライバシーに配慮した識別ヘッダー（`P-Asserted-Identity`/`P-Preferred-Identity`）をアウトバウンドで送信するかどうかを制御します。プロバイダーがPAIを要求していると明記していない限りオフのままにしてください。要求されている場合は、 `trust_id_outbound=yes` および `send_pai=yes` を設定します。
 
-### Normalizing to E.164
+### E.164への正規化
 
-E.164 is the international number format: a leading `+`, country code, then the
-national number, with no spaces or punctuation (for example `+5548999990000` or
-`+14155550100`). Carriers increasingly expect — or require — E.164 on the trunk.
-Rather than scatter formatting across the dialplan, normalize once in the outbound
-context.
+E.164は国際電話番号形式であり、先頭の `+`、国番号、その後に国内番号が続き、スペースや句読点は含まれません（例： `+5548999990000` や `+14155550100`）。通信事業者は、trunk上でE.164形式を期待する、あるいは要求することが増えています。フォーマットの処理をdialplan全体に散らばらせるのではなく、アウトバウンドのcontextで一度だけ正規化を行うようにします。
 
-A North-American example that accepts a 10-digit local number, an 11-digit
-`1`-prefixed number, or an already-E.164 number, and always presents `+1…` to the
-trunk:
+10桁の市内番号、11桁の `1` で始まる番号、またはすでにE.164形式になっている番号を受け入れ、常に `+1…` をtrunkに提示する北米の例を以下に示します。
 
 ```
 [from-internal]
@@ -311,18 +290,15 @@ exten => _+X.,1,Set(CALLERID(num)=+14155550000)
  same =>     n,Hangup()
 ```
 
-Some providers want the `+`; others want the bare digits. If yours rejects the
-`+`, strip it on the way out with `${EXTEN:1}` in the `Dial`. The point is that
-all the format knowledge lives in one place, so switching providers — or adding a
-second one — is a one-line change.
+`+` を要求するプロバイダーもあれば、数字のみを要求するプロバイダーもあります。もしプロバイダーが `+` を拒否する場合は、 `Dial` 内の `${EXTEN:1}` を使用して送信時にそれを取り除いてください。重要なのは、フォーマットに関するすべての知識を一箇所に集約しておくことであり、そうすればプロバイダーの切り替えや追加を行う際も、1行の変更で済むようになります。
 
-## Failover and least-cost routing
+## フェイルオーバーと最小コストルーティング
 
-1 本のトランクだけでは、プロバイダー障害が発生するとアウトバウンドコールができなくなります。2 本以上のトランクがあれば、自動的にフェイルオーバーでき、宛先ごとに最も安価な経路を選択することも可能です — *least-cost routing*（LCR）。
+トランクが1つしかない場合、プロバイダーの障害は発信不能を意味します。2つ以上あれば、自動的にフェイルオーバーを行い、宛先ごとに最も安価なルートを選択する*最小コストルーティング*（LCR）さえ可能になります。
 
-### Failover with `${DIALSTATUS}`
+### `${DIALSTATUS}`によるフェイルオーバー
 
-`Dial()` は戻り値として `${DIALSTATUS}` チャネル変数を設定します。フェイルオーバー時に重要になる値は `CHANUNAVAIL`（トランクに全く到達できなかった）と `CONGESTION`（コールが拒否された、例: 全回線がビジー）です。プライマリートランクを試み、もしコールを運べなければバックアップにフォールスルーします:
+`Dial()`は、戻り値として`${DIALSTATUS}`チャネル変数を設定します。フェイルオーバーにおいて考慮すべき値は、`CHANUNAVAIL`（トランクに全く到達できなかった場合）と`CONGESTION`（呼び出しが拒否された場合、例：全回線使用中）です。まずプライマリトランクを試し、もし通話が確立できなかった場合はバックアップへフォールスルーさせます。
 
 ```
 [from-internal]
@@ -334,11 +310,11 @@ exten => _9NXXXXXXXXX,1,Set(CALLERID(num)=4830001000)
  same =>             n(done),Hangup()
 ```
 
-`BUSY` や `NOANSWER` でフェイルオーバーしないという意図的な選択に注意してください — それらは *called party* が到達して拒否したことを意味し、別のトランクで再試行すると、すでに「いいえ」と言った電話が再び鳴ります（しかも二回目の通話料金がかかります）。*トランク自体* が失敗したときだけ再ルーティングします。
+`BUSY`や`NOANSWER`ではフェイルオーバーを行わないという意図的な選択に注意してください。これらは*呼び出し先*に到達したが拒否されたことを意味するため、別のトランクで再試行すると、すでに拒否した電話を再び鳴らすことになり（2回目の通話料金が発生する可能性もあります）、不適切です。*トランク自体*が失敗した場合のみ、再ルーティングを行ってください。
 
-### A reusable routing subroutine
+### 再利用可能なルーティングサブルーチン
 
-このロジックをすべてのダイヤルパターンで繰り返すのはミスが起きやすいです。目的番号を受け取り、順番に各トランクを試す `GoSub` ルーチンに分割します:
+すべてのダイヤルパターンに対してそのロジックを繰り返すと、エラーが発生しやすくなります。これを`GoSub`ルーチンにまとめ、宛先番号を受け取って各トランクを順番に試すようにします。
 
 ```
 [from-internal]
@@ -356,11 +332,11 @@ exten => s,1,Set(NUM=${ARG1})
  same =>   n(end),Return()
 ```
 
-これで、すべてのアウトバウンドパターンは 1 つの `GoSub` 呼び出しになり、トランクの順序は **1 カ所** で定義されます。
+これで、すべての発信パターンは1回の`GoSub`呼び出しで済み、トランクの順序は一箇所で定義されるようになります。
 
-### Least-cost routing by destination
+### 宛先による最小コストルーティング
 
-真の LCR は、通話先に応じてトランクを選択します。一般的な形としては、宛先プレフィックスにマッチさせ、各クラスの通話を最も安価なプロバイダーに送ります — 例として、国際電話は卸売キャリアへ、ローカル/国内電話はプライマリープロバイダーへ送る、といった具合です:
+真のLCRは、通話の行き先に基づいてトランクを選択します。一般的な構成は、宛先のプレフィックスを照合し、それぞれの通話クラスを最も安価なプロバイダーへ送信することです。例えば、国際電話は卸売キャリアへ、市内/国内通話はプライマリトランクへ送信するといった具合です。
 
 ```
 [from-internal]
@@ -379,17 +355,17 @@ exten => s,1,Set(NUM=${ARG1})
  same =>   n(end),Return()
 ```
 
-数個以上のプレフィックスがある場合は、ルートテーブルをデータベース（`func_odbc`/`AstDB`）に保存し、ハードコーディングしたパターンの代わりにプレフィックスでトランクを検索します。ダイヤルプランは小さく保たれ、レートはテーブルで管理できるため、ロジックをリロードせずに編集可能です。
+プレフィックスが多数ある場合は、ルートテーブルをデータベース（`func_odbc`/`AstDB`）に保存し、パターンをハードコーディングする代わりにプレフィックスでトランクを検索するようにします。これにより、dialplanは簡潔に保たれ、料金設定はロジックをリロードすることなく編集可能なテーブル内に保持されます。
 
-## NAT とトランク
+## NATとtrunk
 
-NAT はトランク問題の最も一般的な原因で、典型的には一方向オーディオや、トランクは登録されているが着信呼び出しを受け取らないといった症状が現れます。その原因は電話の場合と同じで（*SIP & PJSIP in depth* と *Designing a VoIP network* で取り上げられています）、Asterisk が SIP と SDP で自分のアドレスを広告し、NAT の背後にあるプライベート RFC 1918 アドレスはプロバイダーが戻ってルーティングできません。
+NATは、trunkの問題を引き起こす最も一般的な原因です。典型的な症状としては、片方向音声や、登録はできるが着信が一切できないといった問題が挙げられます。原因は電話機の場合（*SIP & PJSIP in depth*および*Designing a VoIP network*で解説）と同じです。AsteriskはSIPやSDPの中で自身のIPアドレスを通知しますが、NAT配下にある場合、それはプロバイダーがルーティングできないプライベートな RFC 1918 アドレスになってしまうためです。
 
-トランクに対する対策は二つの部分からなります — **transport**（あなたのパブリックアドレス）側の設定と **endpoint**（プロバイダーのメディアをどのように扱うか）側の設定です。
+trunkの場合、修正には2つのパートがあります。**transport**の設定（自身のパブリックアドレス）と、**endpoint**の設定（プロバイダーのメディアをどのように扱うか）です。
 
-### transport 側 — あなたのパブリックアドレス
+### transportの設定 — 自身のパブリックアドレス
 
-Asterisk サーバ自体が NAT の背後にある場合（プライベート IP と 1:1 のパブリック IP を持つクラウドやオンプレミスのボックス）、transport にパブリックアドレスとローカルネットワークを伝えます。これらのオプションは一度だけ `transport` で設定し、そこを通るすべてのトラフィックに適用されます。
+Asteriskサーバー自体がNAT配下にある場合（プライベートIPを持ち、1:1のパブリックIPが割り当てられたクラウドやオンプレミスのボックス）、transportに対してそのパブリックアドレスと、どのネットワークがローカルであるかを伝える必要があります。これらのオプションは`transport`で一度設定すれば、その上を通るすべてのトラフィックに適用されます。
 
 ```
 [transport-udp]
@@ -402,13 +378,13 @@ external_media_address=203.0.113.50
 external_signaling_address=203.0.113.50
 ```
 
-- **`external_signaling_address`** — Asterisk が SIP ヘッダー（`Via`、`Contact`）に書き込むパブリック IP で、`local_net`外の宛先向けです。  
-- **`external_media_address`** — Asterisk が SDP `c=` 行に書き込むパブリック IP で、RTP が正しい場所に戻ってくるようにします。通常はシグナリングアドレスと同じです。  
-- **`local_net`** — Asterisk が内部とみなすネットワークで、LAN ピアに対してアドレスを書き換えません。すべての内部サブネットを列挙してください。
+- **`external_signaling_address`** — Asteriskが`local_net`の外側の宛先に対して、SIPヘッダー（`Via`、`Contact`）に書き込むパブリックIP。
+- **`external_media_address`** — RTPが正しい場所に戻るように、AsteriskがSDPの`c=`行に書き込むパブリックIP。通常はシグナリング用のアドレスと同じです。
+- **`local_net`** — Asteriskが内部ネットワークとして扱うネットワーク。LAN内のピアに対してアドレスの書き換えを行わないようにします。内部サブネットをすべてリストしてください。
 
-### エンドポイント側 — プロバイダーのメディア
+### endpointの設定 — プロバイダーのメディア
 
-もう一方は、NAT の背後にあるプロバイダー、あるいは SDP に記載されたアドレスとは異なるアドレスからメディアを送信するプロバイダーを扱います。これらはトランクエンドポイントごとに設定します。
+もう半分は、プロバイダー自体がNAT配下にある場合や、単にSDPに記載されたアドレスとは異なるアドレスからメディアを送信してくる場合への対応です。これらはtrunkのendpointごとに設定します。
 
 ```
 [itsp]
@@ -428,24 +404,26 @@ from_user=4830001000
 from_domain=itsp.example.com
 ```
 
-- **`direct_media=no`** — Asterisk を通してメディアを流すようにし、2 本のレッグが直接会話しないようにします。NAT 環境で必須であり、通話の録音、トランスコード、モニタリングを行う場合にも必要です。  
-- **`rtp_symmetric=yes`** — 従来の *comedia* 動作です。SDP が示すアドレスではなく、実際にメディアが届いたアドレスに RTP を返します。  
-- **`force_rport=yes`** — `Via` ヘッダーを信用せず、リクエスト元の IP/ポートから SIP に応答します (RFC 3581)。  
-- **`rewrite_contact=yes`** — このエンドポイントからのインバウンド SIP メッセージに対し、`Contact` ヘッダー（または適切な `Record-Route` ヘッダー）を、パケットが実際に来た送信元 IP アドレスとポートに書き換えます。このオプションのドキュメントによれば、これは「NAT の背後にあるエンドポイントとサーバーが通信できるようにし」「TCP や TLS などの信頼できるトランスポート接続の再利用を助ける」ものです。
+- **`direct_media=no`** — 2つのレグを直接通信させるのではなく、Asteriskを経由してメディアを流し続けます。NATを越える場合には不可欠であり、通話の録音、トランスコード、監視を行う場合にも必須となります。
+- **`rtp_symmetric=yes`** — 古典的な*comedia*の動作です。SDPが主張するアドレスではなく、実際にメディアが送信されてきたアドレスに対してRTPを返信します。
+- **`force_rport=yes`** — `Via`ヘッダーを信頼する代わりに、リクエストの送信元IP/ポート（RFC 3581）に対してSIPで応答します。
+- **`rewrite_contact=yes`** — このendpointからの着信SIPメッセージに対して、`Contact`ヘッダー（または適切な`Record-Route`ヘッダー）を、パケットが実際に到達した送信元IPアドレスとポートに書き換えます。このオプションのドキュメントによれば、これは「NAT配下のendpointとの通信を助け」、「TCPやTLSのような信頼性の高いトランスポート接続の再利用を助ける」ものです。
 
-> **Recommendation — phones vs trunks.** `rewrite_contact` は電話機に対してほぼ常に正しい選択です。なぜなら、電話機が広告するコンタクトは通常、ルーティングできないプライベート RFC 1918 アドレスだからです。静的 IP ベースのトランクでは、プロバイダー側のコンタクトはすでに正しいパブリックアドレスであることが多く、書き換えは不要な場合が多いです。いくつかのオペレーターは、登録トランクや NAT 環境の電話機に対してのみ有効にし、他の場合はオフにしています。オプションの効果は上記のインバウンド `Contact`/`Record-Route` 書き換えだけなので、静的トランクで有効にする前に、必ずご利用のキャリアでテストしてください。
+> **推奨事項 — 電話機とtrunkの違い。** `rewrite_contact`は、電話機にとってはほぼ常に正しい選択です。なぜなら、電話機が通知する連絡先は通常、ルーティング不可能なプライベートな RFC 1918 アドレスだからです。固定IPベースのtrunkでは、プロバイダーの連絡先は通常すでに正しいパブリックアドレスであるため、書き換えは不要な場合が多いです。一部の通信事業者は、固定trunkではこの設定をオフにし、登録型のtrunkやNAT配下の電話機に対してのみ有効にすることを推奨しています。このオプションの文書化された効果は、上記の着信時の`Contact`/`Record-Route`の書き換えのみです。したがって、安全な運用としては、固定trunkで有効にする前に、特定の通信事業者でテストを行うことを推奨します。
 
-任意のエンドポイントに対して効果的な設定を確認するには、`pjsip show endpoint <name>` — `direct_media`、`rtp_symmetric`、`force_rport`、`rewrite_contact` を使用し、パラメータダンプにすべて出力されます。
+任意のendpointにおける有効な設定は、以下のコマンドで確認できます。
+`pjsip show endpoint <name>` — `direct_media`、`rtp_symmetric`、`force_rport`、
+`rewrite_contact`、およびその他のパラメータがすべてダンプ出力されます。
 
-## Lab — a mock ITSP with a second Asterisk and SIPp
+## Lab — 2台目の Asterisk と SIPp を使用した模擬 ITSP
 
-有料のトランクを用意しなくても練習できます。本書のラボでは、プライベート`172.30.0.0/24`ネットワーク上に Asterisk 22.10.0 コンテナと SIPp コンテナがすでに起動しています。SIPp コンテナを「キャリア」とみなし、着信呼び出しを行い、トランクエンドポイントを追加してそれらの呼び出しを`from-pstn`コンテキストに流します。
+練習のために有料の trunk を用意する必要はありません。この本のラボ環境では、すでに Asterisk 22.10.0 コンテナと SIPp コンテナがプライベートな `172.30.0.0/24` ネットワーク上で動作しています。SIPp コンテナをインバウンド通話を発信する「キャリア」として扱い、その通話を `from-pstn` context に着信させる trunk endpoint を追加します。
 
-![A SIP trunk between the Asterisk PBX and the ITSP: the PBX registers as one account, outbound calls dial `PJSIP/<num>@trunk`, and inbound calls land in the `from-pstn` context.](../images/09-sip-trunking-fig01.png)
+![Asterisk PBX と ITSP 間の SIP trunk: PBX は 1 つのアカウントとして登録し、アウトバウンド通話は `PJSIP/<num>@trunk` にダイヤルし、インバウンド通話は `from-pstn` context に着信します。](images/trunk-lab.png){width=100%}(../images/09-sip-trunking-fig01.png)
 
-### 1. Add the trunk endpoint
+### 1. trunk endpoint の追加
 
-IP ベースのトランクを`lab/asterisk/etc/pjsip.conf`に追加し、ラボの SIPp ホストと一致させ、着信呼び出しを`from-pstn`に流します:
+ラボの SIPp ホストと一致し、インバウンド通話を `from-pstn` に着信させる IP ベースの trunk を `lab/asterisk/etc/pjsip.conf` に追加します。
 
 ```
 [itsp]
@@ -467,9 +445,9 @@ endpoint=itsp
 match=172.30.0.50
 ```
 
-### 2. Route the inbound DID
+### 2. インバウンド DID のルーティング
 
-`lab/asterisk/etc/extensions.conf`で、モックキャリアがダイヤルする DID に応答し、再生する`from-pstn`コンテキストを追加し、さらにアウトバウンドルールを追加します:
+`lab/asterisk/etc/extensions.conf` に、模擬キャリアがダイヤルする DID に応答して音声を再生する `from-pstn` context を追加し、アウトバウンドルールを追加します。
 
 ```
 [from-pstn]
@@ -487,7 +465,7 @@ exten => _9X.,1,Set(CALLERID(num)=4830001000)
  same =>     n,Hangup()
 ```
 
-両方のファイルをリロード（`core reload`）し、トランクがロードされたことを確認します:
+両方のファイルをリロードし（`core reload`）、trunk が読み込まれたことを確認します。
 
 ```
 *CLI> pjsip show endpoint itsp
@@ -498,20 +476,20 @@ exten => _9X.,1,Set(CALLERID(num)=4830001000)
         Match: 172.30.0.50/32
 ```
 
-### 3. Place an inbound call across the trunk
+### 3. trunk を経由したインバウンド通話の発信
 
-SIPp シナリオを PBX に向け、ターゲットユーザーとして DID を指定します。ラボにはすでに`lab/sipp/uac_9000.xml`が用意されており、エクステンション`9000`に INVITE を送ります。これを`uac_did.xml`にコピーし、リクエスト URI／`To`ユーザーを`9000`から`4830001000`に変更して、SIPp コンテナから実行します:
+DID をターゲットユーザーとして、SIPp シナリオを PBX に向けます。ラボ環境にはすでに `lab/sipp/uac_9000.xml` が同梱されており、extension `9000` に対して INVITE を送信します。これを `uac_did.xml` にコピーし、request-URI/`To` ユーザーを `9000` から `4830001000` に変更してから、SIPp コンテナから実行します。
 
 ```
 docker compose -f lab/docker-compose.yml exec -T sipp \
   sipp -sf /sipp/uac_did.xml 172.30.0.10:5060 -m 1 -nostdin
 ```
 
-Asterisk コンソールで`from-pstn`が呼び出されるのを確認します（`pjsip set logger on`は着信 INVITE を示し、`core show channels`は`PJSIP/itsp-…`チャンネルが`demo-congrats`を再生していることを示します）。SIPp の送信元 IP が`identify`と一致しているため、認証なしで呼び出しが受け入れられます――静的キャリアトランクの動作と同様です。
+Asterisk コンソールで通話が `from-pstn` に到達する様子を監視します（`pjsip set logger on` はインバウンドの INVITE を示し、`core show channels` は `PJSIP/itsp-…` チャネルが `demo-congrats` を再生していることを示します）。SIPp の送信元 IP が `identify` と一致するため、認証なしで通話が受け入れられます。これは、静的なキャリア trunk の動作そのものです。
 
-### 4. Inspect the trunk
+### 4. trunk の調査
 
-メモ用にトランクの完全な設定を取得します:
+記録用に trunk の完全な設定をキャプチャします。
 
 ```
 pjsip show endpoint itsp
@@ -519,65 +497,65 @@ pjsip show aors
 pjsip show identifies
 ```
 
-### 5. (Stretch) make it a registration trunk
+### 5. (発展課題) 登録型 trunk への変更
 
-*2 番目* の Asterisk コンテナを実際のレジストラとして立ち上げます。アカウント`4830001000`に対して`endpoint`＋`auth`＋`aor`を設定し、PBX 側ではこの章の冒頭にある`registration`ブロックに置き換えて`identify`ブロックを差し替えます（`server_uri`を 2 番目のコンテナの IP に指すように）。`pjsip show registrations`でステータスが`Registered`と表示されることを確認し、双方向に通話を行います。
+*2台目* の Asterisk コンテナを実際のレジストラとして立ち上げます。アカウント `4830001000` 用に `endpoint`+`auth`+`aor` を設定し、PBX 側で `identify` ブロックを本章の冒頭にある `registration` ブロックに入れ替えます（`server_uri` を 2 台目のコンテナの IP に向けます）。`pjsip show registrations` でステータスが `Registered` と表示されることを確認し、双方向に通話を発信してください。
 
-## Summary
+## 概要
 
-SIPトランクは PBX を外部と接続し、PJSIP では既に知っている同じ `endpoint` + `auth` + `aor` ファミリから構築されたエンドポイントに、`identify`または`registration`を加えたものです。プロバイダーがユーザー名とパスワードを提供する場合は **registration trunk**（`type=registration` と `outbound_auth`）を使用し、認証が送信元 IP による場合は **IP-based trunk**（`type=identify` と `match`）を使用します。その際、認証されていないトランクは料金詐欺の対象になるため、狭い `match` と `acl` でロックしてください。インバウンドでは、プロバイダーの DID が `${EXTEN}` として `from-pstn` コンテキストに届き、そこからエクステンション、IVR、またはキューへルーティングします——パターンと `${EXTEN:-N}` により DID ブロックをコンパクトに保ちます。アウトバウンドでは、所有する番号を `CALLERID(num)` に設定し、1 カ所で E.164 に正規化し、通話を `PJSIP/<number>@trunk` に渡します。複数のトランクを試みて `${DIALSTATUS}`（`CHANUNAVAIL`/`CONGESTION` は再ルートを意味し、`BUSY`/`NOANSWER` は意味しません）で分岐させ、`GoSub` テーブルに最安値ルーティングを配置してレジリエンスを構築します。最後に、トランクの NAT は双方向です：パブリックアドレス用の **transport** で `external_media_address`/`external_signaling_address`/`local_net`、プロバイダー側メディア用の **endpoint** で `direct_media=no`、`rtp_symmetric`、`force_rport`、および `rewrite_contact` を設定します。
+SIP trunkはPBXを外部世界と接続するものであり、PJSIPにおいては、すでに習得済みの `endpoint` + `auth` + `aor` ファミリーに `identify` または `registration` を加えた単なる endpoint に過ぎません。プロバイダーからユーザー名とパスワードが提供される場合は **registration trunk** (`type=registration` と `outbound_auth`) を使用し、ソースIPによって認証を行う場合は **IP-based trunk** (`type=identify` と `match`) を使用します。後者の場合は、認証のない trunk は国際電話詐欺の標的となるため、厳格な `match` と `acl` で保護してください。着信時、プロバイダーからの DID は `from-pstn` context 内の `${EXTEN}` として到着します。そこで extension、IVR、またはキューへとルーティングします。パターンや `${EXTEN:-N}` を使用することで、DID ブロックを簡潔に管理できます。発信時は、所有する番号を `CALLERID(num)` に設定し、一箇所で E.164 形式に正規化してから、呼び出しを `PJSIP/<number>@trunk` に渡します。複数の trunk を試行し、 `${DIALSTATUS}` に基づいて分岐させることで耐障害性を構築します（`CHANUNAVAIL`/`CONGESTION` は再ルーティングを意味し、`BUSY`/`NOANSWER` はそうではありません）。また、最小コストルーティングは `GoSub` テーブルに配置してください。最後に、trunk における NAT は双方向の対応が必要です。パブリックアドレスに対しては **transport** 上で `external_media_address`/`external_signaling_address`/`local_net` を設定し、プロバイダーのメディアに対しては **endpoint** 上で `direct_media=no`、 `rtp_symmetric`、 `force_rport`、 および `rewrite_contact` を設定します。
 
-## Quiz
+## クイズ
 
-1. PJSIP で、プロバイダーへの *outbound* コールまたは登録を認証するために使用される資格情報は次で参照されます:
+1. PJSIPにおいて、プロバイダーへの*アウトバウンド*コールや登録を認証するために使用される認証情報は、以下で参照されます：
    - A. `auth=`
    - B. `outbound_auth=`
    - C. `secret=`
    - D. `remotesecret=`
-2. 次の場合に `type=registration` トランクを使用すべきです:
-   - A. プロバイダーが送信元 IP アドレスであなたを識別する場合。
-   - B. プロバイダーがユーザー名とパスワードを提供し、ログインを期待している場合。
-   - C. Asterisk が `REGISTER` を送信したくない場合。
-   - D. トランクが、あなたが管理する 2 つの静的 IP サーバー間にある場合。
-3. `identify` オブジェクトの `match` オプションは次を受け入れます（該当するものすべて選択）:
-   - A. IP アドレス
-   - B. CIDR 範囲
-   - C. 設定読み込み時に解決されるホスト名
-   - D. SIP ユーザー名のみ
-4. Asterisk 22 では、`auth_type=userpass` は次のとおりです:
-   - A. 唯一の有効な値
-   - B. 非推奨となり `digest` に変換される
-   - C. 削除され、ロードエラーを引き起こす
-   - D. アウトバウンド登録に必須
-5. インバウンド DID 番号はダイヤルプランに次の形で届きます:
+2. `type=registration`トランクを使用すべきなのは、どのような場合ですか：
+   - A. プロバイダーが送信元IPアドレスであなたを識別する場合。
+   - B. プロバイダーがユーザー名とパスワードを提供し、ログインを要求する場合。
+   - C. Asteriskに`REGISTER`を送信させたくない場合。
+   - D. トランクが、あなたが管理する2つの静的IPサーバー間にある場合。
+3. `identify`オブジェクトの`match`オプションは、以下を受け入れます（該当するものをすべて選択してください）：
+   - A. IPアドレス
+   - B. CIDR範囲
+   - C. ホスト名（設定読み込み時に解決されるもの）
+   - D. SIPユーザー名のみ
+4. Asterisk 22において、`auth_type=userpass`は：
+   - A. 唯一の有効な値である
+   - B. 非推奨となり、`digest`に変換される
+   - C. 削除されており、読み込みエラーを引き起こす
+   - D. アウトバウンド登録に必須である
+5. インバウンドのDID番号は、dialplanにおいて以下として到着します：
    - A. `${CALLERID(num)}`
-   - B. `${EXTEN}` がトランクエンドポイントの `context` に含まれる
+   - B. トランクendpointの`context`における`${EXTEN}`
    - C. `${DIALSTATUS}`
    - D. `${CONTEXT}`
-6. ダイヤルされた DID `4830003007` の下2桁をエクステンションに送信するには、次を使用します:
+6. ダイヤルされたDID`4830003007`の下2桁をextensionに送信するには、以下を使用します：
    - A. `${EXTEN:2}`
    - B. `${EXTEN:0:2}`
    - C. `${EXTEN:-2}`
    - D. `${EXTEN:8}`
-7. トランクへの `Dial()` 後、バックアップトランクにフェイルオーバーすべきで、`${DIALSTATUS}` 値は（2つ選択）:
+7. トランクへの`Dial()`の後、どの`${DIALSTATUS}`値を持つバックアップトランクにフェイルオーバーすべきですか（2つ選択してください）：
    - A. `CHANUNAVAIL`
    - B. `BUSY`
    - C. `CONGESTION`
    - D. `NOANSWER`
-8. 発信前にプロバイダーに提示する発信者番号を設定するには、次を使用します:
+8. 発信前にプロバイダーに提示する発信者ID番号を設定するには、以下を使用します：
    - A. `Set(CALLERID(num)=4830001000)`
    - B. `Set(from_user=4830001000)`
    - C. `Set(DIALSTATUS=4830001000)`
    - D. `Set(CONNECTEDLINE(num)=4830001000)`
-9. サーバーが NAT の背後にある場合に Asterisk に *public* アドレスを知らせるオプションは次に設定します:
+9. サーバーがNATの背後にある場合に、Asteriskに対してその*パブリック*アドレスを通知するオプションは、どこで設定されますか：
    - A. `endpoint`
    - B. `aor`
    - C. `transport` (`external_media_address` / `external_signaling_address`)
    - D. `registration`
-10. トランクエンドポイントの `rtp_symmetric=yes` は Asterisk に次を行わせます:
-    - A. RTP を SRTP で暗号化する
-    - B. メディアが実際に到着したアドレスに RTP を送り返し、SDP を無視する
-    - C. RTP を完全に無効化する
-    - D. エンドポイント間で直接メディアを強制する
+10. トランクendpoint上の`rtp_symmetric=yes`は、Asteriskに何を行わせますか：
+    - A. SRTPでRTPを暗号化する
+    - B. SDPを無視し、メディアが実際に到着したアドレスにRTPを返送する
+    - C. RTPを完全に無効化する
+    - D. endpoint間でダイレクトメディアを強制する
 
-**Answers:** 1 — B · 2 — B · 3 — A, B, C · 4 — B · 5 — B · 6 — C · 7 — A, C · 8 — A · 9 — C · 10 — B
+**回答:** 1 — B · 2 — B · 3 — A, B, C · 4 — B · 5 — B · 6 — C · 7 — A, C · 8 — A · 9 — C · 10 — B

@@ -1,53 +1,29 @@
-# Migrating from chan_sip to PJSIP: a cookbook
+# chan_sip から PJSIP への移行：クックブック
 
-If you are reading this with an Asterisk 13, 16, or 18 box still in production,
-you have a deadline. `chan_sip` — the original SIP channel driver configured
-through `sip.conf` — was **deprecated in Asterisk 17, removed from the default
-build in Asterisk 19, and deleted entirely in Asterisk 21**. It does not exist in
-Asterisk 22 LTS. There is no flag to turn it back on, no `noload` to dodge, no
-package to install. The only SIP channel driver in Asterisk 22 is **PJSIP**
-(`res_pjsip` plus `chan_pjsip`), configured through `pjsip.conf`.
+もしあなたが Asterisk 13、16、または 18 を現在本番環境で運用しているなら、期限が迫っています。`chan_sip` — `sip.conf` を通じて設定されるオリジナルの SIP チャネルドライバ — は、**Asterisk 17 で非推奨となり、Asterisk 19 ではデフォルトビルドから除外され、Asterisk 21 では完全に削除されました**。Asterisk 22 LTS には存在しません。これを有効に戻すフラグも、回避するための `noload` も、インストール可能なパッケージもありません。Asterisk 22 における唯一の SIP チャネルドライバは **PJSIP** (`res_pjsip` および `chan_pjsip`) であり、これは `pjsip.conf` を通じて設定されます。
 
-So an upgrade to Asterisk 22 is, for most sites, a *SIP migration project* as much
-as a version bump. The good news is that the protocol on the wire does not change
-— a phone that registered and called yesterday will register and call tomorrow —
-and Asterisk ships a conversion tool to do the first 80% of the translation for
-you. This chapter is a practical cookbook: the concept mapping, the conversion
-script, side-by-side `sip.conf` → `pjsip.conf` translations for the cases you
-actually have, the dialplan and CLI changes that come with the move, realtime
-(database) migration, and a checklist plus the pitfalls that bite people.
+したがって、ほとんどのサイトにとって Asterisk 22 へのアップグレードは、単なるバージョンアップであると同時に、*SIP 移行プロジェクト*でもあります。幸いなことに、ネットワーク上のプロトコル自体は変更されません。昨日登録して通話できた電話機は、明日も登録して通話できます。また、Asterisk には翻訳作業の最初の 80% を自動化する変換ツールが同梱されています。本章は実践的なクックブックです。概念のマッピング、変換スクリプト、実際に遭遇するケースに対応した `sip.conf` → `pjsip.conf` の並列翻訳、移行に伴う dialplan や CLI の変更、realtime (データベース) の移行、そしてチェックリストと陥りやすい落とし穴について解説します。
 
-Everything here is verified against the book's Asterisk 22.10.0 lab. The deep
-legacy material on `chan_sip` itself — and a worked end-to-end conversion of a
-multi-device `sip.conf` — lives in the *Legacy channels* chapter; this chapter is
-the focused, recipe-style companion to it.
+ここに記載されている内容はすべて、本書の Asterisk 22.10.0 ラボ環境で検証済みです。`chan_sip` 自体に関する詳細なレガシー資料や、マルチデバイス `sip.conf` のエンドツーエンドの変換作業については *Legacy channels* の章に記載されています。本章は、その内容を補完する、レシピ形式の集中ガイドです。
 
 ## Objectives
 
-By the end of this chapter, you should be able to:
+この章を読み終えることで、以下のことができるようになります。
 
-- Explain why `chan_sip` is gone in Asterisk 22 and what replaces it
-- Map the `sip.conf` peer/user/friend model onto the PJSIP object model
-  (endpoint + aor + auth + identify + transport + registration)
-- Run the `sip_to_pjsip.py` conversion script and review its output critically
-- Translate the common device types (registering phone, inbound trunk, outbound
-  registration) from `sip.conf` to `pjsip.conf` by hand
-- Migrate NAT, media, DTMF, codec, and authentication settings option-by-option
-- Update the dialplan (`SIP/` → `PJSIP/`) and the CLI (`sip show` → `pjsip show`)
-- Migrate a realtime/ARA deployment from `sippeers`/`sipregs` to the Sorcery
-  `ps_*` tables
-- Work through a migration checklist and avoid the classic pitfalls
+- Asterisk 22でなぜ `chan_sip` が廃止されたのか、そして何に置き換わるのかを説明する
+- `sip.conf` のpeer/user/friendモデルをPJSIPのオブジェクトモデル（endpoint + aor + auth + identify + transport + registration）にマッピングする
+- `sip_to_pjsip.py` 変換スクリプトを実行し、その出力を批判的にレビューする
+- 一般的なデバイスタイプ（登録型電話機、インバウンドtrunk、アウトバウンド登録）を `sip.conf` から `pjsip.conf` へ手動で変換する
+- NAT、メディア、DTMF、codec、認証設定をオプションごとに移行する
+- dialplan（`SIP/` → `PJSIP/`）およびCLI（`sip show` → `pjsip show`）を更新する
+- realtime/ARAのデプロイメントを `sippeers`/`sipregs` からSorcery `ps_*` テーブルへ移行する
+- 移行チェックリストに従って作業を進め、典型的な落とし穴を回避する
 
-## Why migrate at all
+## なぜ移行する必要があるのか
 
-`chan_sip` served Asterisk for nearly two decades, but it carried architectural
-debt: one monolithic module, a single configuration block per device, weak
-multi-transport support, and a SIP stack that had fallen behind the RFCs.
-**PJSIP** — built on Teluu's mature pjproject stack and introduced in Asterisk 12
-— was the ground-up replacement. By Asterisk 21 the Asterisk project finished the
-job and removed `chan_sip` from the tree.
+`chan_sip`は20年近くにわたりAsteriskを支えてきましたが、アーキテクチャ上の負債を抱えていました。それは、モノリシックなモジュール、デバイスごとに1つの設定ブロック、弱いマルチトランスポートサポート、そしてRFCに追いつけなくなったSIPスタックです。**PJSIP**は、Teluuの成熟したpjprojectスタックを基盤として構築され、Asterisk 12で導入された、ゼロから作り直された代替品です。Asterisk 21までに、Asteriskプロジェクトはその作業を完了し、ツリーから`chan_sip`を削除しました。
 
-You can confirm the situation on any Asterisk 22 system:
+Asterisk 22のシステムであれば、以下のコマンドで状況を確認できます。
 
 ```
 *CLI> module show like chan_sip
@@ -60,30 +36,22 @@ chan_pjsip.so                  PJSIP Channel Driver     0          Running     c
 1 modules loaded
 ```
 
-`chan_sip` returns *0 modules loaded* — it is simply not there. There is nothing
-to migrate *to* except PJSIP, so the only real question is *how*, not *whether*.
+`chan_sip`を実行すると *0 modules loaded* と返されます。つまり、そこにはもう存在しないのです。PJSIP以外への移行先は存在しないため、唯一の現実的な問いは「移行するかどうか」ではなく「どのように移行するか」です。
 
-## The conceptual mapping: there is no single "peer"
+## 概念的なマッピング：単一の「ピア」は存在しない
 
-The mental shift that trips up everyone coming from `sip.conf` is this: **PJSIP
-has no `[peer]`.** In `sip.conf` one bracketed block — a `peer`, a `user`, or a
-`friend` — described *everything* about a device: its credentials, where to reach
-it, its codecs, its NAT behaviour, its dialplan context. PJSIP deliberately
-breaks that single block into several smaller, single-purpose objects, each tagged
-with a `type=`, that *reference each other by name*:
+`sip.conf`から移行する際に誰もがつまずく思考の転換点はこれです。**PJSIPには`[peer]`が存在しません。** `sip.conf`では、角括弧で囲まれた1つのブロック（`peer`、`user`、または`friend`）が、デバイスに関するすべて（認証情報、接続先、codec、NATの挙動、dialplanのcontextなど）を記述していました。PJSIPでは、その単一のブロックを意図的に分割し、それぞれが`type=`でタグ付けされた、単一目的の小さなオブジェクト群にしています。これらは*名前によって相互に参照*し合います。
 
-| PJSIP object (`type=`) | Responsibility |
+| PJSIPオブジェクト（`type=`） | 役割 |
 | --- | --- |
-| `endpoint` | The device's call-handling identity: codecs, context, DTMF, media, NAT, and references to its `auth`/`aors`/`transport` |
-| `aor` (Address of Record) | *Where* to reach the device — registered or static contacts, `max_contacts`, qualify |
-| `auth` | Credentials (username/password) for inbound and/or outbound authentication |
-| `identify` | Match an inbound request to an endpoint by **source IP** instead of by the `From` user |
-| `transport` | The listening socket(s): protocol, bind address/port, NAT/external addresses |
-| `registration` | An **outbound** REGISTER from Asterisk to a provider |
+| `endpoint` | デバイスの通話処理におけるアイデンティティ：codec、context、DTMF、メディア、NAT、および`auth`/`aors`/`transport`への参照 |
+| `aor` (Address of Record) | デバイスへの*到達先*：登録済みまたは静的な連絡先、`max_contacts`、qualify設定 |
+| `auth` | インバウンドおよび/またはアウトバウンド認証のための認証情報（ユーザー名/パスワード） |
+| `identify` | インバウンドリクエストを`From`ユーザーではなく**送信元IP**によってendpointにマッチングさせる |
+| `transport` | リッスンするソケット：プロトコル、バインドするアドレス/ポート、NAT/外部アドレス |
+| `registration` | Asteriskからプロバイダーへの**アウトバウンド**REGISTER |
 
-The `friend`/`peer`/`user` distinction disappears entirely — in PJSIP everything
-is an `endpoint`. A single `sip.conf` friend therefore becomes, typically, three
-objects (`endpoint` + `auth` + `aor`) that share a name and point at one another:
+`friend`/`peer`/`user`という区別は完全に消滅しました。PJSIPではすべてが`endpoint`です。したがって、単一の`sip.conf` friendは、通常、名前を共有し互いを指し示す3つのオブジェクト（`endpoint` + `auth` + `aor`）になります。
 
 ```
                 sip.conf                              pjsip.conf
@@ -100,29 +68,21 @@ objects (`endpoint` + `auth` + `aor`) that share a name and point at one another
                                           └───────────┘
 ```
 
-The endpoint is the glue. It names a `transport` (or inherits the default), an
-`auth` object, and one or more `aors`. The object model is covered in depth in
-*SIP & PJSIP in depth*; here we just need it as the target of every translation.
+endpointは接着剤のような役割を果たします。これは`transport`（またはデフォルトを継承）と`auth`オブジェクト、そして1つ以上の`aors`を指定します。このオブジェクトモデルについては『*SIP & PJSIP in depth*』で詳しく解説されていますが、ここではすべての変換のターゲットとして理解しておけば十分です。
 
-## The `sip_to_pjsip.py` conversion tool
+## `sip_to_pjsip.py`変換ツール
 
-Asterisk ships a Python script that reads an existing `sip.conf` and writes a
-`pjsip.conf`. It does not run as a CLI command — it lives in the **Asterisk source
-tree**, not the installed binaries:
+Asteriskには、既存の`sip.conf`を読み込み、`pjsip.conf`を書き出すPythonスクリプトが同梱されています。これはCLIコマンドとして実行するものではなく、インストールされたバイナリではなく**Asteriskソースツリー**内に存在します：
 
 ```
 ${ASTERISK_SRC}/contrib/scripts/sip_to_pjsip/sip_to_pjsip.py
 ```
 
-On the lab's Asterisk 22.10.0 the full path is, for example,
-`/usr/src/asterisk-22.10.0/contrib/scripts/sip_to_pjsip/sip_to_pjsip.py`. The same
-directory holds `sip_to_pjsql.py` (the realtime/SQL variant, covered later) and
-the helper modules `astconfigparser.py`, `astdicts.py`, and `sqlconfigparser.py`.
+ラボのAsterisk 22.10.0では、フルパスは例えば`/usr/src/asterisk-22.10.0/contrib/scripts/sip_to_pjsip/sip_to_pjsip.py`となります。同じディレクトリには`sip_to_pjsql.py`（後述するrealtime/SQLバリアント）や、ヘルパーモジュールの`astconfigparser.py`、`astdicts.py`、`sqlconfigparser.py`も格納されています。
 
-### Running it
+### 実行方法
 
-The script takes optional positional arguments — `[input-file [output-file]]` —
-defaulting to `sip.conf` and `pjsip.conf` in the current directory:
+このスクリプトはオプションの位置引数`[input-file [output-file]]`をとります。デフォルトではカレントディレクトリの`sip.conf`と`pjsip.conf`が使用されます：
 
 ```
 cd /etc/asterisk
@@ -130,7 +90,7 @@ python /usr/src/asterisk-22.10.0/contrib/scripts/sip_to_pjsip/sip_to_pjsip.py \
        sip.conf pjsip_generated.conf
 ```
 
-Its only real options are:
+主なオプションは以下の通りです：
 
 ```
 -h, --help              show usage
@@ -138,17 +98,11 @@ Its only real options are:
 -q, --quiet             don't print messages to stdout
 ```
 
-It reads the input, prints `Converting to PJSIP...`, and writes the output file.
-Internally it walks every `sip.conf` section and, per device, emits the matching
-`endpoint`, `auth`, `aor`, `registration`, and (where it can infer them)
-`transport` objects, applying the option mappings in the next section
-automatically.
+入力ファイルを読み込み、`Converting to PJSIP...`を出力し、出力ファイルを書き出します。内部的にはすべての`sip.conf`セクションを走査し、デバイスごとに対応する`endpoint`、`auth`、`aor`、`registration`、および（推論可能な場合は）`transport`オブジェクトを生成し、次節で説明するオプションのマッピングを自動的に適用します。
 
-### What it does — and its limits
+### 実行内容と制限事項
 
-Treat the output as a **first draft, not a finished file.** The script is honest
-about its own gaps: anything it cannot map cleanly is written into a clearly
-fenced block at the top of the output file:
+出力されたファイルは**完成品ではなく、初稿**として扱ってください。このスクリプトは自身の限界を明確にしており、きれいにマッピングできなかったものはすべて、出力ファイルの先頭にある明確に区切られたブロックに書き出されます：
 
 ```
 ;--
@@ -166,39 +120,24 @@ Non mapped elements end
 --;
 ```
 
-Notice in that real fragment that `qualify = yes` from a `sip.conf` peer landed in
-the *non-mapped* block — because PJSIP qualifies on the **aor** with
-`qualify_frequency` (seconds), not a boolean on the device, the script leaves it
-for you to set deliberately. The practical limitations to plan for:
+この実際の断片を見ると、`sip.conf`ピアの`qualify = yes`が*非マッピング*ブロックに配置されていることがわかります。これは、PJSIPでは`qualify_frequency`（秒）を**aor**で修飾するためであり、デバイス上のブール値ではないため、スクリプトはユーザーが意図的に設定するように残しています。計画時に考慮すべき実用上の制限は以下の通りです：
 
-- **Transports are guessed, not designed.** The script emits a basic
-  `transport-udp` from `bindport`/`bindaddr`, but it cannot know your TLS certs,
-  your TCP needs, or your multi-bind layout. Review and rewrite the transport.
-- **NAT and external addresses need a human.** `externaddr`/`localnet` may not
-  survive cleanly; confirm `external_media_address`, `external_signaling_address`,
-  and `local_net` on the transport by hand.
-- **`qualify`, custom timers, and a handful of options land in "non-mapped".**
-  Read that block top-to-bottom and decide each one.
-- **Codec lists, contexts, and security need review.** Verify `disallow`/`allow`,
-  the dialplan `context`, and that no device is left unintentionally open.
+- **トランスポートは設計ではなく推測される。** スクリプトは`bindport`/`bindaddr`から基本的な`transport-udp`を出力しますが、TLS証明書、TCPの要件、マルチバインドのレイアウトまでは把握できません。トランスポートを確認し、書き直してください。
+- **NATと外部アドレスには人間の判断が必要。** `externaddr`/`localnet`はきれいに移行できない可能性があるため、トランスポート上の`external_media_address`、`external_signaling_address`、`local_net`を手動で確認してください。
+- **`qualify`、カスタムタイマー、およびいくつかのオプションは「非マッピング」ブロックに配置される。** そのブロックを上から下まで読み、それぞれについて判断を下してください。
+- **コーデックリスト、context、セキュリティにはレビューが必要。** `disallow`/`allow`、dialplanの`context`を確認し、意図せずデバイスが開放されたままになっていないことを検証してください。
 
-The workflow is therefore: run the script into a *scratch* file, diff and review
-it, fold the good parts into your real `pjsip.conf`, then test exhaustively before
-production.
+したがって、ワークフローは次のようになります：スクリプトを実行して*スクラッチ*ファイルを作成し、diffをとってレビューし、適切な部分を実際の`pjsip.conf`に統合してから、本番環境の前に徹底的にテストしてください。
 
 ## Side-by-side translations
 
-These are the recipes. `sip.conf` on the left, the verified `pjsip.conf`
-equivalent on the right (stacked here for page width). Every option name and value
-on the right has been checked against the Asterisk 22 lab with
-`config show help res_pjsip ...`.
+これらはレシピです。左側に`sip.conf`、右側に検証済みの`pjsip.conf`相当の記述を配置しています（ページ幅の都合上、ここでは上下に並べています）。右側のすべてのオプション名と値は、Asterisk 22のラボ環境にて`config show help res_pjsip ...`を使用して確認済みです。
 
-### A registering phone (`host=dynamic`)
+### レジストレーションを行う電話機（`host=dynamic`）
 
-The most common device: a desk phone or softphone that logs in with a secret and
-registers its own location.
+最も一般的なデバイスです。シークレットを使用してログインし、自身の場所を登録するデスクフォンやsoftphoneのことです。
 
-**Legacy `sip.conf`:**
+**レガシーな`sip.conf`:**
 
 ```
 [2000]
@@ -213,7 +152,7 @@ secret=Sup3rSecret
 qualify=yes
 ```
 
-**Asterisk 22 `pjsip.conf`:**
+**Asterisk 22の`pjsip.conf`:**
 
 ```
 [2000]
@@ -238,18 +177,13 @@ max_contacts=1
 qualify_frequency=60
 ```
 
-Key moves: `host=dynamic` becomes an `aor` with `max_contacts` (the device
-REGISTERs to fill in its contact); `secret=` becomes `password=` inside a
-`type=auth`; `qualify=yes` becomes `qualify_frequency=60` (seconds) on the
-**aor**, not the endpoint. Set `max_contacts` above 1 only if you genuinely want
-the same account on several devices at once.
+重要な変更点：`host=dynamic`は`max_contacts`を持つ`aor`になります（デバイスがREGISTERして連絡先を埋めます）。`secret=`は`type=auth`内の`password=`になります。`qualify=yes`はendpointではなく**aor**上の`qualify_frequency=60`（秒単位）になります。`max_contacts`を1より大きく設定するのは、同じアカウントを複数のデバイスで同時に使用したい場合のみにしてください。
 
-### An inbound trunk (`host=<ip>` / `type=peer`)
+### インバウンドトランク（`host=<ip>` / `type=peer`）
 
-A provider that sends you calls from a known IP address. There is no registration
-here — you authenticate the *carrier's traffic by its source IP* using `identify`.
+既知のIPアドレスから通話を発信してくるプロバイダーです。ここでは登録は行われません。代わりに`identify`を使用して、*キャリアのトラフィックを送信元IPで*認証します。
 
-**Legacy `sip.conf`:**
+**レガシーな`sip.conf`:**
 
 ```
 [itsp-in]
@@ -261,7 +195,7 @@ allow=ulaw
 insecure=invite
 ```
 
-**Asterisk 22 `pjsip.conf`:**
+**Asterisk 22の`pjsip.conf`:**
 
 ```
 [itsp-in]
@@ -280,21 +214,13 @@ endpoint=itsp-in
 match=203.0.113.10
 ```
 
-The crucial translation is **`insecure=invite` → `identify`**. In `chan_sip`,
-`insecure=invite` told Asterisk "don't challenge inbound INVITEs from this peer
-for authentication." PJSIP achieves the same effect by *matching the source IP to
-the endpoint* with `type=identify`/`match=`, which is both more explicit and more
-secure. The static `host=` becomes a permanent `contact=` on the `aor` so you can
-also dial *out* to the carrier. `match=` accepts an IP, a CIDR range, or a
-hostname (resolved at config-load time — reload if the provider's IP changes).
+重要な変換は **`insecure=invite` → `identify`** です。`chan_sip`では、`insecure=invite`がAsteriskに対して「このピアからのインバウンドINVITEに対して認証を要求するな」と指示していました。PJSIPでは、`type=identify`/`match=`を使用して*送信元IPをendpointに照合する*ことで同じ効果を実現します。これはより明確であり、かつ安全です。静的な`host=`は`aor`上の永続的な`contact=`となるため、キャリアに対して*発信*することも可能になります。`match=`はIPアドレス、CIDR範囲、またはホスト名（設定読み込み時に解決されます。プロバイダーのIPが変更された場合はリロードしてください）を受け付けます。
 
-### An outbound registration (`register =>`)
+### アウトバウンドレジストレーション（`register =>`）
 
-When the provider wants *you* to log in to *them*, `chan_sip` used a single
-`register =>` line in `[general]`. PJSIP replaces it with a dedicated
-`type=registration` object plus an `outbound_auth`.
+プロバイダーが*あなた*にログインを要求する場合、`chan_sip`では`[general]`内の単一の`register =>`行を使用していました。PJSIPでは、これを専用の`type=registration`オブジェクトと`outbound_auth`に置き換えます。
 
-**Legacy `sip.conf`:**
+**レガシーな`sip.conf`:**
 
 ```
 [general]
@@ -311,7 +237,7 @@ fromdomain=sip.example.com
 context=from-pstn
 ```
 
-**Asterisk 22 `pjsip.conf`:**
+**Asterisk 22の`pjsip.conf`:**
 
 ```
 [itsp]
@@ -344,21 +270,13 @@ contact_user=9999
 retry_interval=60
 ```
 
-Map the `register =>` fields one to one: the `1020:supersecret` credentials become
-the `auth` object (referenced as `outbound_auth`); `@sip.example.com:5600` becomes
-the `server_uri`; the `/9999` suffix — the user part the provider delivers inbound
-calls to — becomes `contact_user=9999`. `defaultuser`/`fromuser` and `fromdomain`
-become `from_user` and `from_domain` on the endpoint. Note `outbound_auth` appears
-*twice*: the registration uses it for the REGISTER, the endpoint uses it to answer
-the `407` challenge on outbound INVITEs.
+`register =>`フィールドを1対1でマッピングします。`1020:supersecret`の認証情報は`auth`オブジェクト（`outbound_auth`として参照）になり、`@sip.example.com:5600`は`server_uri`になります。`/9999`のサフィックス（プロバイダーがインバウンド通話を配信する際のユーザー部分）は`contact_user=9999`になります。`defaultuser`/`fromuser`および`fromdomain`は、endpoint上の`from_user`および`from_domain`になります。`outbound_auth`は*2回*登場することに注意してください。レジストレーションはREGISTERのためにこれを使用し、endpointはアウトバウンドINVITEに対する`407`チャレンジに応答するためにこれを使用します。
 
-## Option-by-option migration reference
+## オプションごとの移行リファレンス
 
-When you are translating by hand (or auditing the script's output), this table is
-the lookup. Every PJSIP option name and the placement (endpoint / aor / auth /
-transport) is verified against the Asterisk 22 lab.
+手動で移行を行う場合（またはスクリプトの出力を監査する場合）、この表を参照してください。すべての PJSIP オプション名と配置場所（endpoint / aor / auth / transport）は、Asterisk 22 のラボ環境で検証済みです。
 
-| Legacy `sip.conf` | Asterisk 22 `pjsip.conf` | Where |
+| Legacy `sip.conf` | Asterisk 22 `pjsip.conf` | 配置場所 |
 | --- | --- | --- |
 | `[peer]` / `[user]` / `[friend]` | `type=endpoint` (+ `auth` + `aor`) | — |
 | `host=dynamic` | `max_contacts=1` (device REGISTERs) | aor |
@@ -378,12 +296,9 @@ transport) is verified against the Asterisk 22 lab.
 | `externaddr=` / `externip=` | `external_media_address=` + `external_signaling_address=` | transport |
 | `localnet=` | `local_net=` | transport |
 
-### A note on `secret` → `auth` and `auth_type`
+### `secret` → `auth` および `auth_type` に関する注記
 
-`chan_sip`'s `secret=` becomes the `password=` field of a `type=auth` object. The
-**authentication method** is set with `auth_type`. Use `auth_type=digest`. The
-older values `userpass` and `md5` still work but are **deprecated and silently
-converted to `digest`** — verified directly from the lab:
+`chan_sip`の `secret=` は、ある `type=auth` オブジェクトの `password=` フィールドになります。**認証メソッド**は `auth_type` で設定します。必ず `auth_type=digest` を使用してください。古い値である `userpass` や `md5` も引き続き動作しますが、**非推奨であり、自動的に `digest` へと変換されます**。これはラボ環境で直接検証済みです。
 
 ```
 *CLI> config show help res_pjsip auth auth_type
@@ -394,15 +309,11 @@ converted to `digest`** — verified directly from the lab:
     digest - If selected, the 'password' ... parameters must be provided.
 ```
 
-You will see `auth_type=userpass` in older configs and in the conversion script's
-output (and in earlier chapters of this book). It is harmless, but write `digest`
-in anything new.
+古い設定ファイルや変換スクリプトの出力（および本書の以前の章）には `auth_type=userpass` が見られるはずです。これ自体に害はありませんが、新規の設定には `digest` を記述するようにしてください。
 
-### NAT, media, and DTMF in detail
+### NAT、メディア、DTMFの詳細
 
-These three are where most post-migration "it registers but has no audio" tickets
-come from. The `chan_sip` shorthand `nat=force_rport,comedia` packed three
-behaviours into one option; PJSIP splits them so you can reason about each:
+これら3つの項目は、移行後に「登録はできるが音声が聞こえない」という問い合わせが発生する最も一般的な原因です。`chan_sip` の省略形である `nat=force_rport,comedia` は、3つの動作を1つのオプションに詰め込んでいました。PJSIP ではこれらが分割されているため、それぞれについて個別に検討できます。
 
 ```
 ; sip.conf:  nat=force_rport,comedia
@@ -412,25 +323,17 @@ rewrite_contact=yes    ; rewrite the stored Contact to the real source address
 rtp_symmetric=yes      ; send RTP back where it actually came from (comedia)
 ```
 
-For **media**, `directmedia` becomes `direct_media` (the underscore is the whole
-change); keep `direct_media=no` whenever the call must be anchored on Asterisk —
-across NAT, or to record/transcode/transfer. For **DTMF**, the RFC was
-renumbered: `chan_sip`'s `dtmfmode=rfc2833` is PJSIP's `dtmf_mode=rfc4733` (same
-out-of-band telephone-event mechanism, current RFC number). The lab confirms the
-valid `dtmf_mode` values are `rfc4733`, `inband`, `info`, `auto`, and `auto_info`,
-defaulting to `rfc4733`.
+**メディア**に関しては、 `directmedia` が `direct_media` になります（アンダースコアが変更点のすべてです）。通話を Asterisk でアンカーする必要がある場合（NAT を越える場合や、録音・トランスコード・転送を行う場合）は、常に `direct_media=no` を維持してください。**DTMF** に関しては、RFC の番号が付け直されました。すなわち、 `chan_sip` の `dtmfmode=rfc2833` は PJSIP では `dtmf_mode=rfc4733` となります（帯域外 telephone-event メカニズムは同じで、現在の RFC 番号に基づいています）。ラボでの検証により、有効な `dtmf_mode` の値は `rfc4733`、 `inband`、 `info`、 `auto`、 および `auto_info` であり、デフォルトは `rfc4733` であることが確認されています。
 
-For **codecs**, nothing changes: `disallow=all` followed by `allow=ulaw` (etc.)
-uses the identical syntax on the PJSIP endpoint.
+**codec** に関しては、変更はありません。 `disallow=all` に続く `allow=ulaw` （など）は、PJSIP endpoint においても同一の構文を使用します。
 
 ## Dialplan and CLI changes
 
-The migration does not stop at `pjsip.conf`. Two things in daily use change.
+移行は`pjsip.conf`だけで終わるわけではありません。日常的に使用する2つの要素が変更されます。
 
 ### Channel strings: `SIP/` → `PJSIP/`
 
-Every `Dial()` and channel reference in `extensions.conf` that named the old
-technology must be updated:
+古いテクノロジーを指定していた`extensions.conf`内のすべての`Dial()`およびチャネル参照は、更新する必要があります。
 
 ```
 ; Before (chan_sip)
@@ -440,15 +343,11 @@ exten => 2000,1,Dial(SIP/2000,30,tT)
 exten => 2000,1,Dial(PJSIP/2000,30,tT)
 ```
 
-Trunk dial strings follow the same pattern — `Dial(SIP/${EXTEN}@itsp)` becomes
-`Dial(PJSIP/${EXTEN}@itsp)`. PJSIP also adds the `PJSIP_DIAL_CONTACTS()` function
-to ring every contact bound to an AOR at once, and the `PJSIP_HEADER()` /
-`PJSIP_MEDIA_OFFER()` dialplan functions; grep your dialplan for `SIP/`,
-`SIPPEER`, `SIPCHANINFO`, and `CHANNEL(...)` SIP references and translate each.
+Trunkのdial stringも同様のパターンに従い、`Dial(SIP/${EXTEN}@itsp)`は`Dial(PJSIP/${EXTEN}@itsp)`になります。また、PJSIPでは、AORにバインドされたすべてのコンタクトを同時に呼び出すための`PJSIP_DIAL_CONTACTS()`関数や、`PJSIP_HEADER()` / `PJSIP_MEDIA_OFFER()` dialplan関数が追加されています。dialplanに対して`SIP/`、`SIPPEER`、`SIPCHANINFO`、および`CHANNEL(...)`のSIP参照をgrepで検索し、それぞれを変換してください。
 
 ### CLI: `sip show ...` → `pjsip show ...`
 
-The entire `sip ...` command tree is gone with the driver. The replacements:
+ドライバの廃止に伴い、すべての`sip ...`コマンドツリーが削除されました。代替コマンドは以下の通りです。
 
 | `chan_sip` command | Asterisk 22 (`chan_pjsip`) |
 | --- | --- |
@@ -459,195 +358,121 @@ The entire `sip ...` command tree is gone with the driver. The replacements:
 | `sip set debug on` | `pjsip set logger on` |
 | `sip reload` | `module reload res_pjsip.so` (or `core reload`) |
 
-The old commands do not merely behave differently — they no longer exist. On the
-lab, `sip show peers` returns *No such command*, while `pjsip show endpoints`,
-`pjsip show aors`, `pjsip show auths`, `pjsip show contacts`,
-`pjsip show registrations`, and `pjsip show identifies` are all present. The most
-useful troubleshooting command — the SIP packet logger that printed every message
-with `sip set debug` — is now **`pjsip set logger on`** (with `pjsip set logger
-host <ip>` to focus on one peer).
+古いコマンドは動作が異なるだけでなく、存在しなくなりました。ラボ環境において、`sip show peers`を実行すると *No such command* が返されますが、`pjsip show endpoints`、`pjsip show aors`、`pjsip show auths`、`pjsip show contacts`、`pjsip show registrations`、および`pjsip show identifies`はすべて利用可能です。最も有用なトラブルシューティングコマンドである、すべてのメッセージを`sip set debug`で出力していたSIPパケットロガーは、現在では **`pjsip set logger on`** となっています（特定のピアに絞る場合は `pjsip set logger host <ip>` を使用します）。
 
-## Realtime (ARA) migration
+## Realtime (ARA) 移行
 
-If you ran `chan_sip` from a database (Asterisk Realtime Architecture), your
-devices lived in the `sippeers` table and registrations in `sipregs`. PJSIP uses a
-completely different storage layer — **Sorcery** — with one table *per object
-type*. The mapping:
+もしデータベース（Asterisk Realtime Architecture）から `chan_sip` を実行していた場合、デバイスは `sippeers` テーブルに、レジストレーションは `sipregs` に格納されていました。PJSIP は、**Sorcery** という全く異なるストレージ層を使用しており、*オブジェクトタイプごとに1つのテーブル*が割り当てられます。マッピングは以下の通りです。
 
 | `chan_sip` realtime table | PJSIP / Sorcery table(s) |
 | --- | --- |
-| `sippeers` | `ps_endpoints`, `ps_aors`, `ps_auths` (one row each, split out) |
-| `sipregs` | `ps_contacts` (dynamic registrations) |
+| `sippeers` | `ps_endpoints`, `ps_aors`, `ps_auths` (それぞれ1行ずつに分割) |
+| `sipregs` | `ps_contacts` (動的レジストレーション) |
 | — (outbound `register=>`) | `ps_registrations` |
-| — (IP matching) | `ps_endpoint_id_ips` (the `identify` objects) |
+| — (IP matching) | `ps_endpoint_id_ips` (`identify` オブジェクト) |
 | — (domain aliases) | `ps_domain_aliases` |
 
-The conceptual split is the same as the flat-file case: one `sippeers` row becomes
-*three* rows in three tables (`ps_endpoints` + `ps_aors` + `ps_auths`) that
-reference each other by the endpoint name.
+概念的な分割はフラットファイルの場合と同じです。1つの `sippeers` 行が、エンドポイント名で相互参照される3つのテーブル（`ps_endpoints` + `ps_aors` + `ps_auths`）の *3行* になります。
 
-Two things make this tractable:
+この作業を容易にする要素が2つあります。
 
-- **The schema is generated for you.** Asterisk ships Alembic migrations under
-  `contrib/ast-db-manage/` that create every `ps_*` table. Run
-  `alembic upgrade head` against the `config` database to build the current PJSIP
-  schema rather than writing DDL by hand.
-- **There is a SQL conversion script.** Alongside `sip_to_pjsip.py` sits
-  **`sip_to_pjsql.py`** in the same `contrib/scripts/sip_to_pjsip/` directory; it
-  reuses the same `convert()` logic but emits a `pjsip.sql` file of `INSERT`
-  statements for the `ps_*` tables instead of a flat config file. As with the
-  flat-file tool, review the output before loading it.
+- **スキーマは自動生成されます。** Asterisk には `contrib/ast-db-manage/` 配下に Alembic マイグレーションが同梱されており、これによって必要な `ps_*` テーブルがすべて作成されます。DDL を手書きする代わりに、`config` データベースに対して `alembic upgrade head` を実行し、現在の PJSIP スキーマを構築してください。
+- **SQL 変換スクリプトが用意されています。** `sip_to_pjsip.py` と同じ `contrib/scripts/sip_to_pjsip/` ディレクトリには **`sip_to_pjsql.py`** が存在します。これは同じ `convert()` ロジックを再利用しますが、フラットな設定ファイルの代わりに `ps_*` テーブル用の `INSERT` ステートメントを含む `pjsip.sql` ファイルを出力します。フラットファイル用ツールと同様に、読み込む前に出力を確認してください。
 
-Finally, point `sorcery.conf` at your database so PJSIP reads endpoints, aors,
-auths, and contacts from the `ps_*` tables (via `res_config_odbc` /
-`res_pjsip_realtime`), exactly as `extconfig.conf` once pointed `sippeers` at the
-database for `chan_sip`. The realtime mechanics are covered in the *Realtime*
-chapter; the migration-specific point is simply *which tables map to which*.
+最後に、PJSIP が `ps_*` テーブルから（`res_config_odbc` / `res_pjsip_realtime` を経由して）endpoint、aor、auth、contact を読み込めるように `sorcery.conf` をデータベースに向けます。これはかつて `extconfig.conf` が `chan_sip` のために `sippeers` をデータベースに向けていたのと全く同じです。Realtime の仕組みについては *Realtime* の章で解説されています。移行における重要なポイントは、単に「どのテーブルがどれに対応するか」という点です。
 
-## Migration checklist
+## 移行チェックリスト
 
-A pragmatic order of operations for a production cutover:
+本番環境への切り替えにおける実用的な作業手順は以下の通りです。
 
-1. **Inventory.** List every device, trunk, and `register =>` in `sip.conf` (or
-   every `sippeers`/`sipregs` row). Note custom NAT, codec, and DTMF settings.
-2. **Run the converter into a scratch file.**
-   `sip_to_pjsip.py sip.conf pjsip_generated.conf`. Do **not** point it at your
-   live `pjsip.conf`.
-3. **Read the "Non mapped elements" block** at the top of the output and resolve
-   every line — especially `qualify`, timers, and anything NAT-related.
-4. **Design the transport(s) by hand.** One transport per IP/port; add TLS/TCP as
-   needed; set `external_*_address` and `local_net` for cloud/NAT boxes.
-5. **Verify auth.** Confirm `auth_type=digest`, usernames, and passwords on every
-   `auth` object.
-6. **Verify NAT/media/DTMF.** `force_rport`/`rewrite_contact`/`rtp_symmetric`,
-   `direct_media`, `dtmf_mode=rfc4733` per endpoint as required.
-7. **Update the dialplan.** `SIP/` → `PJSIP/` everywhere; check
-   `SIP*` functions and channel variables.
-8. **Update scripts and monitoring.** Any tool or AMI consumer that parsed
-   `sip show ...` output must move to `pjsip show ...` / PJSIP AMI actions.
-9. **Reload and verify.** `module reload res_pjsip.so`, then
-   `pjsip show endpoints`, `pjsip show registrations`, `pjsip show identifies`.
-10. **Test with the packet logger.** `pjsip set logger on`; place a registration,
-    an inbound call, and an outbound call and read the SIP exchange end to end.
+1. **インベントリの作成。** すべてのデバイス、trunk、および `register =>` を `sip.conf` （またはすべての `sippeers`/`sipregs` 行）にリストアップします。カスタムの NAT、codec、DTMF 設定を記録してください。
+2. **コンバーターを実行し、スクラッチファイルに出力する。**
+   `sip_to_pjsip.py sip.conf pjsip_generated.conf`。本番環境の `pjsip.conf` に対して直接実行しては**いけません**。
+3. **「Non mapped elements」ブロックを読む。** 出力ファイルの先頭にあるこのブロックを確認し、すべての行を解決してください。特に `qualify`、タイマー、および NAT 関連の項目は重要です。
+4. **トランスポートを手動で設計する。** IP/ポートごとに1つのトランスポートを割り当てます。必要に応じて TLS/TCP を追加し、クラウドや NAT 環境のボックス向けに `external_*_address` および `local_net` を設定します。
+5. **認証の検証。** すべての `auth` オブジェクトにおいて、 `auth_type=digest`、ユーザー名、パスワードを確認します。
+6. **NAT/メディア/DTMF の検証。** 必要に応じて、endpoint ごとに `force_rport`/`rewrite_contact`/`rtp_symmetric`、 `direct_media`、 `dtmf_mode=rfc4733` を設定します。
+7. **dialplan の更新。** すべての箇所で `SIP/` を `PJSIP/` に変更します。また、 `SIP*` 関数とチャネル変数をチェックしてください。
+8. **スクリプトと監視の更新。** `sip show ...` の出力を解析していたツールや AMI コンシューマーは、すべて `pjsip show ...` または PJSIP AMI アクションへ移行する必要があります。
+9. **リロードと検証。** `module reload res_pjsip.so` を実行した後、 `pjsip show endpoints`、 `pjsip show registrations`、 `pjsip show identifies` を確認します。
+10. **パケットロガーによるテスト。** `pjsip set logger on` を使用します。レジストレーション、インバウンド通話、アウトバウンド通話をそれぞれ実行し、SIP のやり取りをエンドツーエンドで読み取ります。
 
-## Common pitfalls
+## よくある落とし穴
 
-- **`alwaysauthreject` is built-in now — don't look for it.** `chan_sip` needed
-  `alwaysauthreject=yes` so it wouldn't leak which extensions existed by replying
-  differently to bad usernames. PJSIP does the secure thing by design: it never
-  reveals whether an endpoint exists. There is no `alwaysauthreject` option to
-  set. The related protection — throttling unidentified senders — is the global
-  `unidentified_request_count` / `unidentified_request_period`, on by default.
+- **`alwaysauthreject` は現在組み込み済みです — 探す必要はありません。** `chan_sip` は、不正なユーザー名に対して異なる応答を返すことでどの extension が存在するかを漏洩させないために `alwaysauthreject=yes` を必要としていました。PJSIP は設計上セキュアであり、endpoint が存在するかどうかを一切明かしません。設定すべき `alwaysauthreject` オプションは存在しません。関連する保護機能である「未確認の送信者のスロットリング」は、グローバルな `unidentified_request_count` / `unidentified_request_period` であり、デフォルトで有効になっています。
 
-- **`insecure=invite` is not a PJSIP option — use `identify`.** There is no
-  `insecure=` in `pjsip.conf`. The way to accept unauthenticated INVITEs from a
-  known carrier is to *identify the endpoint by source IP* with `type=identify` /
-  `match=`. Match as narrowly as possible (specific host IPs, not wide CIDRs), and
-  back it with a `type=acl` — an IP-matched trunk with no auth is a toll-fraud
-  target.
+- **`insecure=invite` は PJSIP のオプションではありません — `identify` を使用してください。** `pjsip.conf` には `insecure=` は存在しません。既知のキャリアからの認証されていない INVITE を受け入れる方法は、ソース IP によって endpoint を識別することです。これには `type=identify` / `match=` を使用します。可能な限り限定的にマッチさせ（広範な CIDR ではなく特定のホスト IP）、`type=acl` で保護してください。認証なしの IP マッチングされた trunk は、国際電話詐欺の標的となります。
 
-- **One transport per IP/port.** You cannot bind two transports to the same
-  IP:port, and you cannot bind multiple TCP or TLS transports of the same IP
-  version. The conversion script may emit a transport that collides with one you
-  already have — consolidate to a single, deliberately designed transport layer.
+- **IP/ポートごとに 1 つのトランスポート。** 同じ IP:ポートに 2 つのトランスポートをバインドすることはできません。また、同じ IP バージョンの複数の TCP または TLS トランスポートをバインドすることもできません。変換スクリプトが既存のトランスポートと競合するトランスポートを出力する可能性があるため、意図的に設計された単一のトランスポート層に統合してください。
 
-- **`qualify=yes` doesn't translate to a boolean.** It belongs on the **aor** as
-  `qualify_frequency=<seconds>`. The converter drops `qualify=yes` into the
-  non-mapped block precisely because there is no equivalent boolean on the
-  endpoint.
+- **`qualify=yes` はブール値に変換されません。** これは **aor** の `qualify_frequency=<seconds>` に属します。コンバーターが `qualify=yes` を非マッピングブロックに配置するのは、まさに endpoint 上に同等のブール値が存在しないためです。
 
-- **`secret=` is not an endpoint option.** Credentials live only in a `type=auth`
-  object that the endpoint *references* (`auth=` for inbound, `outbound_auth=` for
-  outbound). Putting a password on the endpoint does nothing.
+- **`secret=` は endpoint のオプションではありません。** 資格情報は、endpoint が参照する `type=auth` オブジェクト内にのみ存在します（インバウンドには `auth=`、アウトバウンドには `outbound_auth=`）。endpoint にパスワードを設定しても何も起こりません。
 
-- **The CLI and any scraping scripts break silently.** `sip show ...` returns "No
-  such command", not an error your monitoring will necessarily catch. Audit every
-  cron job, Nagios check, and AMI client for `sip ` commands before cutover.
+- **CLI およびスクレイピングスクリプトは警告なしに失敗します。** `sip show ...` は「No such command」を返しますが、これは監視システムが必ずしもエラーとして検知できるとは限りません。切り替え前に、すべての cron ジョブ、Nagios チェック、および AMI クライアントで `sip ` コマンドを監査してください。
 
-## Summary
+## 概要
 
-Migrating to Asterisk 22 means migrating off `chan_sip`, because the driver was
-removed in Asterisk 21 and PJSIP is the only SIP channel that remains. The core of
-the work is re-expressing each `sip.conf` `peer`/`user`/`friend` — which packed
-everything into one block — as a set of cooperating PJSIP objects: an `endpoint`
-plus an `auth`, an `aor`, and, depending on the device, an `identify` (inbound
-trunk), a `registration` (outbound login), and a shared `transport`. The
-`sip_to_pjsip.py` script in `contrib/scripts/sip_to_pjsip/` does the bulk
-translation and honestly flags what it cannot map in a "Non mapped elements"
-block, but its output is a first draft: design the transport, NAT, and security by
-hand and test before production. Around the config, update the dialplan
-(`SIP/` → `PJSIP/`) and your fingers and scripts (`sip show` → `pjsip show`,
-`sip set debug` → `pjsip set logger`). Realtime deployments move from
-`sippeers`/`sipregs` to the Sorcery `ps_endpoints`/`ps_aors`/`ps_auths`/
-`ps_contacts` tables, with `sip_to_pjsql.py` and the `contrib/ast-db-manage`
-schema to help. Watch the pitfalls — `alwaysauthreject` is built-in,
-`insecure=invite` becomes `identify`, `qualify=yes` becomes
-`qualify_frequency`, and one transport per IP/port — and the cutover is
-mechanical rather than mysterious.
+Asterisk 22 への移行は、すなわち `chan_sip` からの脱却を意味します。これは、Asterisk 21 で当該ドライバが削除され、SIPチャネルとして PJSIP のみが残されたためです。作業の核心は、すべてを1つのブロックに詰め込んでいた各 `sip.conf` の `peer`/`user`/`friend` を、連携する一連の PJSIP オブジェクトとして再定義することにあります。具体的には、1つの `endpoint` に加え、1つの `auth`、1つの `aor`、そしてデバイスに応じて `identify`（インバウンド trunk）、`registration`（アウトバウンドログイン）、および共有の `transport` を構成します。
 
-## Quiz
+`contrib/scripts/sip_to_pjsip/` に含まれる `sip_to_pjsip.py` スクリプトが変換作業の大半を担い、マッピングできない要素については正直に「Non mapped elements」ブロックとしてフラグを立ててくれますが、その出力はあくまで初稿に過ぎません。トランスポート、NAT、セキュリティの設定は手動で設計し、本番環境へ投入する前に必ずテストを行ってください。設定の周辺では、dialplan（`SIP/` → `PJSIP/`）を更新し、手作業やスクリプト（`sip show` → `pjsip show`、`sip set debug` → `pjsip set logger`）も修正する必要があります。Realtime デプロイメントでは、従来の `sippeers`/`sipregs` から Sorcery の `ps_endpoints`/`ps_aors`/`ps_auths`/`ps_contacts` テーブルへと移行し、その際 `sip_to_pjsql.py` と `contrib/ast-db-manage` スキーマを活用します。落とし穴にも注意してください。すなわち、NAT の `alwaysauthreject` は組み込みであること、`insecure=invite` は `identify` になること、`qualify=yes` は `qualify_frequency` になること、そして1つの IP/ポートにつき1つのトランスポートであるという点です。これらを押さえれば、切り替え作業は不可解なものではなく、機械的な手順となります。
 
-1. Why must an Asterisk 22 deployment use PJSIP for SIP?
-   - A. `chan_sip` is slower but still available
-   - B. `chan_sip` was removed in Asterisk 21 and does not exist in Asterisk 22
-   - C. PJSIP is the default but `chan_sip` can be loaded with `modules.conf`
-   - D. `chan_sip` only works with TLS in Asterisk 22
+## クイズ
 
-2. A single `sip.conf` `type=friend` block most commonly becomes which set of
-   PJSIP objects?
-   - A. A single `type=peer`
-   - B. `type=endpoint` only
+1. Asterisk 22のデプロイメントでSIPにPJSIPを使用しなければならない理由は何ですか？
+   - A. `chan_sip`は低速ですが、まだ利用可能です
+   - B. `chan_sip`はAsterisk 21で削除されており、Asterisk 22には存在しません
+   - C. PJSIPがデフォルトですが、`chan_sip`は`modules.conf`で読み込むことができます
+   - D. `chan_sip`はAsterisk 22ではTLSでのみ動作します
+
+2. 単一の`sip.conf``type=friend`ブロックは、一般的にどのPJSIPオブジェクトのセットになりますか？
+   - A. 単一の`type=peer`
+   - B. `type=endpoint`のみ
    - C. `type=endpoint` + `type=auth` + `type=aor`
    - D. `type=transport` + `type=registration`
 
-3. In `sip.conf`, `host=dynamic` (the device registers its own location) maps to:
-   - A. `type=identify` with `match=dynamic`
-   - B. a `type=aor` with `max_contacts` (the device REGISTERs)
-   - C. `direct_media=yes` on the endpoint
+3. `sip.conf`において、`host=dynamic`（デバイスが自身の場所を登録する）は以下にマッピングされます：
+   - A. `type=identify`と`match=dynamic`
+   - B. `type=aor`と`max_contacts`（デバイスがREGISTERを行う）
+   - C. エンドポイント上の`direct_media=yes`
    - D. `type=registration`
 
-4. The `sip_to_pjsip.py` conversion script is:
-   - A. A CLI command: `asterisk -rx 'sip_to_pjsip'`
-   - B. A Python script in the Asterisk source tree under
-     `contrib/scripts/sip_to_pjsip/`
-   - C. A compiled module loaded at boot
-   - D. Part of `res_pjsip.so`
+4. `sip_to_pjsip.py`変換スクリプトとは何ですか：
+   - A. CLIコマンド：`asterisk -rx 'sip_to_pjsip'`
+   - B. Asteriskソースツリーの`contrib/scripts/sip_to_pjsip/`にあるPythonスクリプト
+   - C. 起動時に読み込まれるコンパイル済みモジュール
+   - D. `res_pjsip.so`の一部
 
-5. True or False: The output of `sip_to_pjsip.py` is production-ready and should be
-   loaded without review.
+5. 正か誤か：`sip_to_pjsip.py`の出力は本番環境ですぐに使用可能であり、レビューなしで読み込むべきである。
 
-6. The `chan_sip` shorthand `nat=force_rport,comedia` translates on a PJSIP
-   endpoint to which three options?
-   - A. `nat=yes`, `qualify=yes`, `directmedia=no`
-   - B. `force_rport=yes`, `rewrite_contact=yes`, `rtp_symmetric=yes`
-   - C. `external_media_address`, `external_signaling_address`, `local_net`
-   - D. `insecure=invite`, `identify`, `match`
+6. `chan_sip`の省略形`nat=force_rport,comedia`は、PJSIPエンドポイント上でどの3つのオプションに変換されますか？
+   - A. `nat=yes`、`qualify=yes`、`directmedia=no`
+   - B. `force_rport=yes`、`rewrite_contact=yes`、`rtp_symmetric=yes`
+   - C. `external_media_address`、`external_signaling_address`、`local_net`
+   - D. `insecure=invite`、`identify`、`match`
 
-7. `sip.conf`'s `dtmfmode=rfc2833` becomes which PJSIP setting?
+7. `sip.conf`の`dtmfmode=rfc2833`は、どのPJSIP設定になりますか？
    - A. `dtmf_mode=rfc2833`
    - B. `dtmf_mode=inband`
    - C. `dtmf_mode=rfc4733`
    - D. `dtmf_mode=info`
 
-8. On Asterisk 22, an `auth` object should use which `auth_type`, and what is the
-   status of `userpass`?
-   - A. `auth_type=userpass`; it is the only valid value
-   - B. `auth_type=digest`; `userpass` is deprecated and converted to `digest`
-   - C. `auth_type=md5`; `digest` is deprecated
-   - D. `auth_type=plaintext`; `digest` was removed
+8. Asterisk 22において、`auth`オブジェクトはどの`auth_type`を使用すべきであり、また`userpass`のステータスはどうなっていますか？
+   - A. `auth_type=userpass`；これが唯一の有効な値です
+   - B. `auth_type=digest`；`userpass`は非推奨であり、`digest`に変換されます
+   - C. `auth_type=md5`；`digest`は非推奨です
+   - D. `auth_type=plaintext`；`digest`は削除されました
 
-9. A `chan_sip` provider peer with `insecure=invite` (accept unauthenticated
-   INVITEs from a known IP) is migrated to PJSIP using:
-   - A. `insecure=invite` on the endpoint
-   - B. `allowguest=yes` in `[global]`
-   - C. a `type=identify` object with `match=<provider IP>`
+9. `insecure=invite`（既知のIPからの認証なしINVITEを受け入れる）を持つ`chan_sip`プロバイダーピアは、以下を使用してPJSIPに移行されます：
+   - A. エンドポイント上の`insecure=invite`
+   - B. `[global]`内の`allowguest=yes`
+   - C. `match=<provider IP>`を持つ`type=identify`オブジェクト
    - D. `auth_type=anonymous`
 
-10. In a realtime migration, the `chan_sip` `sippeers` table is replaced by which
-    PJSIP/Sorcery tables?
-    - A. A single `pjsip_peers` table
-    - B. `ps_endpoints`, `ps_aors`, and `ps_auths`
-    - C. `sipregs` and `voicemail`
-    - D. `ps_contacts` only
+10. realtime移行において、`chan_sip``sippeers`テーブルはどのPJSIP/Sorceryテーブルに置き換えられますか？
+    - A. 単一の`pjsip_peers`テーブル
+    - B. `ps_endpoints`、`ps_aors`、および`ps_auths`
+    - C. `sipregs`および`voicemail`
+    - D. `ps_contacts`のみ
 
-**Answers:** 1 — B · 2 — C · 3 — B · 4 — B · 5 — False · 6 — B · 7 — C · 8 — B · 9 — C · 10 — B
+**回答:** 1 — B · 2 — C · 3 — B · 4 — B · 5 — 誤 · 6 — B · 7 — C · 8 — B · 9 — C · 10 — B

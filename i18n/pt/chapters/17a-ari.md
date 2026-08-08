@@ -1,45 +1,45 @@
-# The Asterisk REST Interface (ARI)
+# A Asterisk REST Interface (ARI)
 
-O capítulo anterior abordou AMI e AGI, as duas formas clássicas de acoplar lógica externa ao Asterisk. Ambas são anteriores à web moderna: AMI fornece um fluxo bruto de eventos orientado a linhas sobre um socket TCP, e AGI entrega um único canal a um script durante a duração de uma chamada. Nenhuma delas foi projetada para o tipo de aplicações stateful, assíncronas e multi‑canal que as pessoas constroem hoje — IVRs que conversam com serviços web, painéis click‑to‑call, controladores de conferência ou voicebots que transmitem áudio para um motor de reconhecimento de fala.
+O capítulo anterior abordou AMI e AGI, as duas formas clássicas de conectar lógica externa ao Asterisk. Ambas são anteriores à web moderna: a AMI fornece um fluxo de eventos bruto e orientado a linhas sobre um socket TCP, e a AGI entrega um único canal a um script durante a duração de uma chamada. Nenhuma das duas foi projetada para o tipo de aplicações com estado, assíncronas e multicanal que as pessoas constroem hoje — IVR que se comunicam com serviços web, painéis de click-to-call, controladores de conferência ou voicebots que transmitem áudio para um mecanismo de fala.
 
-ARI — a Asterisk REST Interface — foi introduzida no Asterisk 12 para preencher essa lacuna, e no Asterisk 22 é a interface recomendada para construir novas aplicações de telefonia. A ideia por trás do ARI é uma separação limpa de responsabilidades: **Asterisk torna‑se um motor de mídia** (ele atende canais, mistura bridges, reproduz e grava áudio, envia DTMF), e **sua aplicação fornece toda a lógica de controle de chamadas** através de uma combinação de uma API REST (HTTP) e um fluxo de eventos WebSocket.
+A ARI — a Asterisk REST Interface — foi introduzida no Asterisk 12 para preencher essa lacuna e, no Asterisk 22, é a interface recomendada para a construção de novas aplicações de telefonia. A ideia por trás da ARI é uma separação clara de responsabilidades: **o Asterisk torna-se um mecanismo de mídia** (ele atende canais, mistura bridges, reproduz e grava áudio, envia DTMF), e **sua aplicação fornece toda a lógica de controle de chamadas** por meio de uma combinação de uma API REST (HTTP) e um fluxo de eventos WebSocket.
 
-## Objectives
+## Objetivos
 
 Ao final deste capítulo, o leitor deverá ser capaz de:
 
 - Explicar o que é ARI e como ele difere de AMI e AGI
-- Decidir quando ARI é a interface adequada para um projeto
+- Decidir quando ARI é a interface correta para um projeto
 - Configurar `ari.conf` e `http.conf` para habilitar ARI e criar um usuário
-- Conectar ao fluxo de eventos WebSocket do ARI
-- Descrever o aplicativo de dialplan Stasis e os eventos `StasisStart`/`StasisEnd`
+- Conectar-se ao fluxo de eventos WebSocket do ARI
+- Descrever a aplicação de dialplan Stasis e os eventos `StasisStart`/`StasisEnd`
 - Descrever o modelo de recursos do ARI: channels, bridges, playbacks, recordings, endpoints e device states
-- Escrever uma aplicação Stasis mínima em Python que atenda um channel, reproduza um som e encerre a chamada
+- Escrever uma aplicação Stasis mínima em Python que atende um channel, reproduz um som e encerra a chamada
 - Explicar o que é o channel `externalMedia` e por que ele é importante para integrações de IA e voicebot
 
-## O que é ARI e quando usá‑lo
+## O que é o ARI e quando utilizá-lo
 
-ARI é construído sobre dois transportes que trabalham juntos:
+O ARI é construído sobre dois transportes que trabalham em conjunto:
 
-- **Uma API REST (HTTP)** que sua aplicação chama para *fazer* coisas — originar um canal, atendê‑lo, reproduzir um som, criar uma ponte, iniciar uma gravação, desligar. Estas são requisições HTTP comuns (`GET`, `POST`, `DELETE`) contra `http://asterisk-host:8088/ari/...`.  
-- **Um fluxo de eventos WebSocket** pelo qual o Asterisk *informa* sua aplicação o que está acontecendo — um canal foi criado, um dígito DTMF chegou, uma reprodução terminou, um canal saiu da sua aplicação. Os eventos são entregues como objetos JSON.
+- **Uma API REST (HTTP)** que sua aplicação chama para *fazer* coisas — originar um canal, atendê-lo, reproduzir um som, criar uma bridge, iniciar uma gravação, desligar. Estas são requisições HTTP comuns (`GET`, `POST`, `DELETE`) contra `http://asterisk-host:8088/ari/...`.
+- **Um fluxo de eventos WebSocket** através do qual o Asterisk *informa* à sua aplicação o que está acontecendo — um canal foi criado, um dígito DTMF chegou, uma reprodução terminou, um canal deixou sua aplicação. Os eventos são entregues como objetos JSON.
 
-O padrão é assíncrono: você faz uma requisição, e o *resultado* dessa requisição geralmente volta depois como um evento. Por exemplo, você `POST` uma requisição para reproduzir um som; o Asterisk responde imediatamente com um objeto `Playback`, e alguns segundos depois você recebe um evento `PlaybackFinished` quando o áudio termina.
+O padrão é assíncrono: você faz uma requisição e o *resultado* dessa requisição geralmente retorna mais tarde como um evento. Por exemplo, você `POST` uma requisição para reproduzir um som; o Asterisk responde imediatamente com um objeto `Playback` e, alguns segundos depois, você recebe um evento `PlaybackFinished` quando o áudio termina.
 
-Escolha ARI em vez de AMI e AGI quando:
+Escolha o ARI em vez do AMI e do AGI quando:
 
-- Você precisa de **controle granular de canais e pontes** — construir conferências, estacionamento, filas ou fluxos de chamada personalizados a partir de primitivas em vez de depender de aplicações do dialplan.  
-- Sua aplicação é **stateful e de longa duração**, mantendo vários canais simultaneamente e reagindo a eventos de todos eles.  
-- Você quer integrar com **serviços web, barramentos de mensagens ou motores de IA/fala** e prefere JSON sobre HTTP a um protocolo de linha ou a um script stdin/stdout.  
+- Você precisa de **controle refinado de canais e bridges** — construindo conferências, estacionamento de chamadas, filas ou fluxos de chamadas personalizados a partir de primitivas, em vez de depender de aplicações do dialplan.
+- Sua aplicação é **stateful e de longa duração**, mantendo vários canais ao mesmo tempo e reagindo a eventos em todos eles.
+- Você deseja integrar com **serviços web, barramentos de mensagens ou motores de IA/fala** e prefere JSON sobre HTTP a um protocolo de linha ou um script stdin/stdout.
 - Você está iniciando um **novo projeto** e deseja a interface que o projeto Asterisk recomenda ativamente.
 
-AMI ainda é a ferramenta correta quando você só precisa *observar* o sistema ou disparar comandos ocasionais (discadores, painéis, monitoramento). AGI ainda é conveniente para um script IVR rápido e autocontido. Mas para qualquer coisa que orquestre chamadas, ARI é a resposta moderna.
+O AMI ainda é a ferramenta certa quando você só precisa *observar* o sistema ou disparar comandos ocasionais (discadores, wallboards, monitoramento). O AGI ainda é conveniente para um script de IVR rápido e independente. Mas, para qualquer coisa que orquestre chamadas, o ARI é a resposta moderna.
 
-> ARI não substitui o dialplan — ele o complementa. Um canal roda no dialplan como de costume até alcançar a aplicação `Stasis()`, ponto em que o controle é passado para sua aplicação ARI. Quando sua aplicação termina, o canal pode ser enviado de volta ao dialplan ou desligado.
+> O ARI não substitui o dialplan — ele o complementa. Um canal é executado no dialplan como de costume até atingir a aplicação `Stasis()`, momento em que o controle é transferido para sua aplicação ARI. Quando sua aplicação termina, o canal pode ser enviado de volta para o dialplan ou desligado.
 
-## Habilitando ARI: http.conf e ari.conf
+## Habilitando o ARI: http.conf e ari.conf
 
-ARI funciona sobre o servidor HTTP interno do Asterisk, portanto dois arquivos de configuração são envolvidos: `http.conf` habilita o servidor web, e `ari.conf` habilita o ARI e define seus usuários.
+O ARI é executado sobre o servidor HTTP nativo do Asterisk, portanto, dois arquivos de configuração estão envolvidos: `http.conf` habilita o servidor web e `ari.conf` habilita o ARI e define seus usuários.
 
 ### http.conf
 
@@ -52,9 +52,9 @@ bindaddr=0.0.0.0
 bindport=8088
 ```
 
-Para produção você deve colocar o ARI atrás de TLS. O Asterisk pode servir HTTPS diretamente (`tlsenable=yes`, `tlsbindaddr`, `tlscertfile`, `tlsprivatekey`), ou você pode terminar o TLS em um proxy reverso na frente da porta 8088. Sobre TLS as URLs tornam‑se `https://` e `wss://` ao invés de `http://` e `ws://`.
+Para produção, você deve colocar o ARI atrás de TLS. O Asterisk pode servir HTTPS diretamente (`tlsenable=yes`, `tlsbindaddr`, `tlscertfile`, `tlsprivatekey`), ou você pode terminar o TLS em um proxy reverso à frente da porta 8088. Sobre TLS, as URLs tornam-se `https://` e `wss://` em vez de `http://` e `ws://`.
 
-Você pode confirmar que o servidor HTTP está ativo a partir da CLI:
+Você pode confirmar se o servidor HTTP está ativo a partir da CLI:
 
 ```
 asterisk*CLI> http show status
@@ -64,7 +64,7 @@ Server Enabled and Bound to 0.0.0.0:8088
 
 ### ari.conf
 
-`ari.conf` tem uma seção `[general]` e uma seção por usuário.
+`ari.conf` possui uma seção `[general]` e uma seção por usuário.
 
 ```ini
 [general]
@@ -81,13 +81,13 @@ password_format=plain   ; "plain" (default) or "crypt"
 Algumas observações sobre essas opções:
 
 - `enabled` liga ou desliga o ARI globalmente.
-- `pretty` formata as respostas JSON para serem legíveis por humanos; desative em produção.
+- `pretty` formata as respostas JSON para serem legíveis por humanos; desligue isso em produção.
 - Cada usuário é uma seção nomeada com `type=user`.
-- `read_only=yes` restringe esse usuário a requisições somente leitura (GET).
-- `password_format` pode ser `plain` (a senha está em texto puro) ou `crypt` (uma senha hash, gerada com `mkpasswd -m sha-512`).
+- `read_only=yes` restringe esse usuário a solicitações somente leitura (GET).
+- `password_format` pode ser `plain` (a senha está em texto simples) ou `crypt` (uma senha com hash, gerada com `mkpasswd -m sha-512`).
 - `permit`, `deny` e `acl` permitem restrições de IP por usuário, seguindo as mesmas regras de `acl.conf`.
 
-Depois de editar os arquivos, recarregue os módulos relevantes (`module reload res_ari.so` e `module reload http.so`) ou reinicie o Asterisk. Você pode verificar se o ARI está em execução com:
+Após editar os arquivos, recarregue os módulos relevantes (`module reload res_ari.so` e `module reload http.so`) ou reinicie o Asterisk. Você pode verificar se o ARI está em execução com:
 
 ```
 asterisk*CLI> module show like res_ari
@@ -101,11 +101,11 @@ Application Name
 =========================
 ```
 
-`ari show apps` lista as aplicações Stasis atualmente registradas pelos clientes conectados. Ela está vazia até que um cliente se conecte, que é exatamente o que faremos a seguir.
+`ari show apps` lista as aplicações Stasis registradas atualmente por clientes conectados. Ela fica vazia até que um cliente se conecte, que é exatamente o que faremos a seguir.
 
-### URL de eventos WebSocket
+### A URL de eventos WebSocket
 
-Um cliente se inscreve no fluxo de eventos abrindo um WebSocket para o endpoint `/ari/events`, nomeando a aplicação Stasis que implementa e passando suas credenciais:
+Um cliente assina o fluxo de eventos abrindo um WebSocket para o endpoint `/ari/events`, nomeando a aplicação Stasis que ele implementa e passando suas credenciais:
 
 ```
 ws://asterisk-host:8088/ari/events?app=hello&api_key=asterisk:secret
@@ -115,13 +115,13 @@ Os parâmetros de consulta são:
 
 - `app` — o nome da sua aplicação Stasis. Este é o mesmo nome que você usará na chamada `Stasis()` do dialplan. Você pode passar vários nomes separados por vírgula.
 - `api_key` — as credenciais, no formato `username:password`, correspondendo a um usuário em `ari.conf`.
-- `subscribeAll` — booleano opcional (padrão `false`); quando `true`, a aplicação recebe todos os eventos, não apenas aqueles dos recursos que possui.
+- `subscribeAll` — booleano opcional (padrão `false`); quando `true`, a aplicação recebe todos os eventos, não apenas aqueles referentes aos recursos que ela possui.
 
-As mesmas credenciais `user:pass` são usadas como autenticação HTTP Basic nas chamadas REST (ou adicionadas como parâmetro de consulta `api_key` lá também).
+As mesmas credenciais `user:pass` são usadas como autenticação HTTP Basic nas chamadas REST (ou anexadas como um parâmetro de consulta `api_key` lá também).
 
-## Stasis: entregando um canal à sua aplicação
+## Stasis: entregando um canal para sua aplicação
 
-A ponte entre o dialplan e o ARI é a aplicação de dialplan **`Stasis()`** (a estrutura subjacente também se chama Stasis). Quando um canal chega a `Stasis(appname[,args])`, o Asterisk entrega esse canal à aplicação ARI registrada em `appname` e interrompe a execução do dialplan para ele. O controle passa agora para o seu código.
+A ponte entre o dialplan e a ARI é a aplicação de dialplan **`Stasis()`** (o framework subjacente também é chamado de Stasis). Quando um canal atinge `Stasis(appname[,args])`, o Asterisk entrega esse canal para a aplicação ARI registrada sob `appname` e para de executar o dialplan para ele. O controle agora pertence ao seu código.
 
 ```
 [from-internal]
@@ -131,22 +131,22 @@ exten => _X.,1,Stasis(hello)
 
 Quando o canal entra na aplicação, todo cliente conectado inscrito em `hello` recebe um evento **`StasisStart`** via WebSocket, contendo o objeto completo do canal (seu ID, nome, caller ID, estado e quaisquer argumentos passados para `Stasis()`). Este é o seu sinal para começar a controlar o canal.
 
-Quando o canal sai da aplicação — porque seu código o devolveu ao dialplan com `continueInDialplan`, ou porque foi encerrado — você recebe um evento **`StasisEnd`**. Após `Stasis()` retornar ao dialplan ele define a variável de canal `STASISSTATUS` (`SUCCESS` ou `FAILED`), permitindo que o dialplan faça ramificações com base no resultado.
+Quando o canal deixa a aplicação — porque seu código o moveu de volta para o dialplan com `continueInDialplan`, ou porque ele foi desligado — você recebe um evento **`StasisEnd`**. Após o `Stasis()` retornar ao dialplan, ele define a variável de canal `STASISSTATUS` (`SUCCESS` ou `FAILED`), para que o dialplan possa ramificar com base no resultado.
 
-## The ARI resource model
+## O modelo de recursos da ARI
 
-ARI exposes Asterisk's internals as a small set of REST resources. Each resource lives under `/ari/<resource>` and is manipulated with standard HTTP methods. The most important ones:
+A ARI expõe os componentes internos do Asterisk como um pequeno conjunto de recursos REST. Cada recurso reside sob `/ari/<resource>` e é manipulado com métodos HTTP padrão. Os mais importantes são:
 
-| Resource | What it represents | Example operations |
+| Recurso | O que representa | Operações de exemplo |
 |----------|--------------------|--------------------|
-| **channels** | A single call leg | originate, answer, play, record, hangup |
-| **bridges** | A mixing point that joins channels | create, add/remove channels, play to the bridge |
-| **playbacks** | An in-progress media playback | get status, stop, pause/unpause |
-| **recordings** | Live and stored recordings | start, stop, list stored, delete |
-| **endpoints** | Configured peers (PJSIP, etc.) | list, get state, send a message |
-| **deviceStates** | Custom device states | list, get, set, delete |
+| **channels** | Uma única perna de chamada | originate, answer, play, record, hangup |
+| **bridges** | Um ponto de mixagem que une canais | create, add/remove channels, play to the bridge |
+| **playbacks** | Uma reprodução de mídia em andamento | get status, stop, pause/unpause |
+| **recordings** | Gravações ao vivo e armazenadas | start, stop, list stored, delete |
+| **endpoints** | Peers configurados (PJSIP, etc.) | list, get state, send a message |
+| **deviceStates** | Estados de dispositivo personalizados | list, get, set, delete |
 
-Some concrete REST calls (paths shown with the `/ari` prefix that appears on the wire):
+Algumas chamadas REST concretas (caminhos exibidos com o prefixo `/ari` que aparece na rede):
 
 ```
 # Channels
@@ -169,17 +169,17 @@ GET    /ari/recordings/stored
 GET    /ari/playbacks/{playbackId}
 ```
 
-The `media` parameter on a `play` request takes a media URI. The most common form is a `sound:` URI naming a built-in sound, e.g. `sound:hello-world` or `sound:tt-monkeys`. When the audio finishes, Asterisk emits a `PlaybackFinished` event for that playback ID, which is how your application knows it can move on.
+O parâmetro `media` em uma requisição `play` aceita uma URI de mídia. A forma mais comum é uma URI `sound:` nomeando um som embutido, por exemplo, `sound:hello-world` ou `sound:tt-monkeys`. Quando o áudio termina, o Asterisk emite um evento `PlaybackFinished` para aquele ID de reprodução, que é como sua aplicação sabe que pode prosseguir.
 
-Channels and bridges are the two building blocks you combine to make call flows. To connect two callers, for instance, you originate or accept two channels, create a `mixing` bridge with `POST /ari/bridges`, and add both channels to it with `POST /ari/bridges/{bridgeId}/addChannel`. To build a conference, you simply keep adding channels to the same bridge.
+Channels e bridges são os dois blocos de construção que você combina para criar fluxos de chamada. Para conectar dois chamadores, por exemplo, você origina ou aceita dois canais, cria uma bridge `mixing` com `POST /ari/bridges` e adiciona ambos os canais a ela com `POST /ari/bridges/{bridgeId}/addChannel`. Para criar uma conferência, você simplesmente continua adicionando canais à mesma bridge.
 
 ## Um exemplo prático: uma aplicação Stasis mínima
 
-Vamos construir a menor aplicação ARI útil. Quando qualquer ramal for discado, a chamada entra em nossa aplicação Stasis, que a atende, reproduz o prompt clássico `hello-world` e encerra a chamada.
+Vamos construir a menor aplicação ARI útil. Quando qualquer extension é discada, a chamada entra em nossa aplicação Stasis, que a atende, reproduz o clássico prompt `hello-world` e encerra a chamada.
 
 ### O dialplan
 
-Em `extensions.conf`, envie o canal para Stasis:
+Em `extensions.conf`, envie o canal para o Stasis:
 
 ```
 [from-internal]
@@ -191,7 +191,7 @@ O nome da aplicação `hello` corresponde ao `app=hello` que usamos ao conectar.
 
 ### O cliente Python
 
-Este cliente usa duas bibliotecas bem conhecidas: `requests` para as chamadas REST e `websocket-client` para o fluxo de eventos. Instale‑as com `pip install requests websocket-client`.
+Este cliente utiliza duas bibliotecas bem conhecidas: `requests` para as chamadas REST e `websocket-client` para o fluxo de eventos. Instale-as com `pip install requests websocket-client`.
 
 ```python
 #!/usr/bin/env python3
@@ -260,29 +260,29 @@ if __name__ == "__main__":
     main()
 ```
 
-Execute o script e, em seguida, disque qualquer número a partir de um endpoint registrado. Você deverá ouvir "Hello, world", após o que a chamada será liberada. No console do Asterisk, `ari show apps` agora listará `hello` enquanto o cliente estiver conectado.
+Execute o script e, em seguida, disque qualquer número a partir de um endpoint registrado. Você deverá ouvir "Hello, world", após o que a chamada será encerrada. No console do Asterisk, `ari show apps` listará agora `hello` enquanto o cliente estiver conectado.
 
-O fluxo vale a pena ser rastreado uma vez:
+Vale a pena rastrear o fluxo uma vez:
 
-1. O dialplan executa `Stasis(hello)`; o Asterisk entrega o canal à nossa aplicação e envia um evento `StasisStart`.
-2. Atendemos o canal e então pedimos ao Asterisk para reproduzir `sound:hello-world`. O Asterisk devolve um objeto `Playback` cujo `id` lembramos.
-3. Quando o áudio termina, o Asterisk envia `PlaybackFinished` com aquela reprodução `id`; localizamos o canal e o encerramos.
-4. Encerrar a chamada faz com que o canal saia do Stasis, gerando um evento `StasisEnd`.
+1. O dialplan executa `Stasis(hello)`; o Asterisk entrega o canal para nossa aplicação e envia um evento `StasisStart`.
+2. Nós atendemos o canal e, em seguida, solicitamos ao Asterisk que reproduza `sound:hello-world`. O Asterisk retorna um objeto `Playback` cujo `id` nós armazenamos.
+3. Quando o áudio termina, o Asterisk envia `PlaybackFinished` com aquele `id` de reprodução; nós localizamos o canal e o encerramos.
+4. Encerrar a chamada faz com que o canal saia do Stasis, produzindo um evento `StasisEnd`.
 
-> **Uma observação sobre bibliotecas cliente.** Existe um wrapper de nível mais alto chamado `ari-py` (o pacote `ari`), mas ele está sem manutenção e foi escrito para uma era mais antiga do Python e das ferramentas Swagger. Para novos trabalhos no Asterisk 22, prefira a abordagem explícita `requests` + WebSocket mostrada acima, ou uma biblioteca asyncio como `asyncari` se precisar de concorrência. A abordagem direta mantém você próximo das chamadas REST e dos eventos reais, que é exatamente o que se deseja ao aprender ARI.
+> **Uma nota sobre bibliotecas de cliente.** Existe um wrapper de nível superior chamado `ari-py` (o pacote `ari`), mas ele não recebe manutenção e foi escrito para uma era mais antiga do Python e das ferramentas Swagger. Para novos trabalhos no Asterisk 22, prefira a abordagem explícita de `requests` + WebSocket mostrada acima, ou uma biblioteca asyncio como a `asyncari` se você precisar de concorrência. A abordagem direta mantém você próximo às chamadas REST e eventos reais, que é exatamente o que você deseja ao aprender ARI.
 
-## externalMedia: the door to AI and voicebots
+## externalMedia: a porta para IA e voicebots
 
-The resources above let you play and record *files*. But modern voice applications — speech-to-text transcription, AI voicebots, real-time analytics — need the *live audio stream* of a call delivered to an external process, and they need to inject audio back.
+Os recursos acima permitem que você reproduza e grave *arquivos*. Mas as aplicações de voz modernas — transcrição de fala para texto, voicebots de IA, análise em tempo real — precisam que o *fluxo de áudio ao vivo* de uma chamada seja entregue a um processo externo, e precisam injetar áudio de volta.
 
-ARI provides this through the **`externalMedia` channel**. A `POST /ari/channels/externalMedia` request creates a special channel that, instead of talking to a phone, streams the call's RTP media to (and from) an external host. You bridge this channel with the caller's channel, and now your external program is in the audio path: it receives the caller's audio as RTP and can send synthesized audio back.
+O ARI fornece isso através do **`externalMedia` channel**. Uma requisição `POST /ari/channels/externalMedia` cria um canal especial que, em vez de falar com um telefone, transmite a mídia RTP da chamada para (e de) um host externo. Você faz a ponte (bridge) deste canal com o canal do chamador, e agora seu programa externo está no caminho do áudio: ele recebe o áudio do chamador como RTP e pode enviar áudio sintetizado de volta.
 
-The request requires only:
+A requisição requer apenas:
 
-- `app` — the Stasis application that owns the new channel.
-- `format` — the audio format, e.g. `ulaw` or `slin16`.
+- `app` — a aplicação Stasis que possui o novo canal.
+- `format` — o formato de áudio, por exemplo, `ulaw` ou `slin16`.
 
-`external_host` (the `host:port` of your media application) is optional in the schema — it may be empty for a WebSocket-server-style connection — but for a classic RTP voicebot you will supply it. The `encapsulation` parameter defaults to `rtp` and `transport` to `udp`, which is exactly what you want for a streaming media endpoint.
+`external_host` (o `host:port` da sua aplicação de mídia) é opcional no esquema — ele pode ficar vazio para uma conexão no estilo servidor WebSocket — mas para um voicebot RTP clássico, você o fornecerá. O parâmetro `encapsulation` tem como padrão `rtp` e `transport` como `udp`, que é exatamente o que você deseja para um endpoint de mídia em streaming.
 
 ```
 POST /ari/channels/externalMedia
@@ -291,61 +291,61 @@ POST /ari/channels/externalMedia
     format=slin16
 ```
 
-This single feature is what turns Asterisk into a front-end for AI: the telephone network terminates on Asterisk, ARI orchestrates the call, and `externalMedia` pipes the audio to a speech/AI engine and back. This is the mechanism on which AI services and voicebots are built.
+Este recurso único é o que transforma o Asterisk em um front-end para IA: a rede telefônica termina no Asterisk, o ARI orquestra a chamada e o `externalMedia` canaliza o áudio para um mecanismo de fala/IA e de volta. Este é o mecanismo sobre o qual os serviços de IA e voicebots são construídos.
 
 ## Resumo
 
-ARI é a interface moderna e recomendada para construir aplicações de telefonia no Asterisk 22. Ela divide o trabalho de forma clara: o Asterisk é o motor de mídia, e sua aplicação — falando JSON via HTTP e um WebSocket — fornece a lógica de controle de chamadas. Você a habilita através de `http.conf` (o servidor web interno na porta 8088) e `ari.conf` (que ativa o ARI e define usuários).
+ARI é a interface moderna e recomendada para a criação de aplicações de telefonia no Asterisk 22. Ela divide o trabalho de forma clara: o Asterisk atua como o motor de mídia, e sua aplicação — comunicando-se via JSON sobre HTTP e um WebSocket — fornece a lógica de controle de chamadas. Você a habilita através do `http.conf` (o servidor web integrado na porta 8088) e do `ari.conf` (que ativa o ARI e define os usuários).
 
-A aplicação de dialplan `Stasis()` entrega um canal para sua app, disparando `StasisStart` quando ele entra e `StasisEnd` quando ele sai. A partir daí você manipula um pequeno conjunto de recursos REST — channels, bridges, playbacks, recordings, endpoints e device states — para atender, reproduzir, gravar, conectar e encerrar chamadas.
+A aplicação de dialplan `Stasis()` entrega um canal para sua aplicação, disparando o `StasisStart` quando ele entra e o `StasisEnd` quando ele sai. A partir daí, você manipula um pequeno conjunto de recursos REST — channels, bridges, playbacks, recordings, endpoints e device states — para atender, reproduzir, gravar, realizar bridge e encerrar chamadas.
 
-Construímos uma aplicação mínima em Python Stasis que atende uma chamada, reproduz um prompt e encerra a chamada, e vimos como o canal `externalMedia` transmite RTP ao vivo para um programa externo — a base para integrações de IA e voicebot.
+Construímos uma aplicação Stasis mínima em Python que atende uma chamada, reproduz um prompt e encerra a ligação, e vimos como o canal `externalMedia` transmite RTP ao vivo para um programa externo — a base para integrações de IA e voicebots.
 
 ## Quiz
 
-1. ARI foi introduzido em qual versão do Asterisk?
+1. O ARI foi introduzido em qual versão do Asterisk?
    - A. Asterisk 1.4
    - B. Asterisk 11
    - C. Asterisk 12
    - D. Asterisk 18
-2. No modelo ARI, o Asterisk atua como motor de mídia enquanto sua aplicação externa fornece a lógica de controle de chamadas.
+2. No modelo ARI, o Asterisk atua como um motor de mídia enquanto sua aplicação externa fornece a lógica de controle de chamadas.
    - A. Verdadeiro
    - B. Falso
-3. ARI usa dois transportes juntos. Qual par está correto?
+3. O ARI utiliza dois transportes em conjunto. Qual par está correto?
    - A. Uma API REST/HTTP para emitir comandos e um fluxo WebSocket para receber eventos
    - B. Um protocolo de linha TCP e um script stdin/stdout
    - C. SNMP e SMTP
    - D. Dois sockets UDP separados
 4. Quais dois arquivos de configuração devem ser configurados para habilitar o ARI?
-   - A. `manager.conf` and `agi.conf`
-   - B. `http.conf` and `ari.conf`
-   - C. `sip.conf` and `rtp.conf`
-   - D. `modules.conf` and `cdr.conf`
+   - A. `manager.conf` e `agi.conf`
+   - B. `http.conf` e `ari.conf`
+   - C. `sip.conf` e `rtp.conf`
+   - D. `modules.conf` e `cdr.conf`
 5. A porta TCP convencional para o servidor HTTP do Asterisk (e, portanto, para o ARI) é ____.
-6. Qual aplicação de dialplan entrega um canal a uma aplicação ARI?
+6. Qual aplicação de dialplan transfere um canal para uma aplicação ARI?
    - A. `AGI()`
    - B. `Dial()`
    - C. `Stasis()`
    - D. `System()`
-7. Quando um canal entra em uma aplicação Stasis, qual evento é enviado ao cliente conectado?
+7. Quando um canal entra em uma aplicação Stasis, qual evento é enviado para o cliente conectado?
    - A. `ChannelDestroyed`
    - B. `StasisStart`
    - C. `Newchannel`
    - D. `Hangup`
-8. Qual requisição ARI cria um ponto de mistura que pode juntar dois ou mais canais?
+8. Qual requisição ARI cria um ponto de mixagem que pode unir dois ou mais canais?
    - A. `POST /ari/channels`
    - B. `POST /ari/bridges`
    - C. `GET /ari/endpoints`
    - D. `DELETE /ari/recordings/stored`
-9. Para reproduzir um prompt interno em um canal, qual evento informa à sua aplicação que o áudio terminou para que ela possa prosseguir?
+9. Para reproduzir um prompt nativo em um canal, qual evento informa à sua aplicação que o áudio terminou para que ela possa prosseguir?
    - A. `PlaybackStarted`
    - B. `DTMFReceived`
    - C. `PlaybackFinished`
    - D. `ChannelTalkingFinished`
 10. O canal `externalMedia` é usado principalmente para:
     - A. Gravar uma chamada em um arquivo WAV local
-    - B. Transmitir o áudio ao vivo da chamada (RTP) para e de uma aplicação externa, por exemplo, um motor de IA/fala
+    - B. Transmitir o áudio ao vivo da chamada (RTP) de e para uma aplicação externa, por exemplo, um motor de IA/fala
     - C. Registrar um endpoint PJSIP
     - D. Recarregar o dialplan
 
-**Answers:** 1 — C · 2 — A · 3 — A · 4 — B · 5 — `8088` · 6 — C · 7 — B · 8 — B · 9 — C · 10 — B
+**Respostas:** 1 — C · 2 — A · 3 — A · 4 — B · 5 — `8088` · 6 — C · 7 — B · 8 — B · 9 — C · 10 — B

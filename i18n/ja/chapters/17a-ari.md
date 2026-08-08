@@ -1,49 +1,49 @@
-# The Asterisk REST Interface (ARI)
+# Asterisk REST Interface (ARI)
 
-前章では AMI と AGI、Asterisk に外部ロジックを組み込む2つの従来手法について説明しました。どちらもモダンなウェブ以前の技術です。AMI は TCP ソケット上で生の行指向イベントストリームを提供し、AGI は通話中の単一チャネルをスクリプトに渡します。どちらも、今日構築されるような状態を保持し非同期で複数チャネルを扱うアプリケーション、たとえば Web サービスと連携する IVR、クリック・トゥ・コール ダッシュボード、会議コントローラ、音声をストリーミングして音声エンジンに渡すボイスボット向けに設計されたものではありません。
+前の章では、Asteriskに外部ロジックを組み込むための2つの古典的な手法であるAMIとAGIについて解説しました。どちらも現代のWebが登場する前の技術です。AMIはTCPソケットを介した生の行指向イベントストリームを提供し、AGIは通話期間中、単一のchannelをスクリプトに渡します。どちらも、Webサービスと連携するIVR、クリック・トゥ・コール・ダッシュボード、会議コントローラー、音声エンジンに音声をストリーミングするボイスボットなど、今日人々が構築しているようなステートフルで非同期なマルチchannelアプリケーション向けには設計されていません。
 
-ARI — Asterisk REST Interface — は Asterisk 12 で導入され、このギャップを埋めるために作られました。Asterisk 22 では新しいテレフォニーアプリケーションを構築するための推奨インターフェースとなっています。ARI の背後にある考え方は、関心事の明確な分離です。**Asterisk はメディアエンジンになる**（チャネルに応答し、ブリッジをミックスし、音声を再生・録音し、DTMF を送信する）一方、**アプリケーション側が REST (HTTP) API と WebSocket イベントストリームの組み合わせで全てのコールコントロールロジックを提供する**というものです。
+ARI（Asterisk REST Interface）は、そのギャップを埋めるためにAsterisk 12で導入されました。Asterisk 22においては、新しい電話アプリケーションを構築するための推奨インターフェースとなっています。ARIの背後にある考え方は、関心の明確な分離です。すなわち、**Asteriskはメディアエンジンとなり**（channelの応答、bridgeのミキシング、音声の再生と録音、DTMFの送信を行います）、**アプリケーション側がREST（HTTP）APIとWebSocketイベントストリームを組み合わせて、すべての通話制御ロジックを提供します**。
 
 ## Objectives
 
-この章の終わりまでに、読者は次のことができるようになります。
+この章を読み終えることで、読者は以下のことができるようになります。
 
-- ARI が何であるか、そして AMI や AGI とどのように異なるかを説明できること
-- プロジェクトに ARI が適切なインターフェースであるかを判断できること
-- `ari.conf` と `http.conf` を設定して ARI を有効化し、ユーザーを作成できること
-- ARI WebSocket イベントストリームに接続できること
-- Stasis ダイヤルプランアプリケーションと `StasisStart`/`StasisEnd` イベントを説明できること
-- ARI リソースモデル（チャネル、ブリッジ、プレイバック、レコーディング、エンドポイント、デバイスステート）を説明できること
-- チャネルに応答し、サウンドを再生し、切断する最小限の Stasis アプリケーションを Python で作成できること
-- `externalMedia` チャネルが何であるか、そして AI やボイスボット統合においてなぜ重要かを説明できること
+- ARIとは何か、そしてAMIやAGIとどのように異なるかを説明できる
+- プロジェクトにおいていつARIが適切なインターフェースとなるかを判断できる
+- `ari.conf`および`http.conf`を設定してARIを有効にし、ユーザーを作成できる
+- ARIのWebSocketイベントストリームに接続できる
+- Stasis dialplanアプリケーションと`StasisStart`/`StasisEnd`イベントについて説明できる
+- ARIのリソースモデル（channels、bridges、playbacks、recordings、endpoints、device states）について説明できる
+- チャネルに応答し、音声を再生し、切断する最小限のStasisアプリケーションをPythonで記述できる
+- `externalMedia`チャネルとは何か、そしてそれがAIやvoicebotの統合においてなぜ重要なのかを説明できる
 
-## What ARI is, and when to use it
+## ARIとは何か、いつ使用すべきか
 
-ARI は 2 つのトランスポートが連携して動作します:
+ARIは、連携して動作する2つのトランスポート上に構築されています。
 
-- **REST (HTTP) API** – アプリケーションが *実行* するために呼び出すものです。チャネルの発信、応答、サウンドの再生、ブリッジの作成、録音の開始、切断などを行います。これらは普通の HTTP リクエスト（`GET`、`POST`、`DELETE`）で `http://asterisk-host:8088/ari/...` に対して行われます。
-- **WebSocket イベントストリーム** – Asterisk がアプリケーションに何が起きたかを *通知* するものです。チャネルが作成された、DTMF が到着した、再生が完了した、チャネルがアプリケーションから離れた、などのイベントが JSON オブジェクトとして配信されます。
+- **REST (HTTP) API**: アプリケーションがチャネルの発信、応答、音声の再生、ブリッジの作成、録音の開始、切断といった「操作」を行うために呼び出すAPIです。これらは`http://asterisk-host:8088/ari/...`に対する通常のHTTPリクエスト（`GET`、`POST`、`DELETE`）です。
+- **WebSocketイベントストリーム**: Asteriskがアプリケーションに対して、チャネルが作成された、DTMFが入力された、再生が終了した、チャネルがアプリケーションから離脱したといった「状況」を通知するためのストリームです。イベントはJSONオブジェクトとして配信されます。
 
-このパターンは非同期です: リクエストを送信し、そのリクエストの *結果* は通常、後でイベントとして返ってきます。たとえば、サウンドを再生するリクエストを `POST` とすると、Asterisk はすぐに `Playback` オブジェクトで応答し、数秒後に音声が終了したことを示す `PlaybackFinished` イベントが届きます。
+このパターンは非同期です。リクエストを行うと、そのリクエストの「結果」は通常、後からイベントとして返されます。例えば、音声を再生するリクエストを`POST`すると、Asteriskは即座に`Playback`オブジェクトで応答し、数秒後に音声が終了した時点で`PlaybackFinished`イベントを受け取ります。
 
-ARI を AMI や AGI より選ぶべきケース:
+以下のような場合には、AMIやAGIではなくARIを選択してください。
 
-- **チャネルやブリッジの細かい制御が必要** – 会議、パーキング、キュー、またはプリミティブからカスタムコールフローを構築したい場合、ダイヤルプランアプリケーションに依存しません。
-- アプリケーションが **ステートフルで長時間稼働** し、複数のチャネルを同時に保持し、すべてのチャネルに対するイベントにリアクションする場合。
-- **Web サービス、メッセージバス、AI/音声エンジン** と統合したい場合で、ラインプロトコルや stdin/stdout スクリプトよりも HTTP 上の JSON を好む場合。
-- **新規プロジェクト** を開始し、Asterisk プロジェクトが積極的に推奨しているインターフェースを利用したい場合。
+- **チャネルとブリッジのきめ細かな制御**が必要な場合。dialplanのアプリケーションに頼るのではなく、プリミティブから会議、パーク、キュー、あるいは独自の通話フローを構築する場合です。
+- アプリケーションが**ステートフルかつ長時間実行**される場合。複数のチャネルを同時に保持し、それらすべてのイベントに対して反応する必要があります。
+- **Webサービス、メッセージバス、またはAI/音声エンジン**と統合したい場合。行指向プロトコルやstdin/stdoutスクリプトよりも、HTTP経由のJSONを好む場合です。
+- **新規プロジェクト**を開始するにあたり、Asteriskプロジェクトが積極的に推奨するインターフェースを使用したい場合。
 
-AMI はシステムを *観測* したり、たまにコマンドを発行したりするだけ（ダイヤラ、ウォールボード、モニタリング）には依然として適切です。AGI は手軽な単体 IVR スクリプトには便利です。しかし、コールをオーケストレーションするものすべてに対しては、ARI が現代的な答えです。
+システムを「監視」するだけ、あるいは時折コマンドを発行するだけ（ダイヤラー、ウォールボード、監視など）であれば、依然としてAMIが適切なツールです。また、簡潔で自己完結型のIVRスクリプトには、AGIが依然として便利です。しかし、通話をオーケストレーションするようなあらゆる用途において、ARIが現代的な回答となります。
 
-> ARI はダイヤルプランを置き換えるものではなく、補完します。チャネルは通常通りダイヤルプラン内で実行され、`Stasis()` アプリケーションに到達した時点で制御が ARI アプリケーションに渡されます。アプリケーションが終了すると、チャネルはダイヤルプランに戻すことも、切断することもできます。
+> ARIはdialplanを置き換えるものではなく、補完するものです。チャネルは通常通りdialplan内で実行され、`Stasis()`アプリケーションに到達した時点で、制御がARIアプリケーションに引き渡されます。アプリケーションの処理が完了すると、チャネルはdialplanに戻されるか、切断されます。
 
-## ARI の有効化: http.conf と ari.conf
+## ARIの有効化: http.conf と ari.conf
 
-ARI は Asterisk の組み込み HTTP サーバ上で動作するため、2 つの設定ファイルが関係します。`http.conf`でウェブサーバを有効にし、`ari.conf`で ARI を有効にしてユーザーを定義します。
+ARIはAsteriskの組み込みHTTPサーバー上で動作するため、2つの設定ファイルが関係します。すなわち、Webサーバーを有効にする`http.conf`と、ARIを有効にしてユーザーを定義する`ari.conf`です。
 
 ### http.conf
 
-HTTP サーバは有効化され、アドレスとポートにバインドされている必要があります。慣例的な ARI ポートは **8088** です。
+HTTPサーバーを有効にし、アドレスとポートにバインドする必要があります。ARIの標準的なポートは **8088** です。
 
 ```ini
 [general]
@@ -52,9 +52,9 @@ bindaddr=0.0.0.0
 bindport=8088
 ```
 
-本番環境では ARI を TLS の背後に置くべきです。Asterisk は HTTPS を直接提供できます（`tlsenable=yes`、`tlsbindaddr`、`tlscertfile`、`tlsprivatekey`）、あるいは 8088 ポートの前にリバースプロキシで TLS を終端させることもできます。TLS を使用すると URL は`https://`と`wss://`になり、`http://`と`ws://`ではなくなります。
+本番環境では、ARIをTLSの背後に配置すべきです。AsteriskはHTTPSを直接提供することもできますし（`tlsenable=yes`、`tlsbindaddr`、`tlscertfile`、`tlsprivatekey`）、ポート 8088 の手前にあるリバースプロキシでTLSを終端させることも可能です。TLS経由の場合、URLは`http://`や`ws://`ではなく、`https://`や`wss://`になります。
 
-CLI から HTTP サーバが起動しているか確認できます:
+HTTPサーバーが起動しているかどうかは、CLIから確認できます。
 
 ```
 asterisk*CLI> http show status
@@ -64,7 +64,7 @@ Server Enabled and Bound to 0.0.0.0:8088
 
 ### ari.conf
 
-`ari.conf`には`[general]`セクションとユーザーごとのセクションがあります。
+`ari.conf`には`[general]`セクションと、ユーザーごとに1つのセクションが含まれます。
 
 ```ini
 [general]
@@ -78,16 +78,16 @@ password=secret
 password_format=plain   ; "plain" (default) or "crypt"
 ```
 
-これらのオプションに関するいくつかの注意点:
+これらのオプションに関するいくつかの注意点です。
 
-- `enabled`は ARI を全体的にオンまたはオフにします。
-- `pretty`は JSON 応答を人間が読みやすい形式に整形します。本番環境ではオフにしてください。
+- `enabled`はARIをグローバルに有効または無効にします。
+- `pretty`はJSONレスポンスを人間が読みやすい形式に整形します。本番環境では無効にしてください。
 - 各ユーザーは`type=user`を持つ名前付きセクションです。
-- `read_only=yes`はそのユーザーを読み取り専用 (GET) リクエストに制限します。
-- `password_format`は`plain`（パスワードが平文）または`crypt`（ハッシュ化されたパスワード、`mkpasswd -m sha-512`で生成）である可能性があります。
-- `permit`、`deny`、`acl`はユーザーごとの IP 制限を許可し、`acl.conf`と同じルールに従います。
+- `read_only=yes`はそのユーザーを読み取り専用（GET）リクエストに制限します。
+- `password_format`には`plain`（パスワードはプレーンテキスト）または`crypt`（`mkpasswd -m sha-512`で生成されたハッシュ化パスワード）を指定できます。
+- `permit`、`deny`、および`acl`は、`acl.conf`と同じルールに従い、ユーザーごとのIP制限を可能にします。
 
-ファイルを編集したら、関連モジュール（`module reload res_ari.so`と`module reload http.so`）をリロードするか Asterisk を再起動してください。ARI が動作しているかは次で確認できます:
+ファイルを編集した後、関連するモジュールをリロードする（`module reload res_ari.so`および`module reload http.so`）か、Asteriskを再起動してください。ARIが実行中であることは以下で確認できます。
 
 ```
 asterisk*CLI> module show like res_ari
@@ -101,27 +101,27 @@ Application Name
 =========================
 ```
 
-`ari show apps`は接続されたクライアントが現在登録している Stasis アプリケーションを一覧表示します。クライアントが接続するまで空であり、次に行うことがそれです。
+`ari show apps`は、接続中のクライアントによって現在登録されているStasisアプリケーションを一覧表示します。クライアントが接続するまでは空ですが、それこそが次に私たちが実行することです。
 
-### WebSocket イベント URL
+### WebSocketイベントURL
 
-クライアントは`/ari/events`エンドポイントに対して WebSocket を開き、実装する Stasis アプリケーション名を指定し、認証情報を渡すことでイベントストリームを購読します:
+クライアントは、実装するStasisアプリケーション名を指定し、認証情報を渡して`/ari/events`エンドポイントへのWebSocketを開くことで、イベントストリームを購読します。
 
 ```
 ws://asterisk-host:8088/ari/events?app=hello&api_key=asterisk:secret
 ```
 
-クエリパラメータは次のとおりです:
+クエリパラメータは以下の通りです。
 
-- `app` — Stasis アプリケーションの名前。これは dialplan の`Stasis()`呼び出しで使用する名前と同じです。カンマ区切りで複数指定できます。
-- `api_key` — 認証情報で、形式は`username:password`、`ari.conf`のユーザーに一致します。
-- `subscribeAll` — オプションのブール値（デフォルト`false`）。`true`の場合、アプリケーションは所有するリソースだけでなくすべてのイベントを受け取ります。
+- `app` — Stasisアプリケーションの名前です。これはdialplanの`Stasis()`呼び出しで使用する名前と同じです。カンマ区切りで複数の名前を渡すこともできます。
+- `api_key` — `ari.conf`内のユーザーと一致する、`username:password`形式の認証情報です。
+- `subscribeAll` — オプションのブール値（デフォルトは`false`）です。`true`の場合、アプリケーションは自身が所有するリソースのイベントだけでなく、すべてのイベントを受信します。
 
-同じ`user:pass`認証情報は REST 呼び出し時の HTTP Basic 認証としても使用され（または`api_key`クエリパラメータとして付加され）ます。
+同じ`user:pass`認証情報は、REST呼び出しにおけるHTTP Basic認証として使用されます（または、そこでも`api_key`クエリパラメータとして付加されます）。
 
-## Stasis: アプリケーションへのチャンネルの受け渡し
+## Stasis: アプリケーションへのチャネルの受け渡し
 
-ダイヤルプランと ARI の間のブリッジは **`Stasis()`** ダイヤルプランアプリケーションです（基盤となるフレームワークも Stasis と呼ばれます）。チャンネルが `Stasis(appname[,args])` に到達すると、Asterisk はそのチャンネルを `appname` に登録された ARI アプリケーションに渡し、ダイヤルプランの実行を停止します。制御はあなたのコードに移ります。
+dialplanとARIの間のブリッジとなるのが **`Stasis()`** dialplanアプリケーションです（基盤となるフレームワークもStasisと呼ばれます）。チャネルが `Stasis(appname[,args])` に到達すると、Asteriskはそのチャネルを `appname` として登録されたARIアプリケーションに引き渡し、そのチャネルに対するdialplanの実行を停止します。これで制御権はあなたのコードに移ります。
 
 ```
 [from-internal]
@@ -129,24 +129,24 @@ exten => _X.,1,Stasis(hello)
  same => n,Hangup()
 ```
 
-チャンネルがアプリケーションに入ると、`hello` にサブスクライブしているすべてのクライアントに **`StasisStart`** イベントが WebSocket を通じて送られ、完全なチャンネルオブジェクト（ID、名前、発信者 ID、状態、そして `Stasis()` に渡された任意の引数）が含まれます。これがチャンネル制御を開始する合図です。
+チャネルがアプリケーションに入ると、 `hello` を購読しているすべての接続済みクライアントは、WebSocket経由で **`StasisStart`** イベントを受け取ります。これにはチャネルの完全なオブジェクト（ID、名前、caller ID、状態、および `Stasis()` に渡された引数）が含まれています。これがチャネルの制御を開始する合図となります。
 
-チャンネルがアプリケーションから離れるとき—コードが `continueInDialplan` でダイヤルプランに戻した場合や、ハングアップされた場合—**`StasisEnd`** イベントが受信されます。`Stasis()` がダイヤルプランに戻った後、`STASISSTATUS` チャンネル変数（`SUCCESS` または `FAILED`）が設定され、ダイヤルプランは結果に基づいて分岐できます。
+あなたのコードが `continueInDialplan` を使用してチャネルをdialplanに戻したか、あるいはハングアップされたことによってチャネルがアプリケーションから離れると、 **`StasisEnd`** イベントを受け取ります。 `Stasis()` がdialplanに復帰した後、 `STASISSTATUS` チャネル変数（ `SUCCESS` または `FAILED` ）が設定されるため、dialplanはその結果に基づいて分岐することができます。
 
-## ARI リソースモデル
+## ARIリソースモデル
 
-ARI は Asterisk の内部を小さな REST リソースの集合として公開します。各リソースは `/ari/<resource>` の下にあり、標準的な HTTP メソッドで操作されます。最も重要なものは次のとおりです。
+ARIは、Asteriskの内部構造を少数のRESTリソースとして公開します。各リソースは`/ari/<resource>`の下に存在し、標準的なHTTPメソッドで操作されます。最も重要なリソースは以下の通りです。
 
-| Resource | What it represents | Example operations |
+| リソース | 何を表すか | 操作例 |
 |----------|--------------------|--------------------|
-| **channels** | 単一の通話レッグ | originate, answer, play, record, hangup |
+| **channels** | 単一の通話レグ | originate, answer, play, record, hangup |
 | **bridges** | チャネルを結合するミキシングポイント | create, add/remove channels, play to the bridge |
 | **playbacks** | 進行中のメディア再生 | get status, stop, pause/unpause |
-| **recordings** | ライブおよび保存された録音 | start, stop, list stored, delete |
-| **endpoints** | 設定されたピア (PJSIP など) | list, get state, send a message |
+| **recordings** | ライブおよび保存済みの録音 | start, stop, list stored, delete |
+| **endpoints** | 設定済みのピア (PJSIPなど) | list, get state, send a message |
 | **deviceStates** | カスタムデバイス状態 | list, get, set, delete |
 
-いくつかの具体的な REST 呼び出し (パスはワイヤ上で表示される `/ari` プレフィックス付き):
+具体的なREST呼び出しの例をいくつか示します（パスは通信経路上に現れる`/ari`プレフィックス付きで表示しています）。
 
 ```
 # Channels
@@ -169,17 +169,17 @@ GET    /ari/recordings/stored
 GET    /ari/playbacks/{playbackId}
 ```
 
-The `media`パラメータは`play`リクエストでメディアURIを受け取ります。最も一般的な形式は、組み込みサウンドを指す`sound:`URIで、例えば`sound:hello-world`や`sound:tt-monkeys`です。音声が終了すると、Asteriskはその再生IDに対して`PlaybackFinished`イベントを発行し、これによりアプリケーションは次に進めることが分かります。
+`play`リクエストの`media`パラメータは、メディアURIを受け取ります。最も一般的な形式は、組み込みサウンドを指定する`sound:`URIであり、例えば`sound:hello-world`や`sound:tt-monkeys`などが挙げられます。オーディオの再生が終了すると、Asteriskはその再生IDに対して`PlaybackFinished`イベントを発行します。アプリケーションはこのイベントによって、次の処理へ進むタイミングを知ることができます。
 
-チャネルとブリッジは、通話フローを構成するために組み合わせる二つの構成要素です。例えば二人の発信者を接続するには、二つのチャネルを発信または受信し、`mixing`ブリッジを`POST /ari/bridges`で作成し、`POST /ari/bridges/{bridgeId}/addChannel`で両方のチャネルを追加します。会議を構築する場合は、同じブリッジにチャネルを追加し続けるだけです。
+channelsとbridgesは、通話フローを作成するために組み合わせる2つの構成要素です。例えば、2人の発信者を接続するには、2つのチャネルを発信または着信させ、`POST /ari/bridges`を使用して`mixing`ブリッジを作成し、`POST /ari/bridges/{bridgeId}/addChannel`を使って両方のチャネルをそのブリッジに追加します。会議通話を構築するには、同じブリッジにチャネルを追加し続けるだけで実現できます。
 
-## A worked example: a minimal Stasis application
+## 実践例：最小限の Stasis アプリケーション
 
-最小限の有用な ARI アプリケーションを構築しましょう。任意の内線がダイヤルされると、通話は Stasis アプリに入ります。アプリは通話に応答し、古典的な `hello-world` プロンプトを再生し、切断します。
+最も小さく、かつ実用的な ARI アプリケーションを作成してみましょう。いずれかの extension がダイヤルされると、通話は私たちの Stasis アプリに送られ、そこで応答し、定番の `hello-world` プロンプトを再生して、通話を終了します。
 
-### The dialplan
+### dialplan
 
-`extensions.conf` で、チャンネルを Stasis に送ります:
+`extensions.conf` で、channel を Stasis に送ります。
 
 ```
 [from-internal]
@@ -187,11 +187,11 @@ exten => _X.,1,Stasis(hello)
  same => n,Hangup()
 ```
 
-アプリケーション名 `hello` は、接続時に使用する `app=hello` と一致します。
+アプリケーション名 `hello` は、接続時に使用する `app=hello` と一致させる必要があります。
 
-### The Python client
+### Python クライアント
 
-このクライアントは二つの有名なライブラリを使用します: `requests` は REST 呼び出し用、`websocket-client` はイベントストリーム用です。これらは `pip install requests websocket-client` でインストールします。
+このクライアントは、REST 呼び出し用の `requests` と、イベントストリーム用の `websocket-client` という2つの有名なライブラリを使用します。これらは `pip install requests websocket-client` でインストールしてください。
 
 ```python
 #!/usr/bin/env python3
@@ -260,29 +260,29 @@ if __name__ == "__main__":
     main()
 ```
 
-スクリプトを実行し、登録済みエンドポイントから任意の番号をダイヤルしてください。「Hello, world」の音声が聞こえた後、通話は切断されます。Asterisk コンソール上では、クライアントが接続中に `ari show apps` が `hello` を一覧表示します。
+スクリプトを実行し、登録済みの endpoint から任意の番号をダイヤルしてください。「Hello, world」という音声が聞こえた後、通話が切断されるはずです。Asterisk コンソールでは、クライアントが接続されている間、 `ari show apps` が `hello` をリスト表示します。
 
-フローは一度追跡すると理解しやすいです:
+この流れを一度追ってみましょう。
 
-1. ダイヤルプランが `Stasis(hello)` を実行します。Asterisk はチャンネルをアプリに渡し、`StasisStart` イベントを送信します。  
-2. チャンネルに応答し、Asterisk に `sound:hello-world` の再生を指示します。Asterisk は `Playback` オブジェクトを返し、その `id` を保持します。  
-3. 音声が終了すると、Asterisk は `PlaybackFinished` とその再生 `id` を送信します。チャンネルを検索し、切断します。  
-4. 切断によりチャンネルは Stasis から離れ、`StasisEnd` イベントが生成されます。
+1. dialplan が `Stasis(hello)` を実行します。Asterisk は channel を私たちのアプリに渡し、 `StasisStart` イベントを送信します。
+2. 私たちは channel に応答し、Asterisk に `sound:hello-world` を再生するよう要求します。Asterisk は `Playback` オブジェクトを返し、私たちはその `id` を保持します。
+3. 音声の再生が終了すると、Asterisk はその playback `id` を含む `PlaybackFinished` を送信します。私たちは channel を特定し、通話を終了させます。
+4. 通話を終了すると channel は Stasis から離脱し、 `StasisEnd` イベントが発生します。
 
-> **A note on client libraries.** `ari-py`（`ari` パッケージ）という上位ラッパーも存在しますが、メンテナンスされておらず、古い Python と Swagger ツールチェーン向けに作られました。Asterisk 22 で新規に開発する場合は、上記の明示的な `requests` + WebSocket アプローチ、または並行処理が必要な場合は `asyncari` のような asyncio ライブラリを使用することを推奨します。生のアプローチは実際の REST 呼び出しとイベントに近い形で操作でき、ARI を学習する際にまさに求められる方法です。
+> **クライアントライブラリに関する注意。** `ari-py` （ `ari` パッケージ）と呼ばれる高レベルのラッパーが存在しますが、これはメンテナンスされておらず、古い時代の Python および Swagger ツール向けに書かれたものです。Asterisk 22 での新規開発では、上記で示した明示的な `requests` + WebSocket のアプローチ、あるいは並行処理が必要な場合は `asyncari` のような asyncio ライブラリを使用することを推奨します。生の（raw）アプローチを採用することで、実際の REST 呼び出しやイベントに近い状態で作業できるため、ARI を学習する際には最適です。
 
-## externalMedia: the door to AI and voicebots
+## externalMedia: AIとボイスボットへの扉
 
-上記のリソースでは *files* の再生と録音が可能です。しかし、モダンな音声アプリケーション――音声からテキストへの文字起こし、AI ボイスボット、リアルタイム分析――は、通話の *live audio stream* を外部プロセスに渡し、さらに音声を注入する必要があります。
+上記の各リソースを使用することで、*ファイル*の再生や録音が可能になります。しかし、音声認識（speech-to-text）、AIボイスボット、リアルタイム分析といった現代の音声アプリケーションでは、通話の*ライブオーディオストリーム*を外部プロセスに配信し、さらに音声を注入し返す必要があります。
 
-ARI はこれを **`externalMedia` channel** を通じて提供します。`POST /ari/channels/externalMedia` リクエストは、電話と対話する代わりに通話の RTP メディアを外部ホストへ（および外部ホストから）ストリームする特別なチャネルを作成します。このチャネルを発信者のチャネルとブリッジすれば、外部プログラムがオーディオパスに入り、RTP で発信者の音声を受け取り、合成音声を送り返すことができます。
+ARIは、**`externalMedia`チャネル**を通じてこれを実現します。 `POST /ari/channels/externalMedia`リクエストは、電話機と通信するのではなく、通話のRTPメディアを外部ホストへ（および外部ホストから）ストリーミングする特別なチャネルを作成します。このチャネルを発信者のチャネルとブリッジすることで、外部プログラムがオーディオパスに介在し、発信者の音声をRTPとして受信し、合成音声を送り返すことが可能になります。
 
-リクエストに必要なのは以下だけです：
+このリクエストに必要なのは以下の項目のみです。
 
-- `app` ― 新しいチャネルを所有する Stasis アプリケーション。
-- `format` ― オーディオフォーマット、例: `ulaw` または `slin16`。
+- `app` — 新しいチャネルを所有するStasisアプリケーション。
+- `format` — オーディオフォーマット（例: `ulaw`や`slin16`）。
 
-`external_host`（メディアアプリケーションの `host:port`）はスキーマ上オプションです――WebSocket サーバー形式の接続では空でも構いません――しかし、従来型の RTP ボイスボットでは指定する必要があります。`encapsulation` パラメータはデフォルトで `rtp`、`transport` は `udp` に設定されており、これはストリーミングメディアエンドポイントに最適です。
+`external_host`（メディアアプリケーションの`host:port`）はスキーマ上ではオプションであり、WebSocketサーバー形式の接続であれば空でも構いませんが、一般的なRTPボイスボットの場合は指定する必要があります。 `encapsulation`パラメータはデフォルトで`rtp`となり、`transport`は`udp`となりますが、これはストリーミングメディアのendpointとしてまさに望ましい設定です。
 
 ```
 POST /ari/channels/externalMedia
@@ -291,61 +291,61 @@ POST /ari/channels/externalMedia
     format=slin16
 ```
 
-この単一機能が Asterisk を AI のフロントエンドに変える鍵です：電話ネットワークは Asterisk で終端し、ARI が通話をオーケストレーションし、`externalMedia` が音声を音声/AI エンジンへ、そして戻します。これが AI サービスやボイスボットが構築されるメカニズムです。
+この単一の機能こそが、AsteriskをAIのフロントエンドへと変貌させる鍵です。電話網はAsteriskで終端され、ARIが通話を制御し、`externalMedia`が音声を音声認識/AIエンジンへと送受信します。これこそが、AIサービスやボイスボットが構築されるメカニズムです。
 
-## Summary
+## 概要
 
-ARI は Asterisk 22 上でテレフォニーアプリケーションを構築するための、最新かつ推奨されるインターフェースです。作業をきれいに分割します：Asterisk がメディアエンジンとなり、JSON を HTTP と WebSocket でやり取りするアプリケーションがコールコントロールロジックを提供します。これを有効にするには `http.conf`（ポート 8088 の組み込みウェブサーバ）と `ari.conf`（ARI をオンにしユーザーを定義する）を使用します。
+ARIは、Asterisk 22上でテレフォニーアプリケーションを構築するための、現代的で推奨されるインターフェースです。ARIは役割を明確に分離します。Asteriskはメディアエンジンとして機能し、HTTP経由でJSONを扱いWebSocketで通信するアプリケーションが、通話制御ロジックを提供します。ARIは`http.conf`（ポート8088で動作する組み込みWebサーバー）と`ari.conf`（ARIを有効化しユーザーを定義する設定）を通じて利用可能になります。
 
-`Stasis()` ダイヤルプランアプリケーションはチャンネルをアプリに渡し、入場時に `StasisStart`、退出時に `StasisEnd` を発生させます。そこからは、REST リソース（channels、bridges、playbacks、recordings、endpoints、device states）の小さな集合を操作して、応答、再生、録音、ブリッジ、ハングアップを行います。
+`Stasis()` dialplanアプリケーションは、チャネルをアプリケーションに引き渡し、チャネルがアプリケーションに入ると`StasisStart`を、離れると`StasisEnd`を発生させます。そこから、チャネル、ブリッジ、再生、録音、endpoint、デバイス状態といった一連のRESTリソースを操作することで、応答、再生、録音、ブリッジ、切断を行います。
 
-最小限の Python Stasis アプリを作成し、通話に応答してプロンプトを再生し、ハングアップする例を示しました。また、`externalMedia` チャンネルが外部プログラムへライブ RTP をストリームする様子を確認しました—これは AI やボイスボット統合の基盤となります。
+私たちは、着信に応答してプロンプトを再生し、切断する最小限のPython Stasisアプリケーションを構築しました。また、`externalMedia`チャネルがどのようにライブRTPを外部プログラムにストリーミングするかを確認しました。これは、AIやボイスボットを統合するための基盤となります。
 
-## Quiz
+## クイズ
 
-1. ARI はどのバージョンの Asterisk で導入されましたか？
+1. ARIはAsteriskのどのバージョンで導入されましたか？
    - A. Asterisk 1.4
    - B. Asterisk 11
    - C. Asterisk 12
    - D. Asterisk 18
-2. ARI モデルでは、Asterisk がメディアエンジンとして動作し、外部アプリケーションがコールコントロールロジックを提供します。
-   - A. True
-   - B. False
-3. ARI は 2 つのトランスポートを組み合わせて使用します。正しい組み合わせはどれですか？
+2. ARIモデルにおいて、Asteriskはメディアエンジンとして機能し、外部アプリケーションが通話制御ロジックを提供します。
+   - A. 真
+   - B. 偽
+3. ARIは2つのトランスポートを組み合わせて使用します。正しい組み合わせはどれですか？
    - A. コマンド発行用の REST/HTTP API と、イベント受信用の WebSocket ストリーム
-   - B. TCP ラインプロトコルと stdin/stdout スクリプト
+   - B. TCPラインプロトコルと stdin/stdout スクリプト
    - C. SNMP と SMTP
-   - D. 2 つの別個の UDP ソケット
-4. ARI を有効にするために設定が必要な 2 つの設定ファイルはどれですか？
-   - A. `manager.conf` と `agi.conf`
-   - B. `http.conf` と `ari.conf`
-   - C. `sip.conf` と `rtp.conf`
-   - D. `modules.conf` と `cdr.conf`
-5. Asterisk HTTP サーバー（したがって ARI）の標準 TCP ポートは ____ です。
-6. どの dialplan アプリケーションがチャンネルを ARI アプリケーションに渡しますか？
+   - D. 2つの独立した UDP ソケット
+4. ARIを有効にするために設定が必要な2つの設定ファイルはどれですか？
+   - A. `manager.conf` および `agi.conf`
+   - B. `http.conf` および `ari.conf`
+   - C. `sip.conf` および `rtp.conf`
+   - D. `modules.conf` および `cdr.conf`
+5. Asterisk HTTPサーバー（したがってARI）の一般的な TCP ポートは ____ です。
+6. どの dialplan アプリケーションがチャネルを ARI アプリケーションに引き渡しますか？
    - A. `AGI()`
    - B. `Dial()`
    - C. `Stasis()`
    - D. `System()`
-7. チャンネルが Stasis アプリケーションに入ると、接続されたクライアントに送信されるイベントはどれですか？
+7. チャネルが Stasis アプリケーションに入ると、接続されたクライアントにどのイベントが送信されますか？
    - A. `ChannelDestroyed`
    - B. `StasisStart`
    - C. `Newchannel`
    - D. `Hangup`
-8. 2 つ以上のチャンネルを結合できるミキシングポイントを作成する ARI リクエストはどれですか？
+8. 2つ以上のチャネルを結合できるミキシングポイントを作成する ARI リクエストはどれですか？
    - A. `POST /ari/channels`
    - B. `POST /ari/bridges`
    - C. `GET /ari/endpoints`
    - D. `DELETE /ari/recordings/stored`
-9. チャンネルで組み込みプロンプトを再生する際、オーディオが終了したことをアプリケーションに通知し、次に進めるようにするイベントはどれですか？
+9. チャネル上で組み込みのプロンプトを再生する際、音声が終了したことをアプリケーションに通知し、次の処理へ進めるようにするイベントはどれですか？
    - A. `PlaybackStarted`
    - B. `DTMFReceived`
    - C. `PlaybackFinished`
    - D. `ChannelTalkingFinished`
-10. `externalMedia` チャンネルは主に何に使用されますか？
-    - A. ローカル WAV ファイルへの通話録音
-    - B. 通話のライブオーディオ（RTP）を外部アプリケーション（例：AI/音声エンジン）へストリームすること
-    - C. PJSIP エンドポイントの登録
-    - D. dialplan のリロード
+10. `externalMedia` チャネルは主に何のために使用されますか？
+    - A. 通話をローカルの WAV ファイルに録音する
+    - B. 通話のライブオーディオ（RTP）を外部アプリケーション（AI/音声エンジンなど）との間でストリーミングする
+    - C. PJSIP endpoint を登録する
+    - D. dialplan をリロードする
 
-**Answers:** 1 — C · 2 — A · 3 — A · 4 — B · 5 — `8088` · 6 — C · 7 — B · 8 — B · 9 — C · 10 — B
+**回答:** 1 — C · 2 — A · 3 — A · 4 — B · 5 — `8088` · 6 — C · 7 — B · 8 — B · 9 — C · 10 — B

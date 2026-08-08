@@ -290,7 +290,7 @@ Asterisk ships DB migrations for every realtime schema under `contrib/ast-db-man
 cd /usr/src/asterisk-22.x/contrib/ast-db-manage
 cp config.ini.sample config.ini
 # edit config.ini → set sqlalchemy.url, e.g.
-#   sqlalchemy.url = mysql+pymysql://astdb:supersecret@127.0.0.1/astdb
+#   sqlalchemy.url = mysql+pymysql://astdb:CHANGE_ME_DB_PASSWORD@127.0.0.1/astdb
 alembic -c config.ini upgrade head
 ```
 

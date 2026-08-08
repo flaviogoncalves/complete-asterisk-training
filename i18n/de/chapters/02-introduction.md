@@ -1,366 +1,366 @@
 # Einführung in Asterisk PBX
 
-Die Beliebtheit von sofort einsatzbereiten Distributionen wie FreePBX und Issabel ist in letzter Zeit stark gewachsen. In diesem Buch behandeln wir das klassische Asterisk, das die Grundlage für das Verständnis dieser Distributionen bildet. Asterisk PBX ist Open‑Source‑Software, die einen gewöhnlichen PC in eine leistungsfähige Multi‑Protokoll‑PBX verwandeln kann. In diesem Kapitel lernen wir die Möglichkeiten dieser neuen Technologie und ihre Grundarchitektur kennen.
+Die Popularität von sofort einsatzbereiten Distributionen wie FreePBX und Issabel ist in letzter Zeit gewachsen. In diesem Buch behandeln wir das klassische Asterisk, welches die Grundlage für das Verständnis dieser Distributionen bildet. Asterisk PBX ist eine Open-Source-Software, die in der Lage ist, einen gewöhnlichen PC in eine leistungsstarke Multiprotokoll-PBX zu verwandeln. In diesem Kapitel lernen wir die Möglichkeiten dieser neuen Technologie und ihre grundlegende Architektur kennen.
 
 ## Ziele
 
-Am Ende dieses Kapitels sollten Sie in der Lage sein:
+Nach Abschluss dieses Kapitels sollten Sie in der Lage sein:
 
-- zu erklären, was Asterisk ist und was es tut;
-- die Rolle von Digium™ und seinem Nachfolger Sangoma zu beschreiben;
-- die Grundarchitektur von Asterisk und seine Komponenten zu erkennen;
-- mehrere Anwendungsszenarien zu benennen; und
-- Quellen für Informationen und Hilfe zu identifizieren.
+- Zu erklären, was Asterisk ist und was es tut;
+- Die Rolle von Digium™ und dessen Nachfolger Sangoma zu beschreiben;
+- Die grundlegende Architektur von Asterisk und seine Komponenten zu erkennen;
+- Auf verschiedene Einsatzszenarien hinzuweisen; und
+- Informations- und Hilfsquellen zu identifizieren.
 
-## What is Asterisk
+## Was ist Asterisk
 
-Asterisk ist Open‑Source‑PBX‑Software, die einen gewöhnlichen Computer in eine voll ausgestattete PBX für Heimanwender, Unternehmen, VoIP‑Dienstanbieter und Telefonunternehmen verwandelt. Asterisk ist zugleich eine Open‑Source‑Community und ein Projekt, das von Sangoma Technologies gesponsert wird (die 2018 Digium übernommen haben). Sie können Asterisk frei nutzen und an Ihre Bedürfnisse anpassen. Asterisk ermöglicht die Echtzeit‑Verbindung zwischen PSTN‑ und VoIP‑Netzwerken. Da Asterisk weit mehr als eine PBX ist, erhalten Sie nicht nur ein herausragendes Upgrade Ihrer bestehenden PBX, sondern können auch neue Dinge in der Telefonie tun, wie zum Beispiel:
+Asterisk ist eine Open-Source-PBX-Software, die einen gewöhnlichen Computer in eine voll ausgestattete PBX für Privatanwender, Unternehmen, VoIP-Dienstanbieter und Telefongesellschaften verwandelt. Asterisk ist sowohl eine Open-Source-Community als auch ein Projekt, das von Sangoma Technologies (die 2018 Digium übernahmen) gesponsert wird. Es steht Ihnen frei, Asterisk zu nutzen und an Ihre Bedürfnisse anzupassen. Asterisk ermöglicht eine Echtzeit-Konnektivität zwischen PSTN- und VoIP-Netzwerken. Da Asterisk weit mehr als eine PBX ist, erhalten Sie nicht nur ein außergewöhnliches Upgrade für Ihre bestehende PBX, sondern können auch neue Dinge in der Telefonie umsetzen, wie zum Beispiel:
 
-- Mitarbeiter, die von zu Hause aus arbeiten, über das Breitband‑Internet mit einer Office‑PBX verbinden;
-- Mehrere Büros an verschiedenen Standorten über ein IP‑Netzwerk, ein privates Netzwerk oder sogar über das Internet selbst verbinden;
-- Ihren Mitarbeitern eine Voicemail bereitstellen, die in Web und E‑Mail integriert ist;
-- Anwendungen wie IVRs erstellen, die Verbindungen zu Ihrem Bestellsystem oder anderen Anwendungen ermöglichen;
-- Reisenden Benutzern Zugriff auf die Unternehmens‑PBX von überall mit einer einfachen Breitband‑ oder VPN‑Verbindung gewähren; und
+- Verbindung von Mitarbeitern im Homeoffice mit einer Office-PBX über Breitband-Internet;
+- Verbindung mehrerer Standorte an verschiedenen Orten über ein IP-Netzwerk, ein privates Netzwerk oder sogar über das Internet selbst;
+- Bereitstellung einer in das Web und E-Mail integrierten voicemail für Ihre Mitarbeiter;
+- Entwicklung von Anwendungen wie IVRs, die Verbindungen zu Ihrem Bestellsystem oder anderen Anwendungen ermöglichen;
+- Zugriff für reisende Benutzer auf die Firmen-PBX von überall aus mit einer einfachen Breitband- oder VPN-Verbindung; und
 - vieles mehr....
 
-Asterisk enthält mehrere fortgeschrittene Funktionen, die zuvor nur in High‑End‑Systemen zu finden waren, wie:
+Asterisk umfasst mehrere fortschrittliche Ressourcen, die zuvor nur in High-End-Systemen zu finden waren, wie zum Beispiel:
 
-- Musik für Kunden, die in Warteschlangen halten, mit Unterstützung für Media‑Streaming und MP3‑Dateien;
-- Anrufwarteschlangen, bei denen ein Team von Agenten Anrufe entgegennehmen und Warteschlangen überwachen kann;
-- Integration von Text‑zu‑Sprache und Spracherkennung;
-- Detaillierte Aufzeichnungen, die sowohl in Textdateien als auch in SQL‑Datenbanken übertragen werden; und
-- PSTN‑Konnektivität über digitale und analoge Leitungen.
+- Musik für Kunden in der Warteschleife, mit Unterstützung für Media-Streaming und MP3-Dateien;
+- Call queues, bei denen ein Team von Agenten Anrufe entgegennehmen und Warteschlangen überwachen kann;
+- Integration mit Text-to-Speech und Spracherkennung;
+- Detaillierte Aufzeichnungen, die sowohl in Textdateien als auch in SQL-Datenbanken übertragen werden; und
+- PSTN-Konnektivität über sowohl digitale als auch analoge Leitungen.
 
 ## Was ist AsteriskNOW (historisch) und FreePBX
 
-Asterisk in seiner reinsten Form, auch bekannt als „classic asterisk“ (Debian‑Paketbezeichnung), wird eher als Entwicklungswerkzeug denn als fertiges Produkt angesehen. AsteriskNOW war eine Initiative, Asterisk zu einer Soft‑Appliance zu machen. Die Distribution enthielt CentOS als Betriebssystem und FreePBX als grafische Oberfläche. AsteriskNOW wurde inzwischen eingestellt.
+Asterisk in seiner reinsten Form, auch bekannt als „classic asterisk“ (Bezeichnung im Debian-Paket), wird eher als Entwicklungswerkzeug denn als fertiges Produkt an sich betrachtet. AsteriskNOW war eine Initiative, um Asterisk in eine Soft-Appliance zu verwandeln. Die Distribution enthielt CentOS als Betriebssystem und FreePBX als grafische Oberfläche. AsteriskNOW wurde inzwischen eingestellt.
 
-Heute ist die standardmäßige schlüsselfertige Asterisk‑Distribution **FreePBX** (gepflegt von Sangoma), die Asterisk mit einer webbasierten Administrations‑GUI und einem Modul‑Ökosystem bündelt. FreePBX ist gemäß GPL lizenziert und kann kostenlos von www.freepbx.org heruntergeladen werden. Für kommerzielle Einsätze bietet Sangoma zudem **FreePBX Distro** (ein komplettes Linux‑Image) und das kommerzielle Produkt **PBXact** an.
+Heute ist die standardmäßige schlüsselfertige Asterisk-Distribution **FreePBX** (gepflegt von Sangoma), die Asterisk mit einer webbasierten Administrations-GUI und einem Modul-Ökosystem bündelt. FreePBX ist unter der GPL lizenziert und kann frei von www.freepbx.org heruntergeladen werden. Für kommerzielle Implementierungen bietet Sangoma zudem die **FreePBX Distro** (ein vollständiges Linux-Image) sowie das kommerzielle Produkt **PBXact** an.
 
 ## Rolle von Digium™ und Sangoma
 
-Digium, ein Unternehmen mit Sitz in Huntsville, Alabama, war seit seiner Gründung im Jahr 1999 der Erfinder und Hauptentwickler von Asterisk. Neben der Hauptsponsorship für die Asterisk‑Entwicklung stellte Digium Telefonie‑Interface‑Karten und weitere Hardware für Asterisk‑PBXs her und entwickelte kommerzielle Produkte wie Switchvox (gerichtet an den SMB‑Markt). 2018 wurde Digium von **Sangoma Technologies**, einem kanadischen Unternehmen für Unified Communications, übernommen. Seit der Übernahme unterstützt Sangoma die Asterisk‑Entwicklung weiterhin und fungiert als primärer Verwalter, wobei das Open‑Source‑Projekt unter www.asterisk.org gepflegt wird.
+Digium, ein Unternehmen mit Sitz in Huntsville, Alabama, war seit seiner Gründung im Jahr 1999 der Schöpfer und Hauptentwickler von Asterisk. Neben der Rolle als Hauptsponsor der Asterisk-Entwicklung produzierte Digium Telefonie-Schnittstellenkarten und andere Hardware für Asterisk PBXs und schuf kommerzielle Produkte wie Switchvox (das auf den KMU-Markt ausgerichtet ist). Im Jahr 2018 wurde Digium von **Sangoma Technologies** übernommen, einem kanadischen Unternehmen für Unified Communications. Seit der Übernahme sponsert Sangoma weiterhin die Asterisk-Entwicklung und fungiert als dessen Hauptverwalter, wobei das Open-Source-Projekt unter www.asterisk.org gepflegt wird.
 
-Historisch bot Digium Asterisk unter drei Arten von Lizenzvereinbarungen an:
+Historisch gesehen bot Digium Asterisk unter drei Arten von Lizenzvereinbarungen an:
 
-- General Public License (GPL) Asterisk. Dies ist die am häufigsten genutzte Version. Sie enthält alle Funktionen und darf gemäß den Bedingungen der GPL‑Lizenz frei verwendet und modifiziert werden.
-- Asterisk Business Edition war eine kommerzielle Version von Asterisk. Einige Unternehmen nutzten die Business Edition, weil sie die GPL‑Lizenz nicht verwenden wollten oder konnten – meist weil sie ihren Quellcode nicht zusammen mit Asterisk veröffentlichen wollten. **Hinweis:** Asterisk Business Edition wurde eingestellt; heute wird Asterisk ausschließlich unter der GPL vertrieben.
-- Asterisk OEM‑Lizenzierung. Nachdem Digium den Einzelhandelsverkauf der Asterisk Business Edition eingestellt hatte, lizenzierte es diese kommerzielle Edition weiterhin an OEM‑Kunden – Gerätehersteller, die proprietäre Produkte auf Basis von Asterisk bauen wollten, ohne ihren eigenen Quellcode unter der GPL zu veröffentlichen.
+- General Public License (GPL) Asterisk. Dies ist die am häufigsten verwendete Version. Sie enthält alle Funktionen und kann gemäß den Bedingungen der GPL-Lizenz kostenlos genutzt und modifiziert werden.
+- Asterisk Business Edition war eine kommerzielle Version von Asterisk. Einige Unternehmen nutzten die Business Edition, weil sie die GPL-Lizenz nicht wollten oder nicht nutzen konnten – meist, weil sie ihren Quellcode nicht zusammen mit Asterisk veröffentlichen wollten. **Hinweis:** Die Asterisk Business Edition wurde eingestellt; heute wird Asterisk ausschließlich unter der GPL vertrieben.
+- Asterisk OEM-Lizenzierung. Nachdem Digium den Einzelhandelsverkauf der Asterisk Business Edition eingestellt hatte, lizenzierte es diese kommerzielle Edition weiterhin an OEM-Kunden – Gerätehersteller, die proprietäre Produkte auf Basis von Asterisk entwickeln wollten, ohne ihren eigenen Quellcode unter der GPL veröffentlichen zu müssen.
 
-### Das Zapata‑Projekt und seine Beziehung zu Asterisk
+### Das Zapata-Projekt und seine Beziehung zu Asterisk
 
-Das Zapata‑Projekt wurde von Jim Dixon entwickelt, der ebenfalls für das revolutionäre Hardware‑Design verantwortlich war, das mit Asterisk verwendet wird. Die Hardware ist ebenfalls Open‑Source; sie kann daher von jedem Unternehmen genutzt werden, und heute produzieren mehrere Hersteller Karten, die mit dieser Architektur kompatibel sind.
+Das Zapata-Projekt wurde von Jim Dixon entwickelt, der auch für das revolutionäre Hardware-Design verantwortlich war, das mit Asterisk verwendet wird. Die Hardware ist ebenfalls Open-Source; daher kann sie von jedem Unternehmen verwendet werden, und heute produzieren mehrere Hersteller Karten, die mit dieser Architektur kompatibel sind.
 
-Das Zapata‑Projekt erzeugte eine Architektur namens Zaptel, später umbenannt in DAHDI (Digium/Asterisk Hardware Device Interface). Einer der Hauptvorteile dieser Architektur ist die Möglichkeit, die PC‑CPU zur Verarbeitung von Medien‑Streaming, Echo‑Unterdrückung und Transkodierung zu nutzen. Im Gegensatz dazu verwenden die meisten bestehenden Karten digitale Signalprozessoren (DSP), um diese Aufgaben zu erledigen. Der Einsatz der PC‑CPU anstelle dedizierter DSPs senkt den Preis der Karte dramatisch. Daher sind diese Karten deutlich günstiger als zuvor verfügbare Schnittstellen anderer Hersteller. Auf der anderen Seite benötigen diese Karten viel CPU; ein Missbrauch der PC‑CPU kann die Sprachqualität erheblich beeinträchtigen. Kürzlich hat Digium eine Coprozessor‑Karte eingeführt, die DSPs zum Kodieren und Dekodieren von G.729 und G.723 verwendet und so eine bessere Skalierbarkeit für eine große Anzahl von Kanälen ermöglicht.
+Das Zapata-Projekt brachte eine Architektur namens Zaptel hervor, die später in DAHDI (Digium/Asterisk Hardware Device Interface) umbenannt wurde. Einer der Hauptvorteile dieser Architektur ist die Möglichkeit, die PC-CPU zur Verarbeitung von Media-Streaming, Echokompensation und Transcoding zu nutzen. Im Gegensatz dazu verwenden die meisten existierenden Karten digitale Signalprozessoren (DSP), um diese Aufgaben auszuführen. Die Nutzung der PC-CPU anstelle dedizierter DSPs senkt den Preis der Karte drastisch. Somit sind diese Karten deutlich günstiger als zuvor erhältliche Schnittstellen anderer Hersteller. Andererseits benötigen diese Karten viel CPU-Leistung; eine Fehlbelastung der PC-CPU kann die Sprachqualität erheblich beeinträchtigen. Kürzlich hat Digium eine Koprozessorkarte auf den Markt gebracht, die DSPs zum Kodieren und Dekodieren von G.729 und G.723 verwendet, was eine bessere Skalierbarkeit für eine große Anzahl von Kanälen ermöglicht.
 
-## Why Asterisk?
+## Warum Asterisk?
 
-I remember my first contact with Asterisk. Usually, the first reaction to something new—especially something that competes with what you already know—is to reject it! This is exactly what happened in 2003. Asterisk was competing with a solution that I was selling to a customer (4 E1 VoIP Gateway), and it was ten times less expensive than what I was charging for the solution I already knew. This disproportionate price led me to start studying Asterisk in order to identify potential pitfalls and drawbacks. For example, I found that the PC CPU at that time would not support 120 g.729 simultaneous sections, at the end of the day, I won the proposal with my Gateway solution.
+Ich erinnere mich an meinen ersten Kontakt mit Asterisk. Normalerweise ist die erste Reaktion auf etwas Neues – besonders auf etwas, das mit dem konkurriert, was man bereits kennt – Ablehnung! Genau das passierte im Jahr 2003. Asterisk konkurrierte mit einer Lösung, die ich gerade einem Kunden verkaufte (4 E1 VoIP Gateway), und es war zehnmal günstiger als das, was ich für die Lösung berechnete, die ich bereits kannte. Dieser unverhältnismäßige Preis veranlasste mich dazu, Asterisk zu studieren, um potenzielle Fallstricke und Nachteile zu identifizieren. Ich stellte zum Beispiel fest, dass die PC-CPU zu dieser Zeit keine 120 gleichzeitigen g.729-Sitzungen unterstützen würde; am Ende des Tages gewann ich das Angebot mit meiner Gateway-Lösung.
 
-However, this exercise led me to the discovery that Asterisk could solve a variety of very expensive problems for my customer base. We were in trouble with expensive quotes for IVR, unified messaging, call recording, and dialers; with appropriate dimensioning, the CPU problems could be worked around. Indeed, in just three years Asterisk became the flagship product of my company (I actually decided to open another company just for the Asterisk business). In my opinion, Asterisk is a revolution in telecommunication that represents to IP telephony what Apache represents to web services.
+Diese Übung führte mich jedoch zu der Entdeckung, dass Asterisk eine Vielzahl sehr teurer Probleme für meinen Kundenstamm lösen konnte. Wir hatten Probleme mit teuren Angeboten für IVR, Unified Messaging, Anrufaufzeichnung und Dialer; bei entsprechender Dimensionierung konnten die CPU-Probleme umgangen werden. Tatsächlich wurde Asterisk in nur drei Jahren zum Flaggschiff-Produkt meines Unternehmens (ich entschied mich sogar, ein weiteres Unternehmen nur für das Asterisk-Geschäft zu gründen). Meiner Meinung nach ist Asterisk eine Revolution in der Telekommunikation, die für die IP-Telefonie das darstellt, was Apache für Webdienste bedeutet.
 
-### Extreme cost reduction
+### Extreme Kostensenkung
 
-If you compare a traditional PBX with Asterisk in regard to digital interfaces and phones, Asterisk is slightly cheaper than those PBXs. However, Asterisk really pays off when you add advanced features such as voicemail, ACD, IVR and CTI. With these advanced features, Asterisk becomes significantly less expensive than traditional PBXs. In fact, comparing Asterisk PBXs with low-end analog PBXs is unfair because Asterisk offers so many features not available in low-end analog systems.
+Wenn man eine traditionelle PBX mit Asterisk in Bezug auf digitale Schnittstellen und Telefone vergleicht, ist Asterisk etwas günstiger als diese PBXs. Asterisk zahlt sich jedoch erst richtig aus, wenn man erweiterte Funktionen wie voicemail, ACD, IVR und CTI hinzufügt. Mit diesen erweiterten Funktionen wird Asterisk deutlich günstiger als traditionelle PBXs. Tatsächlich ist der Vergleich von Asterisk PBXs mit analogen Low-End-PBXs unfair, da Asterisk so viele Funktionen bietet, die in analogen Low-End-Systemen nicht verfügbar sind.
 
-### Telephony system control and independence
+### Kontrolle und Unabhängigkeit des Telefonsystems
 
-One of customers’ most often-quoted benefits of asterisk is the independence that it provides. Some of today’s manufacturers do not even give the customer the system’s password or the configuration documentation. With Asterisk's “do-it-yourself” approach, the user achieves total freedom; as a bonus, the user has access to a standard interface.
+Einer der am häufigsten genannten Vorteile von Asterisk durch Kunden ist die Unabhängigkeit, die es bietet. Einige der heutigen Hersteller geben dem Kunden nicht einmal das Systempasswort oder die Konfigurationsdokumentation. Mit dem „Do-it-yourself“-Ansatz von Asterisk erreicht der Benutzer völlige Freiheit; als Bonus hat der Benutzer Zugriff auf eine Standardschnittstelle.
 
-### Easy and rapid development environment
+### Einfache und schnelle Entwicklungsumgebung
 
-Asterisk can be extended using script languages like PHP and Perl with AMI and AGI interfaces. Asterisk is open-source, and its source code can be modified by the user. The source code is written mostly in ANSI C programming language.
+Asterisk kann mithilfe von Skriptsprachen wie PHP und Perl mit AMI und AGI Schnittstellen erweitert werden. Asterisk ist Open-Source und der Quellcode kann vom Benutzer modifiziert werden. Der Quellcode ist größtenteils in der Programmiersprache ANSI C geschrieben.
 
-### Feature rich
+### Funktionsreich
 
-Asterisk has several features that are either not found or optional in traditional PBXs (e.g., voicemail, CTI, ACD, IVR, built-in music on hold, and recording). The costs of these features in some platforms exceed the price of the platform itself.
+Asterisk verfügt über mehrere Funktionen, die in traditionellen PBXs entweder nicht vorhanden oder optional sind (z. B. voicemail, CTI, ACD, IVR, integrierte Warteschleifenmusik und Aufzeichnung). Die Kosten für diese Funktionen übersteigen bei einigen Plattformen den Preis der Plattform selbst.
 
-### Dynamic content on the phone
+### Dynamische Inhalte auf dem Telefon
 
-Asterisk is programmed using C language and other languages common in today's development environment. The possibility to provide dynamic content is practically limitless.
+Asterisk wird in der Sprache C und anderen Sprachen programmiert, die in der heutigen Entwicklungsumgebung üblich sind. Die Möglichkeit, dynamische Inhalte bereitzustellen, ist praktisch unbegrenzt.
 
-### Flexible and powerful dial plan
+### Flexibler und leistungsstarker dialplan
 
-Another Asterisk breakthrough is its powerful dial plan. In traditional PBXs, even simple features like least cost routing (LCR) are either not feasible or optional. With Asterisk, choosing the best route is easy and clean.
+Ein weiterer Durchbruch von Asterisk ist sein leistungsstarker dialplan. In traditionellen PBXs sind selbst einfache Funktionen wie Least Cost Routing (LCR) entweder nicht machbar oder optional. Mit Asterisk ist die Wahl der besten Route einfach und sauber.
 
-### Open-source running on top of Linux
+### Open-Source auf Linux
 
-One of the greatest features of Asterisk is its community. Several resources are available, including the official Asterisk documentation (docs.asterisk.org), the community-maintained VoIP-Info wiki (www.voip-info.org <http://www.voip-info.org>), e-mail distribution lists, and forums. As Asterisk becomes increasingly adopted, bugs are found and fixed quickly. With a large user base and an active development team, Asterisk is among the most widely tested PBX platforms in the world, which helps keep the code base stable and mature.
+Eines der größten Merkmale von Asterisk ist seine Community. Es stehen verschiedene Ressourcen zur Verfügung, darunter die offizielle Asterisk-Dokumentation (docs.asterisk.org), das von der Community gepflegte VoIP-Info Wiki (www.voip-info.org <http://www.voip-info.org>), E-Mail-Verteilerlisten und Foren. Da Asterisk immer häufiger eingesetzt wird, werden Fehler schnell gefunden und behoben. Mit einer großen Benutzerbasis und einem aktiven Entwicklungsteam gehört Asterisk zu den am weitesten getesteten PBX-Plattformen der Welt, was dazu beiträgt, die Codebasis stabil und ausgereift zu halten.
 
-### Asterisk architecture limitations
+### Einschränkungen der Asterisk-Architektur
 
-Some limitations in Asterisk stem from the use of the Zapata telephony design. In this design, Asterisk uses the PC CPU to process voice channels instead of dedicated digital signal processors (DSPs), which are common in other platforms. Although this allows for a huge cost reduction in hardware interface, the system becomes dependent on the PC CPU. My recommendation is to run Asterisk in a dedicated machine and be conservative about hardware dimensioning. You can also use Asterisk in a separate VLAN to avoid excessive broadcasts that consume the CPU (broadcast storms caused by loops or viruses). Some newer interface cards from several vendors are now including DSPs to process echo cancellation, codecs, and other features, which will make Asterisk even better.
+Einige Einschränkungen in Asterisk beruhen auf der Verwendung des Zapata-Telefoniedesigns. Bei diesem Design verwendet Asterisk die PC-CPU zur Verarbeitung von Sprachkanälen anstelle von dedizierten digitalen Signalprozessoren (DSPs), die in anderen Plattformen üblich sind. Obwohl dies eine enorme Kostensenkung bei der Hardwareschnittstelle ermöglicht, wird das System von der PC-CPU abhängig. Meine Empfehlung ist, Asterisk auf einer dedizierten Maschine zu betreiben und bei der Hardwaredimensionierung konservativ zu sein. Sie können Asterisk auch in einem separaten VLAN verwenden, um übermäßige Broadcasts zu vermeiden, die die CPU belasten (Broadcast-Stürme, die durch Schleifen oder Viren verursacht werden). Einige neuere Schnittstellenkarten verschiedener Hersteller enthalten mittlerweile DSPs zur Verarbeitung von Echounterdrückung, codecs und anderen Funktionen, was Asterisk noch besser machen wird.
 
-## Main objections to Asterisk PBX
+## Hauptsächliche Einwände gegen Asterisk PBX
 
-Es ist üblich, Einwände gegen die Einführung von Asterisk zu hören, die wir hier behandeln werden.
+Es ist üblich, Einwände gegen die Einführung von Asterisk zu hören, auf die wir hier eingehen werden.
 
-### Asterisk’s market share is too small
+### Der Marktanteil von Asterisk ist zu gering
 
-Der Marktanteil wird üblicherweise anhand der verkauften PBXs gemessen. Diese Statistiken werden im Allgemeinen von den größten Vertriebspartnern bezogen. Asterisk ist freie Software, die heruntergeladen und eingesetzt werden kann, ohne dass ein Verkauf erfasst wird, sodass es in diesen Zahlen systematisch unterrepräsentiert ist. Trotzdem treibt Asterisk eine sehr große installierte Basis weltweit an – von Ein-Server‑Büro‑PBXs bis hin zu großen Carrier‑ und Contact‑Center‑Installationen – und bleibt die dominante Engine hinter dem Open‑Source‑PBX‑Ökosystem (einschließlich schlüsselfertiger Distributionen wie FreePBX).
+Der Marktanteil wird üblicherweise an der Anzahl der verkauften PBX-Systeme gemessen. Diese Statistiken werden im Allgemeinen von den größten Distributoren erhoben. Asterisk ist freie Software, die heruntergeladen und bereitgestellt werden kann, ohne dass ein Verkauf registriert wird, weshalb es in diesen Zahlen systematisch untererfasst wird. Dennoch treibt Asterisk weltweit eine sehr große installierte Basis an — von Büro-PBX-Systemen auf einem einzelnen Server bis hin zu großen Carrier- und Contact-Center-Bereitstellungen — und bleibt die dominierende Engine hinter dem Open-Source-PBX-Ökosystem (einschließlich schlüsselfertiger Distributionen wie FreePBX).
 
-### If it is free, how does the manufacturer survive?
+### Wenn es kostenlos ist, wie überlebt der Hersteller?
 
-Tatsächlich gibt es im traditionellen Sinne keinen Open‑Source‑Software‑Hersteller. Digium entwickelte Asterisk seit 1999 und finanzierte sich durch den Verkauf von Telefonie‑Interface‑Karten, kommerziellen PBX‑Produkten wie Switchvox und zugehöriger Software. 2018 wurde Digium von Sangoma Technologies übernommen. Sangoma finanziert weiterhin die Asterisk‑Entwicklung und erzielt Einnahmen durch kommerzielle Produkte (FreePBX‑Kommerzmodule, PBXact, Switchvox), Hardware‑Verkäufe und professionelle Dienstleistungen.
+Tatsächlich gibt es keinen Open-Source-Softwarehersteller im traditionellen Sinne. Digium entwickelte Asterisk seit 1999 und finanzierte sich durch den Verkauf von Telefonie-Schnittstellenkarten, kommerziellen PBX-Produkten wie Switchvox und zugehöriger Software. Im Jahr 2018 erwarb Sangoma Technologies Digium. Sangoma finanziert weiterhin die Asterisk-Entwicklung und generiert Einnahmen durch kommerzielle Produkte (kommerzielle FreePBX-Module, PBXact, Switchvox), Hardwareverkäufe und professionelle Dienstleistungen.
 
-### It is hard to find technical support!
+### Es ist schwer, technischen Support zu finden!
 
-Sangoma bietet kommerziellen technischen Support für Asterisk über sein Partner‑Ökosystem und direkt über seine Produktangebote. Ein globales Netzwerk zertifizierter Fachleute leistet First‑Line‑Support und professionelle Services. Der Community‑Support bleibt aktiv über die Asterisk‑Foren und Mailing‑Listen unter www.asterisk.org.
+Sangoma bietet kommerziellen technischen Support für Asterisk über sein Partner-Ökosystem und direkt über seine Produktangebote an. Ein globales Netzwerk zertifizierter Fachleute bietet First-Line-Support und professionelle Dienstleistungen. Der Community-Support bleibt über die Asterisk-Foren und Mailinglisten unter www.asterisk.org aktiv.
 
-### Does Asterisk support more than 200 extensions?
+### Unterstützt Asterisk mehr als 200 extensions?
 
-Ja, absolut. Ein einzelner gut dimensionierter Asterisk‑Server kann eine große Anzahl von Extensions verarbeiten, und Asterisk skaliert weiter, indem Benutzer über mehrere Server mit Load‑Balancing und Failover verteilt werden, was große Multi‑Site‑Deployments ermöglicht.
+Ja, absolut. Ein einzelner, gut dimensionierter Asterisk-Server kann eine große Anzahl von extensions verarbeiten, und Asterisk skaliert weiter, indem Benutzer über mehrere Server mit Load Balancing und Failover verteilt werden, was große standortübergreifende Bereitstellungen ermöglicht.
 
-### Only “geeks” are able to install Asterisk
+### Nur „Geeks“ sind in der Lage, Asterisk zu installieren
 
-Mit FreePBX (verfügbar als eigenständige Distribution von Sangoma) können selbst Fachleute mit begrenztem Linux‑Wissen eine PBX mittlerer Komplexität installieren und konfigurieren. Mit Hilfe einer GUI ist es möglich, eine komplette PBX in nur wenigen Stunden zu konfigurieren.
+Mit FreePBX (als eigenständige Distribution von Sangoma erhältlich) sind selbst Fachleute mit begrenzten Linux-Kenntnissen in der Lage, eine PBX mittlerer Komplexität zu installieren und zu konfigurieren. Mit Hilfe einer GUI ist es möglich, eine komplette PBX in nur wenigen Stunden zu konfigurieren.
 
-### What if the server fails?
+### Was passiert, wenn der Server ausfällt?
 
-Einer der Hauptvorteile von Asterisk ist seine Fähigkeit, in fehlertoleranten Systemen zu laufen. Es ist relativ einfach und kostengünstig, zwei Server parallel zu betreiben. Ich fordere Sie heraus, dies mit einer konventionellen PBX zu versuchen!
+Einer der Hauptvorteile von Asterisk ist seine Fähigkeit, in fehlertoleranten Systemen zu laufen. Es ist relativ einfach und kostengünstig, zwei Server parallel zu betreiben. Ich fordere Sie heraus, dies mit einer herkömmlichen PBX zu versuchen!
 
-### Our company does not use open-source software
+### Unser Unternehmen verwendet keine Open-Source-Software
 
-Ihr Unternehmen nutzt wahrscheinlich Open‑Source‑Software, ohne es zu merken. Mehrere Appliances verwenden Linux als Betriebssystem. Darüber hinaus stehen kommerzieller Support und verwaltete Deployments von Sangoma und seinem zertifizierten Partnernetzwerk zur Verfügung.
+Ihr Unternehmen verwendet wahrscheinlich Open-Source-Software, ohne es überhaupt zu merken. Mehrere Appliances verwenden Linux als Betriebssystem. Darüber hinaus sind kommerzieller Support und verwaltete Bereitstellungen von Sangoma und seinem zertifizierten Partnernetzwerk verfügbar.
 
-### Using the PC's CPU to process signaling and media is not recommended
+### Die Verwendung der PC-CPU zur Verarbeitung von Signalisierung und Medien wird nicht empfohlen
 
-Asterisk nutzt die CPU des Servers, um Signalisierung und Medien für Sprachkanäle zu verarbeiten, anstatt dedizierte DSPs zu verwenden. Obwohl dies eine Kostenreduktion von bis zu dem Fünffachen ermöglicht, macht es das System abhängig von der Leistung der Haupt‑CPU. Mit der richtigen Dimensionierung ist Asterisk in der Lage, große Volumina zu bewältigen. Wenn Sie die Haupt‑CPU dennoch von diesen Aufgaben entlasten möchten, können Sie auch Hardware‑Echo‑Cancellation und sogar Transcoder‑Karten einsetzen, wie die Sangoma (früher Digium) TC400B, die auf DSPs basiert.
+Asterisk verwendet die CPU des Servers, um Signalisierung und Medien für Sprachkanäle zu verarbeiten, anstatt dedizierte DSPs zu haben. Obwohl dies eine Kostenreduzierung um das bis zu Fünffache ermöglicht, macht es das System von der Leistung der Haupt-CPU abhängig. Bei korrekter Dimensionierung ist Asterisk in der Lage, große Volumina zu bewältigen. Wenn Sie die Haupt-CPU dennoch von diesen Aufgaben entlasten möchten, können Sie auch Hardware-Echokompensation und sogar Transcoder-Karten verwenden, wie die Sangoma (ehemals Digium) TC400B, die auf DSPs basiert.
 
-## Asterisk Architecture
+## Asterisk Architektur
 
-This section will explain how Asterisk’s architecture works. The figure below shows the basic Asterisk architecture. Next, we will explain architecture-related concepts, including channels, codecs, and applications.
+Dieser Abschnitt erläutert die Funktionsweise der Architektur von Asterisk. Die folgende Abbildung zeigt die grundlegende Asterisk Architektur. Im Anschluss werden wir architekturbezogene Konzepte erläutern, einschließlich Channels, Codecs und Anwendungen.
 
-![The Asterisk architecture](../images/01-introduction-fig01.png)
+![Die Asterisk Architektur](../images/01-introduction-fig01.png)
 
 ### Channels
 
-A channel is the equivalent of a telephone line, but in a digital format. It usually consists of an analog or digital (TDM) signaling system or a combination of codec and signaling protocol (e.g., SIP-GSM, IAX-uLaw). Initially, all telephony connections were analog and susceptible to echo and noise. Later, most systems were converted to digital systems, with the analogical sound converted into a digital format using pulse code modulation (PCM) in most cases. This format allows voice transmission in 64 kilobits/second without compression.
+Ein Channel ist das Äquivalent zu einer Telefonleitung, jedoch in einem digitalen Format. Er besteht normalerweise aus einem analogen oder digitalen (TDM) Signalisierungssystem oder einer Kombination aus Codec und Signalisierungsprotokoll (z. B. SIP-GSM, IAX-uLaw). Ursprünglich waren alle Telefonieverbindungen analog und anfällig für Echo und Rauschen. Später wurden die meisten Systeme auf digitale Systeme umgestellt, wobei der analoge Ton in den meisten Fällen mittels Pulscodemodulation (PCM) in ein digitales Format umgewandelt wurde. Dieses Format ermöglicht die Sprachübertragung mit 64 Kilobit pro Sekunde ohne Komprimierung.
 
-Channels interfacing with the Public Switched Telephone Network (PSTN):
+Channels zur Anbindung an das Public Switched Telephone Network (PSTN):
 
-- `chan_dahdi`: analog (FXO/FXS) and digital (E1/T1/PRI) TDM cards from Sangoma (formerly Digium), Xorcom, and others. Built separately against DAHDI — see the *Legacy channels* chapter.
+- `chan_dahdi`: analoge (FXO/FXS) und digitale (E1/T1/PRI) TDM-Karten von Sangoma (ehemals Digium), Xorcom und anderen. Separat gegen DAHDI gebaut — siehe das Kapitel *Legacy channels*.
 
-Channels interfacing with Voice over IP:
+Channels zur Anbindung an Voice over IP:
 
-- `chan_pjsip`: SIP — the primary and only SIP channel driver in Asterisk 22 LTS. Dial string: `PJSIP/endpoint_name`. (**Note:** the old `chan_sip` was removed in Asterisk 21 and does not exist in Asterisk 22. See *Building your first PBX with PJSIP* for configuration.)
-- `chan_iax2`: the IAX2 protocol — still ships in Asterisk 22 but is legacy; SIP/PJSIP is preferred for new deployments. Dial string: `IAX2/peer`.
-- `chan_unistim`: Nortel/Avaya UNISTIM phones. Still available (extended support) but rarely used.
+- `chan_pjsip`: SIP — der primäre und einzige SIP-Channel-Treiber in Asterisk 22 LTS. Dial-String: `PJSIP/endpoint_name`. (**Hinweis:** der alte `chan_sip` wurde in Asterisk 21 entfernt und existiert in Asterisk 22 nicht mehr. Siehe *Building your first PBX with PJSIP* für die Konfiguration.)
+- `chan_iax2`: das IAX2-Protokoll — wird in Asterisk 22 noch mitgeliefert, ist aber veraltet (Legacy); SIP/PJSIP wird für neue Implementierungen bevorzugt. Dial-String: `IAX2/peer`.
+- `chan_unistim`: Nortel/Avaya UNISTIM-Telefone. Immer noch verfügbar (erweiterter Support), aber selten genutzt.
 
-The older VoIP channels are no longer part of a standard Asterisk 22 build: `chan_h323` (H.323) survives only as the community `ooh323` add-on, and `chan_mgcp` (MGCP) and `chan_skinny` (Cisco SCCP) were deprecated and dropped from the modern channel set. If you must interwork with those protocols, a gateway in front of Asterisk is the usual approach.
+Die älteren VoIP-Channels sind nicht mehr Teil eines Standard-Asterisk 22-Builds: `chan_h323` (H.323) überlebt nur als Community-Add-on `ooh323`, und `chan_mgcp` (MGCP) sowie `chan_skinny` (Cisco SCCP) wurden als veraltet markiert und aus dem modernen Channel-Set entfernt. Wenn Sie mit diesen Protokollen zusammenarbeiten müssen, ist ein Gateway vor Asterisk der übliche Ansatz.
 
-Miscellaneous channels:
+Sonstige Channels:
 
-- **Local**: a pseudo-channel (built into the core) that loops back into the dial plan in a different context — useful for recursive routing and for fanning a call out to multiple destinations. Dial string: `Local/extension@context`.
+- **Local**: ein Pseudo-Channel (im Kern integriert), der in den dialplan in einem anderen context zurückführt — nützlich für rekursives Routing und um einen Anruf an mehrere Ziele zu verteilen. Dial-String: `Local/extension@context`.
 
-### Codec and codec translation
+### Codec und Codec-Übersetzung
 
-We usually try to put as many voice connections as possible in a data network. Codecs enable new features in digital voice, including compression, which is one of the most important features as it allows compression rates larger than 8 to 1. Many codecs also define features such as voice activity detection (silence suppression), packet loss concealment, and comfort noise generation, though Asterisk itself does not generate comfort noise or perform silence suppression. Several codecs are available for Asterisk and can be transparently translated from one to another. Internally, Asterisk uses slinear as the stream format when it needs to convert from one codec to another. Some codecs in Asterisk are supported only in pass-through mode; these codecs cannot be translated. To verify which codecs are installed in your system, you can use the console command:
+Wir versuchen normalerweise, so viele Sprachverbindungen wie möglich in einem Datennetzwerk unterzubringen. Codecs ermöglichen neue Funktionen in der digitalen Sprachübertragung, einschließlich der Komprimierung, die eines der wichtigsten Merkmale ist, da sie Komprimierungsraten von mehr als 8 zu 1 ermöglicht. Viele Codecs definieren auch Funktionen wie Voice Activity Detection (Stilleunterdrückung), Packet Loss Concealment und Comfort Noise Generation, obwohl Asterisk selbst kein Comfort Noise erzeugt oder eine Stilleunterdrückung durchführt. Für Asterisk sind verschiedene Codecs verfügbar, die transparent ineinander übersetzt werden können. Intern verwendet Asterisk slinear als Stream-Format, wenn es von einem Codec in einen anderen konvertieren muss. Einige Codecs in Asterisk werden nur im Pass-Through-Modus unterstützt; diese Codecs können nicht übersetzt werden. Um zu überprüfen, welche Codecs auf Ihrem System installiert sind, können Sie den Konsolenbefehl verwenden:
 
 ```
 CLI>core show translation
 ```
 
-The following codecs are supported:
+Die folgenden Codecs werden unterstützt:
 
 - G.711 ulaw (USA) - (64 Kbps).
-- G.711 alaw (Europe) - (64 Kbps).
+- G.711 alaw (Europa) - (64 Kbps).
 - G.722 (High Definition) – (64 Kbps)
-- G.723.1 - Only pass-through mode
+- G.723.1 - Nur Pass-Through-Modus
 - G.726 - (16/24/32/40kbps)
-- G.729 - Binary codec module distributed by Sangoma; the download is free of charge, but lawful use requires purchasing a per-channel license (8Kbps)
+- G.729 - Binäres Codec-Modul, vertrieben von Sangoma; der Download ist kostenlos, aber die rechtmäßige Nutzung erfordert den Erwerb einer Lizenz pro Channel (8Kbps)
 - GSM - (12-13 Kbps)
 - iLBC - (15 Kbps)
 - LPC10 - (2.4 Kbps)
 - Speex - (2.15-44.2 Kbps)
 - Opus - (6-510 Kbps)
 
-### Protocols
+### Protokolle
 
-Sending data from one phone to another should be easy provided that the data find a path to the other phone on their own. Unfortunately, it doesn't happen this way, and a signaling protocol is necessary in order to establish connections between phones, discover end devices, and implement telephony signaling. SIP is the dominant signaling protocol in modern deployments and is the only SIP channel available in Asterisk 22 LTS (via chan_pjsip). IAX2 is still available but considered legacy. Asterisk supports the following protocols.
+Das Senden von Daten von einem Telefon zum anderen sollte einfach sein, vorausgesetzt, die Daten finden ihren Weg zum anderen Telefon von selbst. Leider ist dies nicht der Fall, und ein Signalisierungsprotokoll ist erforderlich, um Verbindungen zwischen Telefonen herzustellen, Endgeräte zu entdecken und Telefoniesignalisierung zu implementieren. SIP ist das dominierende Signalisierungsprotokoll in modernen Implementierungen und der einzige SIP-Channel, der in Asterisk 22 LTS verfügbar ist (via chan_pjsip). IAX2 ist weiterhin verfügbar, gilt aber als veraltet (Legacy). Asterisk unterstützt die folgenden Protokolle.
 
 - SIP — via `chan_pjsip`
-- IAX2 — legacy, still ships in Asterisk 22
-- UNISTIM — Nortel/Avaya phones (extended support)
-- H.323, MGCP, and SCCP (Cisco Skinny) — legacy protocols no longer in a standard Asterisk 22 build (H.323 only via the community `ooh323` add-on)
+- IAX2 — veraltet (Legacy), wird in Asterisk 22 noch mitgeliefert
+- UNISTIM — Nortel/Avaya-Telefone (erweiterter Support)
+- H.323, MGCP und SCCP (Cisco Skinny) — veraltete Protokolle, die nicht mehr in einem Standard-Asterisk 22-Build enthalten sind (H.323 nur über das Community-Add-on `ooh323`)
 
-### Applications
+### Anwendungen
 
-To bridge calls from one phone to another, the application dial() is used. Most Asterisk features (e.g., voicemail and conferencing) are implemented as applications. You can see available Asterisk applications by using the core show applications console command.
+Um Anrufe von einem Telefon zum anderen zu überbrücken, wird die Anwendung dial() verwendet. Die meisten Asterisk-Funktionen (z. B. voicemail und Konferenzen) sind als Anwendungen implementiert. Sie können die verfügbaren Asterisk-Anwendungen mit dem Konsolenbefehl core show applications anzeigen.
 
 ```
 CLI>core show applications
 ```
 
-Sie können Anwendungen aus Asterisk‑Add‑Ons, von Drittanbietern oder sogar solche, die Sie selbst entwickeln, hinzufügen.
+Sie können Anwendungen aus Asterisk-Add-ons, von Drittanbietern oder sogar solche, die Sie selbst entwickeln, hinzufügen.
 
-## Überblick über ein Asterisk‑System
+## Überblick über ein Asterisk-System
 
-Asterisk ist eine Open‑Source‑PBX, die wie eine hybride PBX funktioniert und Technologien wie TDM‑ und IP‑Telefonie integriert. Asterisk ist bereit, Funktionen wie Interactive Voice Response (IVR) und Automatic Call Distribution (ACD) zu implementieren; zudem, wie bereits erwähnt, ist es offen für die Entwicklung neuer Anwendungen. Diese Abbildung zeigt, wie Asterisk über analoge und digitale Schnittstellen mit dem PSTN und bestehenden PBXs verbunden ist und gleichzeitig analoge sowie IP‑Telefone unterstützt. Es kann als Soft‑Switch, Media‑Gateway, Voicemail und Audio‑Konferenz fungieren und verfügt zudem über integrierte Music‑on‑Hold.
+Asterisk ist eine Open-Source-PBX, die wie eine hybride PBX fungiert und Technologien wie TDM und IP-Telefonie integriert. Asterisk ist bereit für die Implementierung von Funktionen wie interactive voice response (IVR) und automatic call distribution (ACD); darüber hinaus ist es, wie bereits erwähnt, offen für die Entwicklung neuer Anwendungen. Diese Abbildung zeigt, wie Asterisk über analoge und digitale Schnittstellen eine Verbindung zum PSTN und zu bestehenden PBXs herstellt sowie analoge und IP-Telefone unterstützt. Es kann als SoftSwitch, Media Gateway, voicemail, Audio-Konferenzsystem fungieren und verfügt zudem über eine integrierte Wartemusik (music on hold).
 
-![Überblick über ein Asterisk‑System](../images/01-introduction-fig02.png)
+![Überblick über ein Asterisk-System](../images/01-introduction-fig02.png)
 
 ## Vergleich der alten und der neuen Welt
 
-Im alten Soft‑Switch‑Modell wurden alle Komponenten einzeln verkauft, das bedeutet, dass Sie jede Komponente separat erwerben und dann in die PBX‑ oder Soft‑Switch‑Umgebung integrieren mussten. Die Kosten und Risiken waren hoch und die meisten Geräte waren proprietär.
+Im alten SoftSwitch-Modell wurden alle Komponenten separat verkauft, was bedeutete, dass man jede Komponente einzeln erwerben und dann in die PBX- oder SoftSwitch-Umgebung integrieren musste. Die Kosten und Risiken waren hoch und die meisten Geräte waren proprietär.
 
-![Die alte Welt: Komponenten separat gekauft und integriert](../images/01-introduction-fig03.png)
+![Die alte Welt: Komponenten wurden separat gekauft und integriert](../images/01-introduction-fig03.png)
 
 ### Telefonie mit Asterisk
 
-Alle Funktionen sind in der Asterisk‑Plattform integriert, entweder in derselben oder in verschiedenen Boxen je nach Dimensionierung, und alle sind GPL‑lizenziert. Manchmal ist es einfacher, Asterisk zu installieren, als einige der gängigen IP‑PBXs zu lizenzieren.
+Alle Funktionen sind in der Asterisk-Plattform integriert, entweder in derselben oder in verschiedenen Boxen, je nach Dimensionierung, und alle sind unter der GPL lizenziert. Manchmal ist es einfacher, Asterisk zu installieren, als einige der gängigen IP-PBXs zu lizenzieren.
 
-![Telefonie mit Asterisk: Die Funktionen sind integriert](../images/01-introduction-fig04.png)
+![Telefonie mit Asterisk: die Funktionen sind integriert](../images/01-introduction-fig04.png)
 
-## Building a test system
+## Aufbau eines Testsystems
 
-When implementing an Asterisk solution, our first step is generally to build a test system. The goal is a minimal **1×1 PBX** — one phone that can call another — so you can try out endpoints, dialplan, and features before touching production. Today this is entirely software: you do not need any telephony hardware.
+Bei der Implementierung einer Asterisk-Lösung besteht unser erster Schritt im Allgemeinen darin, ein Testsystem aufzubauen. Das Ziel ist eine minimale **1×1 PBX** — ein Telefon, das ein anderes anrufen kann —, damit Sie endpoints, dialplan und Funktionen ausprobieren können, bevor Sie das Produktionssystem anfassen. Heutzutage ist dies rein softwarebasiert: Sie benötigen keinerlei Telefonie-Hardware.
 
-![A simple Asterisk test system](../images/01-introduction-fig05.png)
+![Ein einfaches Asterisk-Testsystem](../images/01-introduction-fig05.png)
 
-### The modern way: a software lab (recommended)
+### Der moderne Weg: ein Software-Labor (empfohlen)
 
-The fastest test system is Asterisk 22 running in a container or virtual machine, with **softphones** for the endpoints and, optionally, a **SIP trunk** to reach the public network:
+Das schnellste Testsystem ist Asterisk 22, das in einem Container oder einer virtuellen Maschine läuft, mit **softphones** als endpoints und optional einem **SIP trunk**, um das öffentliche Netz zu erreichen:
 
-- **Asterisk 22** on a small Linux box, VM, or Docker container. This book ships a ready-made Docker lab (see the lab guide) that boots a fully configured Asterisk 22 with a single command — no compilation, no hardware.
-- **Two softphones** registered as PJSIP endpoints, so you can place a real call between them. Throughout this book we use the **SipPulse Softphone** (free download: <https://www.sippulse.com/produtos/softphone>), available for desktop and mobile.
-- **A SIP trunk** (optional) from a VoIP provider, for when you want to reach the PSTN. No card and no analog line — just credentials.
+- **Asterisk 22** auf einem kleinen Linux-Rechner, einer VM oder einem Docker-Container. Dieses Buch enthält ein fertiges Docker-Labor (siehe Laboranleitung), das mit einem einzigen Befehl ein vollständig konfiguriertes Asterisk 22 startet — ohne Kompilierung, ohne Hardware.
+- **Zwei softphones**, die als PJSIP endpoints registriert sind, sodass Sie einen echten Anruf zwischen ihnen tätigen können. In diesem Buch verwenden wir das **SipPulse Softphone** (kostenloser Download: <https://www.sippulse.com/produtos/softphone>), das für Desktop und Mobilgeräte verfügbar ist.
+- **Ein SIP trunk** (optional) von einem VoIP-Anbieter, falls Sie das PSTN erreichen möchten. Keine Karte und keine analoge Leitung — nur Zugangsdaten.
 
-This is how every example in this book is built and verified, and you can reproduce it on any laptop.
+So wird jedes Beispiel in diesem Buch erstellt und verifiziert, und Sie können es auf jedem Laptop reproduzieren.
 
-### The legacy way: analog/digital cards
+### Der klassische Weg: analoge/digitale Karten
 
-Before VoIP, a test PBX needed physical interfaces: an **FXO** port to connect to an existing telephone line and an **FXS** port to connect an analog phone, which together gave you a 1×1 PBX. A single card carrying one FXO and one FXS interface was the classic starter kit. These DAHDI-based cards (from Sangoma, formerly Digium) still exist for sites that must terminate analog or T1/E1 lines, but they are niche today — most deployments are pure VoIP. If you only need to connect analog phones or lines, see the *Legacy Channels* chapter; otherwise you can skip telephony hardware entirely.
+Vor VoIP benötigte eine Test-PBX physische Schnittstellen: einen **FXO**-Port zum Anschluss an eine bestehende Telefonleitung und einen **FXS**-Port zum Anschluss eines analogen Telefons, was zusammen eine 1×1 PBX ergab. Eine einzelne Karte mit einer FXO- und einer FXS-Schnittstelle war das klassische Starter-Kit. Diese DAHDI-basierten Karten (von Sangoma, ehemals Digium) existieren immer noch für Standorte, die analoge oder T1/E1-Leitungen terminieren müssen, sind aber heute eine Nische — die meisten Implementierungen sind reine VoIP-Lösungen. Wenn Sie nur analoge Telefone oder Leitungen anschließen müssen, lesen Sie das Kapitel *Legacy Channels*; ansonsten können Sie auf Telefonie-Hardware vollständig verzichten.
 
-## Asterisk-Szenarien
+## Asterisk Szenarien
 
-Asterisk kann in mehreren verschiedenen Szenarien eingesetzt werden. Wir werden einige davon auflisten und die Vorteile sowie mögliche Einschränkungen jedes einzelnen erläutern.
+Asterisk kann in verschiedenen Szenarien eingesetzt werden. Wir werden einige davon auflisten und die Vorteile sowie mögliche Einschränkungen für jedes einzelne erläutern.
 
 ### IP PBX
 
-Das häufigste Szenario ist die Installation einer neuen oder der Austausch einer bestehenden PBX. Wenn Sie Asterisk mit einigen anderen Alternativen vergleichen, werden Sie feststellen, dass es günstiger und funktionsreicher ist als die meisten derzeit auf dem Markt erhältlichen PBXs. Mehrere Unternehmen stellen ihre Spezifikationen jetzt auf Asterisk um, anstatt andere Marken‑PBXs zu verwenden.
+Das häufigste Szenario ist die Installation einer neuen oder der Ersatz einer bestehenden PBX. Wenn Sie Asterisk mit anderen Alternativen vergleichen, werden Sie feststellen, dass es kostengünstiger und funktionsreicher ist als die meisten derzeit auf dem Markt erhältlichen PBXs. Viele Unternehmen ändern ihre Spezifikationen mittlerweile auf Asterisk anstelle von anderen Marken-PBXs.
 
-![Asterisk als IP-PBX](../images/01-introduction-fig06.png)
+![Asterisk als IP PBX](../images/01-introduction-fig06.png)
 
-### IP-fähige Legacy-PBXs
+### IP-Anbindung für Legacy-PBXs
 
-Das folgende Bild veranschaulicht eine der am häufigsten verwendeten Aufbauten. Große Unternehmen wollen im Allgemeinen kein erhebliches Risiko eingehen, wenn sie in neue Technologien investieren, und gleichzeitig ihre Investitionen in Altgeräte erhalten. Die IP‑Aktivierung von Legacy‑PBX kann sehr teuer sein; daher kann die Anbindung einer Asterisk‑PBX über T1/E1‑Leitungen eine gute Alternative für kostenbewusste Kunden sein. Ein weiterer Vorteil ist die Möglichkeit, sich mit einem VoIP‑Dienstanbieter zu verbinden, der bessere Telefoniekonditionen bietet.
+Das folgende Bild veranschaulicht eines der am häufigsten verwendeten Setups. Große Unternehmen möchten im Allgemeinen kein nennenswertes Risiko eingehen, wenn sie in neue Technologien investieren, und gleichzeitig ihre Investitionen in bestehende Geräte bewahren. Die IP-Anbindung einer Legacy-PBX kann sehr teuer sein; daher kann die Verbindung einer Asterisk PBX über T1/E1-Leitungen eine gute Alternative für kostenbewusste Kunden sein. Ein weiterer Vorteil ist die Möglichkeit, sich mit einem VoIP-Dienstanbieter mit besseren Telefontarifen zu verbinden.
 
-![IP-Aktivierung einer Legacy-PBX](../images/01-introduction-fig07.png)
+![IP-Anbindung einer Legacy-PBX](../images/01-introduction-fig07.png)
 
-### Gebührenumgehung
+### Toll Bypass
 
-Eine sehr nützliche Anwendung für VoIP ist das Verbinden von Niederlassungen über das Internet oder ein WAN. Die Nutzung einer bestehenden Datenverbindung ermöglicht es, die bei Telekommunikationsverbindungen zwischen Hauptsitz und Niederlassungen anfallenden Gebühren zu umgehen.
+Eine sehr nützliche Anwendung für VoIP ist die Verbindung von Niederlassungen über das Internet oder ein WAN. Die Nutzung einer bestehenden Datenverbindung ermöglicht es Ihnen, die Gebühren für Telekommunikationsverbindungen zwischen Hauptsitz und Niederlassungen zu umgehen.
 
-![Gebührenumgehung zwischen Büros über ein WAN](../images/01-introduction-fig08.png)
+![Toll Bypass zwischen Büros über ein WAN](../images/01-introduction-fig08.png)
 
 ### Anwendungsserver (IVR, Konferenz, Voicemail)
 
-Asterisk kann als Anwendungs‑Server für die bestehende PBX verwendet werden oder direkt an die PSTN angeschlossen werden. Asterisk bietet Dienste wie Voicemail, Faxempfang, Anrufaufzeichnung, IVR, das an eine Datenbank angebunden ist, und einen Audio‑Konferenz‑Server. Wenn Sie Voicemail und Fax in einen bestehenden E‑Mail‑Server integrieren, erhalten Sie ein einheitliches Messaging‑System, das in der Regel eine teure Lösung darstellt. Die Nutzung von Asterisk als Anwendungs‑Server ermöglicht eine extreme Kostenreduktion im Vergleich zu anderen Lösungen.
+Asterisk kann als Anwendungsserver für eine bestehende PBX verwendet oder direkt mit dem PSTN verbunden werden. Asterisk bietet Dienste wie voicemail, Faxempfang, Anrufaufzeichnung, mit einer Datenbank verbundenes IVR und einen Audiokonferenzserver. Wenn Sie voicemail und Fax in einen bestehenden E-Mail-Server integrieren, erhalten Sie ein Unified-Messaging-System, was normalerweise eine teure Lösung ist. Die Verwendung von Asterisk als Anwendungsserver bietet eine extreme Kostenreduzierung im Vergleich zu anderen Lösungen.
 
 ![Asterisk als Anwendungsserver](../images/01-introduction-fig09.png)
 
-### Media-Gateway
+### Media Gateway
 
-Most voice-over IP service providers use an SIP proxy to host all registration, location, and authentication of SIP users. They still have to send calls to the PSTN directly or route it through a wholesale call termination provider using an SIP or H.323 voice-over IP connection. Asterisk can act as a back-to-back user agent (B2BUA) or media gateway, replacing very expensive soft switches or media gateways. Compare the price of a four E1/T1 gateway from the main market manufacturers with Asterisk. The Asterisk solution can cost several times less than other solutions and is capable of translating signaling protocols (H.323, SIP, IAX…) and codecs (G.711, G.729…).
+Die meisten VoIP-Dienstanbieter verwenden einen SIP-Proxy, um die gesamte Registrierung, Lokalisierung und Authentifizierung von SIP-Benutzern zu hosten. Sie müssen Anrufe dennoch direkt an das PSTN senden oder sie über einen Wholesale-Anbieter für Anrufbeendigung mittels einer SIP- oder H.323-VoIP-Verbindung routen. Asterisk kann als Back-to-Back User Agent (B2BUA) oder Media Gateway fungieren und sehr teure SoftSwitch-Systeme oder Media Gateways ersetzen. Vergleichen Sie den Preis eines vier E1/T1-Gateways der führenden Markthersteller mit Asterisk. Die Asterisk-Lösung kann um ein Vielfaches günstiger sein als andere Lösungen und ist in der Lage, Signalisierungsprotokolle (H.323, SIP, IAX…) und codecs (G.711, G.729…) zu übersetzen.
 
-![Asterisk als Mediengateway](../images/01-introduction-fig10.png)
+![Asterisk als Media Gateway](../images/01-introduction-fig10.png)
 
 ### Contact Center Plattform
 
-Ein Contact Center ist eine sehr komplexe Lösung, die mehrere Technologien kombiniert, wie automatische Anrufverteilung (ACD), Interactive Voice Response (IVR) und Anrufüberwachung. Grundsätzlich stehen drei Arten von Contact Centern zur Verfügung: inbound, outbound und blended.
+Ein Contact Center ist eine sehr komplexe Lösung, die verschiedene Technologien kombiniert, wie z. B. automatische Anrufverteilung (ACD), IVR und Anrufüberwachung. Grundsätzlich sind drei Arten von Contact Centern verfügbar: Inbound, Outbound und Blended.
 
-Inbound contact centers sind sehr anspruchsvoll und benötigen in der Regel ACD, IVR, CTI, Aufzeichnung, Überwachung und Berichte. Asterisk hat ein integriertes ACD, um die Anrufe zu queueen. IVR kann mit dem Asterisk Gateway Interface (AGI) oder internen Mechanismen wie der Anwendung background() umgesetzt werden. Computer‑Telephony‑Integration (CTI) wird über das Asterisk Manager Interface (AMI) realisiert; Aufzeichnung und Reporting sind in Asterisk eingebaut.
+Inbound-Contact-Center sind sehr anspruchsvoll und erfordern in der Regel ACD, IVR, CTI, Aufzeichnung, Überwachung und Berichte. Asterisk verfügt über eine integrierte ACD, um die Anrufe in Warteschlangen zu stellen. IVR kann mithilfe der AGI oder interner Mechanismen wie der Anwendung background() realisiert werden. CTI wird mithilfe der AMI erreicht; Aufzeichnung und Berichterstattung sind in Asterisk integriert.
 
-Für ein ausgehendes Contact Center ist ein Predictive‑ oder Power‑Dialer einer der Hauptkomponenten. Obwohl mehrere Dialer für das Open‑Source‑Asterisk verfügbar sind, ist es nicht schwer, einen eigenen für die Plattform zu erstellen, wenn Sie das wünschen. Ein gemischtes Contact Center ermöglicht gleichzeitigen eingehenden und ausgehenden Betrieb und spart Geld, indem die Zeit der Agenten besser genutzt wird. Es ist möglich, Asterisk und seinen ACD‑Mechanismus zu verwenden, um eine gemischte Lösung zu implementieren.
+Für ein Outbound-Contact-Center ist ein Predictive oder Power Dialer eine der Hauptkomponenten. Obwohl mehrere Dialer für das Open-Source-Asterisk verfügbar sind, ist es nicht schwer, bei Bedarf einen eigenen für die Plattform zu erstellen. Ein Blended-Contact-Center ermöglicht den gleichzeitigen Inbound- und Outbound-Betrieb und spart Geld, indem eine bessere Auslastung der Agentenzeit sichergestellt wird. Es ist möglich, Asterisk und seinen ACD-Mechanismus zu verwenden, um eine Blended-Lösung zu implementieren.
 
 ![Eine Asterisk Contact-Center-Plattform](../images/01-introduction-fig11.png)
 
-## Informationen finden und Hilfe
+## Informationen und Hilfe finden
 
-Dieser Abschnitt bietet einige der wichtigsten Informationsquellen zu Asterisk.
+Dieser Abschnitt bietet einige der wichtigsten Informationsquellen rund um Asterisk.
 
-- Asterisk’s offizielle Website: <https://www.asterisk.org> Hier finden Sie Informationen zu:
-- Documentation & Wiki -> <https://docs.asterisk.org>
+- Offizielle Asterisk-Website: <https://www.asterisk.org> Hier finden Sie Informationen zu:
+- Dokumentation & Wiki -> <https://docs.asterisk.org>
 - Community-Forum -> <https://community.asterisk.org>
-- Bug tracking -> <https://github.com/asterisk/asterisk/issues>
-- Wiki (legacy, largely superseded by docs.asterisk.org) -> <https://wiki.asterisk.org>
+- Fehlerverfolgung (Bug Tracking) -> <https://github.com/asterisk/asterisk/issues>
+- Wiki (veraltet, weitgehend durch docs.asterisk.org ersetzt) -> <https://wiki.asterisk.org>
 
 ### Community-Forum
 
-Das Asterisk Community-Forum hat die alten Mailinglisten weitgehend ersetzt und ist der Ort, um Fragen zu stellen. Versuchen Sie, so viele Informationen wie möglich zu sammeln, bevor Sie posten. Niemand wird Ihnen helfen, wenn Sie Ihre Hausaufgaben nicht gemacht haben – versuchen Sie mindestens einmal, das Problem selbst zu lösen.
+Das Asterisk-Community-Forum hat die alten Mailinglisten weitgehend ersetzt und ist der Ort, an dem man Fragen stellen kann. Versuchen Sie, so viele Informationen wie möglich zu sammeln, bevor Sie einen Beitrag verfassen. Niemand wird Ihnen helfen, wenn Sie Ihre Hausaufgaben nicht gemacht haben — versuchen Sie zumindest einmal, das Problem selbst zu lösen.
 
 - <https://community.asterisk.org>
 
-## Summary
+## Zusammenfassung
 
-Asterisk ist eine nach GPL lizenzierte Software, die einen gewöhnlichen PC zu einer leistungsfähigen IP‑PBX‑Plattform macht. Digiums Mark Spencer entwickelte Asterisk Ende der 1990er Jahre, und Digium finanzierte sich durch den Verkauf von Asterisk‑bezogener Hardware und kommerziellen Produkten. Digium wurde 2018 von Sangoma Technologies übernommen; Sangoma unterstützt nun die Entwicklung von Asterisk. Das Design der Hardware‑Schnittstelle stammt aus dem Zapata‑Projekt von Jim Dixon, aus dem DAHDI hervorging.
+Asterisk ist eine unter der GPL lizenzierte Software, die es einem gewöhnlichen PC ermöglicht, als leistungsstarke IP PBX-Plattform zu fungieren. Mark Spencer von Digium entwickelte Asterisk in den späten 1990er Jahren, und Digium finanzierte sich durch den Verkauf von Asterisk-bezogener Hardware und kommerziellen Produkten. Digium wurde 2018 von Sangoma Technologies übernommen; Sangoma sponsert heute die Entwicklung von Asterisk. Das Design der Hardwareschnittstellen hat seinen Ursprung im Zapata-Projekt, das von Jim Dixon entwickelt wurde und aus dem DAHDI hervorging.
 
-Die Asterisk‑Architektur besteht aus den folgenden Hauptkomponenten:
+Die Asterisk-Architektur besteht aus den folgenden Hauptkomponenten:
 
-- CHANNELS: Analog, digital oder Voice‑over‑IP. In Asterisk 22 LTS wird SIP ausschließlich von `chan_pjsip` verarbeitet.
+- CHANNELS: Analog, digital oder Voice-over-IP. In Asterisk 22 LTS wird SIP ausschließlich durch `chan_pjsip` gehandhabt.
 - PROTOCOLS: Kommunikationsprotokolle, die für die Signalisierung der Anrufe verantwortlich sind, einschließlich SIP (via PJSIP), H.323, MGCP und IAX2.
-- CODECS: Übersetzen digitale Sprachformate und ermöglichen Kompression sowie Concealment von Paketverlusten. Beachten Sie, dass Asterisk selbst keine Stummsuppression (Voice Activity Detection) oder Comfort‑Noise‑Erzeugung durchführt; wenn Endpunkte VAD verwenden, sollte Comfort‑Noise auf der Client‑Seite deaktiviert werden.
-- APPLICATIONS: Verantwortlich für die PBX‑Funktionalität von Asterisk. Konferenz, Voicemail und Fax sind Beispiele für Asterisk‑Anwendungen.
+- CODECS: Übersetzen digitale Formate von Sprache und ermöglichen Komprimierung sowie die Verschleierung von Paketverlusten. Beachten Sie, dass Asterisk selbst keine Stilleunterdrückung (Voice Activity Detection) oder die Erzeugung von Komfortrauschen durchführt; wenn endpoints VAD verwenden, sollte das Komfortrauschen auf der Client-Seite deaktiviert werden.
+- APPLICATIONS: Verantwortlich für die Asterisk PBX-Funktionalität. Konferenz, voicemail und Fax sind Beispiele für Asterisk-Anwendungen.
 
-Asterisk kann in verschiedenen Szenarien eingesetzt werden, von einer kleinen IP‑PBX bis hin zu einem anspruchsvollen Contact‑Center. Hilfe finden Sie leicht unter www.asterisk.org und docs.asterisk.org.
+Asterisk kann in verschiedenen Szenarien eingesetzt werden, von einer kleinen IP PBX bis hin zu einem hochentwickelten Contact Center. Hilfe finden Sie ganz einfach unter www.asterisk.org und docs.asterisk.org.
 
 ## Quiz
 
-1. Welches Unternehmen hat Digium im Jahr 2018 übernommen und ist jetzt der Hauptverwalter des Open‑Source‑Projekts Asterisk?
+1. Welches Unternehmen hat Digium im Jahr 2018 übernommen und fungiert nun als primärer Verwalter des Asterisk Open-Source-Projekts?
    - A. Cisco Systems
    - B. Sangoma Technologies
    - C. Nortel Networks
    - D. Red Hat
 
-2. In Asterisk 22 LTS, welcher Kanal‑Treiber stellt SIP‑Konnektivität bereit?
+2. Welcher Channel-Treiber stellt in Asterisk 22 LTS die SIP-Konnektivität bereit?
    - A. `chan_sip`
    - B. `chan_skinny`
    - C. `chan_pjsip`
    - D. `chan_h323`
 
-3. Wahr oder Falsch: Der `chan_sip`‑Kanal‑Treiber wurde in Asterisk 21 entfernt und ist in einem Standard‑Asterisk 22‑Build nicht mehr enthalten.
+3. Wahr oder Falsch: Der Channel-Treiber `chan_sip` wurde in Asterisk 21 entfernt und ist in einem Standard-Build von Asterisk 22 nicht mehr enthalten.
 
-4. Welche der folgenden Kanäle/Protokolle sind **nicht mehr** Teil eines Standard‑Asterisk 22‑Builds? (Wählen Sie alle zutreffenden aus.)
+4. Welche der folgenden Channels/Protokolle sind **nicht mehr** Teil eines Standard-Builds von Asterisk 22? (Wählen Sie alle zutreffenden aus.)
    - A. MGCP (`chan_mgcp`)
-   - B. SCCP / Cisco Skinny (`chan_skinny`)
+   - B. SCCP / Cisco Skinny (`chan_skinny`)
    - C. IAX2 (`chan_iax2`)
-   - D. H.323 (`chan_h323`, nur noch als Community‑`ooh323`‑Add‑on erhalten)
+   - D. H.323 (`chan_h323`, nur noch als Community-Add-on `ooh323` verfügbar)
 
-5. Die Hardware‑Architektur des Zapata‑Projekts, ursprünglich Zaptel genannt, wurde später in ____ umbenannt.
+5. Die Hardware-Architektur des Zapata-Projekts, ursprünglich Zaptel genannt, wurde später umbenannt in ____.
    - A. DAHDI
    - B. PJSIP
    - C. PRI
    - D. mISDN
 
-6. Wenn Asterisk Audio von einem Codec in einen anderen konvertieren muss, welches interne Stream‑Format wird dafür verwendet?
+6. Über welches interne Stream-Format übersetzt Asterisk, wenn Audio von einem codec in einen anderen konvertiert werden muss?
    - A. G.711 ulaw
    - B. GSM
    - C. slinear (signed linear)
    - D. Opus
 
-7. Laut Kapitel, wie ist die Lizenzsituation des von Sangoma vertriebenen G.729‑Codec‑Moduls?
-   - A. Es ist GPL und völlig kostenlos für jede Nutzung.
-   - B. Der Download ist kostenlos, aber die legale Nutzung erfordert den Kauf einer pro‑Kanal‑Lizenz.
-   - C. Es kann überhaupt nicht bezogen werden, ohne die Asterisk Business Edition zu kaufen.
-   - D. Es funktioniert nur im Pass‑Through‑Modus und kann nicht installiert werden.
+7. Wie ist laut diesem Kapitel die Lizenzsituation des von Sangoma vertriebenen G.729 codec-Moduls?
+   - A. Es ist GPL und für jede Nutzung komplett kostenlos.
+   - B. Der Download ist kostenlos, aber die rechtmäßige Nutzung erfordert den Erwerb einer Lizenz pro Kanal.
+   - C. Es ist ohne den Kauf der Asterisk Business Edition überhaupt nicht erhältlich.
+   - D. Es funktioniert nur im Pass-Through-Modus und kann nicht installiert werden.
 
-8. Welche Asterisk‑Anwendung wird verwendet, um einen Anruf von einem Telefon zu einem anderen zu verbinden?
+8. Welche Asterisk-Anwendung wird verwendet, um einen Anruf von einem Telefon zu einem anderen zu verbinden?
    - A. `Background()`
    - B. `Dial()`
    - C. `Queue()`
    - D. `Goto()`
 
-9. Was ist der `Local`‑Kanal in Asterisk?
-   - A. Eine Hardware‑FXS‑Schnittstelle für analoge Telefone.
-   - B. Ein SIP‑Trunk zu einem lokalen Dienstanbieter.
-   - C. Ein Pseudo‑Kanal, der einen Anruf zurück in den Dialplan in einem anderen Kontext schleift.
-   - D. Ein Codec für On‑Net‑Anrufe.
+9. Was ist der `Local` Channel in Asterisk?
+   - A. Eine Hardware-FXS-Schnittstelle für analoge Telefone.
+   - B. Ein SIP-trunk zu einem lokalen Dienstanbieter.
+   - C. Ein Pseudo-Channel, der einen Anruf in einem anderen context zurück in den dialplan leitet.
+   - D. Ein codec, der für On-Net-Anrufe verwendet wird.
 
-10. In welchem Anwendungsszenario fungiert Asterisk als Back‑to‑Back‑User‑Agent (B2BUA) und übersetzt zwischen Signalisierungs‑Protokollen und Codecs, um teure SoftSwitches zu ersetzen?
-    - A. IP‑Aktivierung einer Legacy‑PBX
-    - B. Toll‑Bypass
-    - C. Media‑Gateway
-    - D. Contact‑Center‑Plattform
+10. In welchem Nutzungsszenario fungiert Asterisk als Back-to-Back User Agent (B2BUA), der zwischen Signalisierungsprotokollen und codecs übersetzt, um teure SoftSwitch-Lösungen zu ersetzen?
+    - A. IP-Anbindung einer bestehenden PBX
+    - B. Toll Bypass
+    - C. Media Gateway
+    - D. Contact Center Plattform
 
-**Answers:** 1 — B · 2 — C · 3 — True · 4 — A, B, D · 5 — A · 6 — C · 7 — B · 8 — B · 9 — C · 10 — C
+**Antworten:** 1 — B · 2 — C · 3 — Wahr · 4 — A, B, D · 5 — A · 6 — C · 7 — B · 8 — B · 9 — C · 10 — C

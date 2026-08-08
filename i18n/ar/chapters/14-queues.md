@@ -1,73 +1,73 @@
-# Call Queues
+# طوابير المكالمات
 
-تُعَدّ قوائم الانتظار للمكالمات، المعروفة أيضًا باسم ACD (التوزيع التلقائي للمكالمات)، ذات أهمية متزايدة في الرد على مكالمات العملاء بكفاءة. يمكن لموزع المكالمات التلقائي أن يساعد في خفض التكاليف، وزيادة مستوى الخدمة، وتحسين المبيعات حيث إن موزعات المكالمات تؤثر على طريقة عمل عملك—not for a few days, but for many years. في بيئة مركز الاتصال، العامل الأول هو الناس؛ فهم أغلى مورد. يتطلب توظيف الوكلاء وتدريبهم وتحفيزهم وقتًا، ومالًا، وصبرًا. باستخدام ACD، يمكنك تعظيم إنتاجية الوكلاء من خلال تحديد عدد الوكلاء المطلوب بدقة، والتحكم في الحضور الجيد والسيء، وتحليل تدفق المكالمات.
+أصبحت طوابير المكالمات، المعروفة أيضاً باسم ACD (توزيع المكالمات التلقائي)، تكتسب أهمية متزايدة للرد على مكالمات العملاء بكفاءة. يمكن لموزع المكالمات التلقائي أن يساعد في خفض التكاليف، وزيادة مستوى الخدمة، وتحسين المبيعات، حيث تؤثر موزعات المكالمات على كيفية عمل نشاطك التجاري — ليس لبضعة أيام فحسب، بل لسنوات عديدة. في بيئة مراكز الاتصال، العامل الأول والأهم هو العنصر البشري؛ فهم المورد الأكثر تكلفة. يتطلب توظيف وتدريب وتحفيز الوكلاء وقتاً ومالاً وصبراً. باستخدام ACD، يمكنك زيادة إنتاجية الوكلاء إلى أقصى حد من خلال تحديد عدد الوكلاء المطلوب بدقة، ومراقبة أداء الموظفين الجيد والسيئ، وتحليل تدفق المكالمات.
 
-## Objectives
+## الأهداف
 
-By the end of this chapter, you should be able to:
+بحلول نهاية هذا الفصل، ينبغي أن تكون قادراً على:
 
-- Understand why and how to use call queues
-- Understand the basic theory of call queues
-- Install and configure the queue system
+- فهم سبب وكيفية استخدام طوابير الانتظار (call queues)
+- فهم النظرية الأساسية لطوابير الانتظار
+- تثبيت وتهيئة نظام الطوابير
 
-## كيف تعمل قوائم الانتظار؟
+## كيف تعمل طوابير الانتظار؟
 
-قوائم الانتظار ليست بالضرورة ابتكارًا جديدًا. عندما يكون لديك تدفق مكالمات واردة عالي، يصبح من الصعب توزيع المكالمات بشكل مناسب. استخدام استراتيجية مجموعة حيث يرن الهاتف على جميع الوكلاء في آن واحد لا يبدو فعالًا، إلا إذا كان لديك عدد قليل من الوكلاء. ومع ذلك، تقوم قائمة الانتظار بتسليم المكالمات إلى وكيل متاح واحد فقط في كل مرة وتضع العميل في وضع الانتظار مع الموسيقى عندما لا يكون هناك وكلاء متاحين. تعمل القائمة عن طريق الاحتفاظ بالمكالمة أثناء البحث عن وكيل غير مشغول للرد عليها. أحد أكبر فوائد القائمة هو تجنب فقدان المكالمات مع إتاحة إمكانية توليد إحصاءات.
+طوابير الانتظار للمكالمات ليست بالأمر الجديد تماماً. عندما يكون لديك تدفق عالٍ للمكالمات الواردة، يصبح من الصعب توزيع المكالمات بشكل مناسب. إن استخدام استراتيجية المجموعة حيث ترن الهواتف في وقت واحد لدى جميع الوكلاء لا يبدو فعالاً، إلا إذا كان لديك عدد قليل فقط من الوكلاء. ومع ذلك، فإن طابور انتظار المكالمات يقوم بتوصيل المكالمات إلى وكيل واحد متاح في كل مرة، ويضع العميل في حالة انتظار مع تشغيل موسيقى في حال عدم توفر وكلاء. يعمل الطابور عن طريق الاحتفاظ بالمكالمة أثناء البحث عن وكيل غير مشغول للرد عليها. إحدى أكبر فوائد الطابور هي تجنب فقدان المكالمات مع توفير إمكانية إنشاء إحصائيات.
 
-![A call queue: incoming 1-800 calls enter the queue and an ACD strategy (ringall, rrmemory, leastrecent, priority, and others) distributes them to the available agents](../images/14-queues-fig01.png)
+![طابور انتظار المكالمات: المكالمات الواردة عبر 1-800 تدخل الطابور وتقوم استراتيجية ACD (مثل ringall، وrrmemory، وleastrecent، وpriority، وغيرها) بتوزيعها على الوكلاء المتاحين](../images/14-queues-fig01.png)
 
-عادةً، تعمل قائمة الانتظار على النحو التالي:
+عادةً، يعمل طابور انتظار المكالمات على النحو التالي:
 
-- يقوم الوكلاء بتسجيل الدخول إلى القائمة.
-- تُضع المكالمات الواردة في قائمة الانتظار.
-- تُستخدم استراتيجية قائمة الانتظار لتوزيع المكالمات على الوكلاء.
-- تُشغل موسيقى الانتظار بينما ينتظر المتصل.
-- يمكن تقديم إعلانات للمتصلين، تُعلمهم بوقت الانتظار.
-- يرد الوكيل على المكالمة وتُولد الإحصاءات.
+- يقوم الوكلاء بتسجيل الدخول إلى الطابور.
+- يتم وضع المكالمات الواردة في الطابور.
+- تُستخدم استراتيجية طابور لتوزيع المكالمات وإرسالها إلى الوكلاء.
+- يتم تشغيل موسيقى الانتظار بينما ينتظر المتصل.
+- يمكن تقديم إعلانات للمتصلين لإخطارهم بوقت الانتظار.
+- يتم الرد على المكالمة من قبل الوكيل وتُنشأ الإحصائيات.
 
-التطبيق الرئيسي للقوائم هو خدمة العملاء. عند استخدام القوائم، تتجنب فقدان المكالمات عندما يكون وكلاؤك مشغولين. يمكنك إضافة وكلاء جدد إلى القائمة إذا لاحظت أن عدد المتصلين في القائمة يزداد. ميزة أخرى للقوائم هي إمكانية الحصول على إحصاءات مثل معدل التخلي عن المكالمة، متوسط مدة المكالمة، وهدف الرد على المكالمات. ستساعدك هذه الإحصاءات في تحديد عدد الوكلاء اللازم لتقديم خدمة أفضل لعملائك.
+التطبيق الرئيسي للطوابير هو خدمة العملاء. عند استخدام الطوابير، تتجنب فقدان المكالمات عندما يكون وكلاؤك مشغولين. يمكنك إضافة وكلاء جدد إلى الطابور إذا وجدت أن عدد المتصلين في الطابور في تزايد. ميزة أخرى للطوابير هي أنه يمكنك الآن الحصول على إحصائيات مثل معدل التخلي عن المكالمات، ومتوسط مدة المكالمة، وهدف الرد على المكالمات. ستساعدك هذه الإحصائيات في تحديد عدد الوكلاء الذين يجب استخدامهم لتقديم خدمة أفضل لعملائك.
 
 ### بنية ACD
 
-تتكون بنية ACD من القوائم والوكلاء. يمكن أن يكون الوكيل في قائمتين في نفس الوقت. يمكن أن تحتوي القائمة على وكلاء، قنوات، ومجموعات وكلاء.
+تتكون بنية ACD من طوابير ووكلاء. يمكن لوكيل واحد أن يكون في طابورين في نفس الوقت. يمكن أن يحتوي الطابور على وكلاء، وقنوات، ومجموعات وكلاء.
 
-![ACD architecture: each queue (Customer Service, Inside Sales) is fed by a phone number and delivers calls to agents, who are in turn bound to physical channels](../images/14-queues-fig02.png)
+![بنية ACD: كل طابور (خدمة العملاء، المبيعات الداخلية) يتم تغذيته بواسطة رقم هاتف ويوصل المكالمات إلى الوكلاء، الذين يرتبطون بدورهم بقنوات مادية](../images/14-queues-fig02.png)
 
 ## Queues
 
-Queues are defined in the queues.conf configuration file. Agents are attendants who log in and are members of queues. Agents are defined in the agents.conf file. The queue system has grown significantly over many releases, making the configuration file extensive. We will explain some of the major parameters. One general parameter worth highlighting is `autofill`:
+يتم تعريف Queues في ملف الإعدادات queues.conf. الوكلاء (Agents) هم الموظفون الذين يقومون بتسجيل الدخول ويصبحون أعضاء في Queues. يتم تعريف الوكلاء في ملف agents.conf. لقد نما نظام Queues بشكل ملحوظ عبر العديد من الإصدارات، مما جعل ملف الإعدادات واسع النطاق. سنشرح بعض المعلمات الرئيسية. إحدى المعلمات العامة التي تستحق الإبراز هي `autofill`:
 
 ```
 autofill=yes
 ```
 
-The old behavior for the queue was serial type. The queue waited for a call to be dispatched before sending the succeeding call to the next agent. If an agent takes 15 seconds to answer a call, the other calls in the queue had to wait until that call was answered. For high-volume queues, this behavior was inefficient. The new behavior autofill=yes does not wait until a call is answered, but rather works in parallel. You can record the calls in the queue using the option mixmonitor. In this mode, calls are recorded and mixed at the same time.
+كان السلوك القديم لـ Queue هو النوع التسلسلي (serial). حيث كان Queue ينتظر حتى يتم إرسال المكالمة قبل إرسال المكالمة التالية إلى الوكيل التالي. إذا استغرق الوكيل 15 ثانية للرد على مكالمة، كان على المكالمات الأخرى في Queue الانتظار حتى يتم الرد على تلك المكالمة. بالنسبة لـ Queues ذات الحجم الكبير، كان هذا السلوك غير فعال. السلوك الجديد autofill=yes لا ينتظر حتى يتم الرد على المكالمة، بل يعمل بالتوازي. يمكنك تسجيل المكالمات في Queue باستخدام الخيار mixmonitor. في هذا الوضع، يتم تسجيل المكالمات ودمجها في نفس الوقت.
 
-### Queue configuration file
+### ملف إعدادات Queue
 
-Queues are configured in the queues.conf file. In the figure, you will find a working example of a queue.
+يتم إعداد Queues في ملف queues.conf. في الشكل، ستجد مثالاً عملياً لـ Queue.
 
-![A working example of the queues.conf file, showing the general section and a customerservice queue with strategy, service level, announcements, recording, and members](../images/14-queues-fig03.png)
+![مثال عملي لملف queues.conf، يوضح القسم العام و Queue لخدمة العملاء مع الاستراتيجية، ومستوى الخدمة، والإعلانات، والتسجيل، والأعضاء](../images/14-queues-fig03.png)
 
-### Agents
+### الوكلاء (Agents)
 
-You can configure your agents in the file agents.conf. Agents can log in from any extension to receive calls. You can dial an agent using:
+يمكنك إعداد الوكلاء في ملف agents.conf. يمكن للوكلاء تسجيل الدخول من أي extension لاستقبال المكالمات. يمكنك الاتصال بوكيل باستخدام:
 
 ```
 Dial(agent/<name>)
 ```
 
-#### Agent login
+#### تسجيل دخول الوكيل
 
-The login flow for Agent 300 works like this:
+يعمل تدفق تسجيل الدخول للوكيل 300 على النحو التالي:
 
-- The user dials an extension that runs the `AgentLogin()` application.
-- `AgentLogin()` is executed and the agent is associated with the current channel.
-- You can check the status of the agents using the command `agent show all`.
+- يقوم المستخدم بطلب extension يقوم بتشغيل تطبيق `AgentLogin()`.
+- يتم تنفيذ `AgentLogin()` ويتم ربط الوكيل بـ channel الحالي.
+- يمكنك التحقق من حالة الوكلاء باستخدام الأمر `agent show all`.
 
-![Agents: a user logs in by dialing an extension that runs the agentlogin application, which binds Agent 300 to the current channel; you can check agent status with `agent show all`](../images/14-queues-fig04.png)
+![الوكلاء: يقوم المستخدم بتسجيل الدخول عن طريق طلب extension يقوم بتشغيل تطبيق agentlogin، والذي يربط الوكيل 300 بـ channel الحالي؛ يمكنك التحقق من حالة الوكيل باستخدام `agent show all`](../images/14-queues-fig04.png)
 
-You can define the agents in the file agents.conf
+يمكنك تعريف الوكلاء في ملف agents.conf
 
 ```
 ; Agent configuration
@@ -89,55 +89,56 @@ agent => 300,300
 agent => 301,301
 ```
 
-### Members
+### الأعضاء (Members)
 
-Members are active channels responding to the queue. Members can be direct channels (PJSIP, DAHDI) or agents who log in before receiving calls.
+الأعضاء هم channels نشطة تستجيب لـ Queue. يمكن أن يكون الأعضاء channels مباشرة (PJSIP, DAHDI) أو وكلاء يقومون بتسجيل الدخول قبل استقبال المكالمات.
 
-### Strategies
 
-Calls are distributed among members according to one of these strategies:
+### الاستراتيجيات (Strategies)
 
-- ringall: Plays all channels available until someone answers.
-- leastrecent: Distributes to the least recent member.
-- fewestcalls: Distributes to the member with fewest calls.
-- random: Ring random interface.
-- wrandom: Ring random interface, but use the member’s penalty as a weight when calculating their metric.
-- rrmemory: Uses round robin with memory; it remembers where it left off with the call in the last pass.
-- rrordered: Same as rrmemory, except the queue member order from the config file is preserved.
-- linear: Rings members in the order they are listed in queues.conf; for dynamic members, in the order they were added.
+يتم توزيع المكالمات بين الأعضاء وفقاً لإحدى هذه الاستراتيجيات:
 
-The older `roundrobin` strategy was deprecated back in Asterisk 1.4. It is no longer a documented strategy and should not be used: in Asterisk 22 the parser still accepts the word `roundrobin`, but only as a backward-compatibility alias that maps to `rrmemory`. Use `rrmemory` (or `rrordered`) explicitly instead. The list above is the set of documented strategies for the `strategy` option in the Asterisk 22 `queues.conf`.
+- ringall: يقوم برنين جميع channels المتاحة حتى يرد شخص ما.
+- leastrecent: يوزع المكالمات على العضو الأقل حداثة في الاستقبال.
+- fewestcalls: يوزع المكالمات على العضو الذي لديه أقل عدد من المكالمات.
+- random: رنين واجهة عشوائية.
+- wrandom: رنين واجهة عشوائية، ولكن مع استخدام عقوبة (penalty) العضو كوزن عند حساب مقياسه.
+- rrmemory: يستخدم التوزيع الدائري (round robin) مع الذاكرة؛ حيث يتذكر من أين توقف مع المكالمة في المرة السابقة.
+- rrordered: نفس rrmemory، باستثناء أنه يتم الحفاظ على ترتيب أعضاء Queue كما هو في ملف الإعدادات.
+- linear: يرن الأعضاء بالترتيب الذي تم إدراجهم به في queues.conf؛ وبالنسبة للأعضاء الديناميكيين، بالترتيب الذي تمت إضافتهم به.
 
-## Agents
+تم إهمال استراتيجية `roundrobin` القديمة منذ Asterisk 1.4. لم تعد استراتيجية موثقة ولا ينبغي استخدامها: في Asterisk 22 لا يزال المحلل يقبل الكلمة `roundrobin`، ولكن فقط كاسم مستعار للتوافق مع الإصدارات السابقة والذي يتم تعيينه إلى `rrmemory`. استخدم `rrmemory` (أو `rrordered`) بشكل صريح بدلاً من ذلك. القائمة أعلاه هي مجموعة الاستراتيجيات الموثقة لخيار `strategy` في Asterisk 22 `queues.conf`.
 
-Agents are implemented as proxy channels. They can be used inside the queues. Another use for the agent channels is extension mobility. The user can log in using any phone and receive its calls. This allows a user to go to any room to make it an office. You can dial an agent in the dial plan using dial(agent/<name>). You define agents in the agents.conf file.
+## الوكلاء (Agents)
 
-![Agent mobility: the user picks up any phone, dials a login extension, and passes the agent number and password; after agentlogin() succeeds the agent (Agent 300) is ready to take calls, and you can check status with the CLI command `agent show all`](../images/14-queues-fig05.png)
+يتم تنفيذ الوكلاء كقنوات وكيلة (proxy channels). ويمكن استخدامهم داخل طوابير الانتظار (queues). ومن الاستخدامات الأخرى لقنوات الوكلاء هي تنقل الامتدادات (extension mobility). حيث يمكن للمستخدم تسجيل الدخول باستخدام أي هاتف واستقبال مكالماته. وهذا يسمح للمستخدم بالذهاب إلى أي غرفة لجعلها مكتباً له. يمكنك الاتصال بوكيل في الـ dialplan باستخدام `dial(agent/<name>)`. ويتم تعريف الوكلاء في ملف `agents.conf`.
 
-### Agent Groups
+![تنقل الوكيل: يقوم المستخدم برفع سماعة أي هاتف، وطلب امتداد تسجيل الدخول، وإدخال رقم الوكيل وكلمة المرور؛ بعد نجاح `agentlogin()` يصبح الوكيل (Agent 300) جاهزاً لاستقبال المكالمات، ويمكنك التحقق من الحالة باستخدام أمر الـ CLI `agent show all`](../images/14-queues-fig05.png)
 
-You may choose to use agent groups. This function does not take ACD strategies into consideration. You will probably prefer to list all agents individually. If you want to transfer to an agent group, you can use `queues.conf`:
+### مجموعات الوكلاء (Agent Groups)
+
+قد تختار استخدام مجموعات الوكلاء. هذه الوظيفة لا تأخذ استراتيجيات الـ ACD في الاعتبار. ومن المرجح أنك ستفضل إدراج جميع الوكلاء بشكل فردي. إذا كنت ترغب في التحويل إلى مجموعة وكلاء، يمكنك استخدام `queues.conf`:
 
 ```
 member => agent/@1    ; any agent in group 1
 member => agent/:1,1  ; any agent in group 1, wait for first available
 ```
 
-### The configuration file for agents
+### ملف الإعدادات الخاص بالوكلاء
 
-Agents are defined in the file agents.conf. Below is a working example of the file.
+يتم تعريف الوكلاء في الملف `agents.conf`. فيما يلي مثال عملي للملف.
 
-![A working example of the agents.conf file: a general section with persistentagents, an agents section with the default parameters (autologoff, ackcall, endcall, wrapuptime, musiconhold), and two agent definitions (300 and 301)](../images/14-queues-fig06.png)
+![مثال عملي لملف `agents.conf`: قسم عام يحتوي على `persistentagents`، وقسم للوكلاء يحتوي على المعلمات الافتراضية (`autologoff`، `ackcall`، `endcall`، `wrapuptime`، `musiconhold`)، وتعريفين لوكيلين (300 و 301)](../images/14-queues-fig06.png)
 
-## التطبيقات المتعلقة بـ ACD
+## تطبيقات متعلقة بـ ACD
 
-نظام قوائم الانتظار في Asterisk يوفر عدة تطبيقات لتنفيذ القوائم في مخطط الاتصال. أدناه نعرض بعضًا منها.
+يوفر نظام الطوابير في Asterisk العديد من التطبيقات لتنفيذ الطوابير داخل الـ dialplan. فيما يلي، نستعرض بعضاً منها.
 
 ### التطبيق queue()
 
-هذا التطبيق يضع المكالمات الواردة في قائمة انتظار معينة كما هو معرف في queues.conf. قد يحتوي سلسلة الخيارات على صفر أو أكثر من الخيارات أحرف واحدة (الموضحة في الشكل أدناه). بالإضافة إلى تحويل المكالمة، يمكن إيقاف المكالمة مؤقتًا ثم التقاطها من قبل مستخدم آخر. سيتم إرسال عنوان URL الاختياري إلى الطرف المتصل إذا كان القناة تدعمه. المعامل الاختياري AGI سيُعدّ سكريبت AGI ليُنفّذ على قناة الطرف المتصل بمجرد ربطه بعضو في القائمة. سيؤدي انتهاء المهلة إلى فشل القائمة بعد عدد محدد من الثواني، يتم التحقق منه بين كل دورة مهلة وإعادة محاولة. هذا التطبيق يضبط متغيّر الحالة QUEUE عند الانتهاء:
+يقوم هذا التطبيق بوضع المكالمات الواردة في طابور مكالمات معين كما هو محدد في queues.conf. قد تحتوي سلسلة الخيارات على صفر أو أكثر من الخيارات المكونة من حرف واحد (موضحة في الشكل أدناه). بالإضافة إلى تحويل المكالمة، يمكن وضع المكالمة في الانتظار (parked) ثم التقاطها من قبل مستخدم آخر. سيتم إرسال الـ URL الاختياري إلى الطرف المتصل إذا كانت القناة تدعم ذلك. سيقوم معامل AGI الاختياري بإعداد سكربت AGI ليتم تنفيذه على قناة الطرف المتصل بمجرد اتصاله بأحد أعضاء الطابور. سيؤدي الـ timeout إلى فشل الطابور بعد عدد محدد من الثواني، يتم التحقق منه بين كل دورة timeout و retry. يقوم هذا التطبيق بضبط متغير الحالة QUEUE عند الانتهاء:
 
-![The queue() application: its syntax `Queue(queuename,options,URL,announceoverride,timeout,AGI)` — Asterisk 22 separates the arguments with commas (the older pipe `|` form is gone) — and the available single-letter options (d, h, H, n, i, r, t, T, w, W)](../images/14-queues-fig07.png)
+![التطبيق queue(): صيغته `Queue(queuename,options,URL,announceoverride,timeout,AGI)` — يفصل Asterisk 22 بين الوسائط بفواصل (تم الاستغناء عن صيغة الـ pipe `|` القديمة) — والخيارات المتاحة المكونة من حرف واحد (d, h, H, n, i, r, t, T, w, W)](../images/14-queues-fig07.png)
 
 - TIMEOUT
 - FULL
@@ -148,13 +149,13 @@ Agents are defined in the file agents.conf. Below is a working example of the fi
 
 ### التطبيق agentlogin()
 
-هذا التطبيق يطلب من الوكيل تسجيل الدخول إلى النظام. دائمًا ما يُعيد -1. أثناء تسجيل الدخول، سيسمع الوكيل الذي يتلقى المكالمات صوت صفارة عندما تأتي مكالمة جديدة. يمكن للوكيل إنهاء المكالمة بالضغط على المفتاح *.
+يطلب هذا التطبيق من الـ agent تسجيل الدخول إلى النظام. يعيد هذا التطبيق دائماً القيمة -1. أثناء تسجيل الدخول، سيسمع الـ agent الذي يستقبل المكالمات صفيراً عند ورود مكالمة جديدة. يمكن للـ agent إنهاء المكالمة بالضغط على مفتاح *.
 
-![The agentlogin() application: its syntax `AgentLogin([AgentNo][|options])` and the `s` option for a silent login that does not announce the login confirmation](../images/14-queues-fig08.png)
+![التطبيق agentlogin(): صيغته `AgentLogin([AgentNo][|options])` والخيار `s` لتسجيل دخول صامت لا يعلن عن تأكيد تسجيل الدخول](../images/14-queues-fig08.png)
 
 ### التطبيق addQueueMember()
 
-هذا التطبيق يضيف جهازًا (مثل PJSIP/3000) إلى قائمة الانتظار بشكل ديناميكي. إذا كان الجهاز موجودًا بالفعل، سيُعيد خطأ.
+يقوم هذا التطبيق بإضافة جهاز (على سبيل المثال PJSIP/3000) إلى طابور بشكل ديناميكي. إذا كان الجهاز موجوداً بالفعل، فسيقوم بإرجاع خطأ.
 
 ```
 AddQueueMember(queuename[|interface][|penalty]):
@@ -162,25 +163,25 @@ AddQueueMember(queuename[|interface][|penalty]):
 
 #### التطبيق removeQueueMember()
 
-هذا التطبيق يزيل جهازًا من القائمة بشكل ديناميكي. إذا لم يكن الجهاز جزءًا من القائمة، سيُعيد خطأ.
+يقوم هذا التطبيق بإزالة جهاز من الطابور بشكل ديناميكي. إذا كان الجهاز لا ينتمي إلى الطابور، فسيقوم بإرجاع خطأ.
 
 ```
 RemoveQueueMember(queuename[|interface])
 ```
 
-### التطبيقات الداعمة وأوامر CLI
+### تطبيقات الدعم وأوامر CLI
 
-بعض التطبيقات وأوامر وحدة التحكم يمكنها المساعدة في العمل مع القوائم. يوضح ما يلي ما يفعله كل تطبيق:
+هناك بعض التطبيقات وأوامر وحدة التحكم (console) القادرة على المساعدة في العمل مع الطوابير. يوضح ما يلي وظيفة كل تطبيق:
 
-![Support applications (AddQueueMember, RemoveQueueMember) and CLI commands (agent show all, queue show, queue show <name>) used to manage queues at runtime](../images/14-queues-fig09.png)
+![تطبيقات الدعم (AddQueueMember, RemoveQueueMember) وأوامر CLI (agent show all, queue show, queue show <name>) المستخدمة لإدارة الطوابير أثناء التشغيل](../images/14-queues-fig09.png)
 
-## مهام التكوين
+## مهام الإعداد
 
-تلخص الصورة أدناه المهام الرئيسية لإنشاء نظام طابور عمل.
+يلخص الشكل أدناه المهام الرئيسية لإنشاء نظام طوابير فعال.
 
-![مهام تكوين ACD: (1) إنشاء طابور المكالمات (مطلوب)، (2) تعريف معلمات الوكيل (اختياري)، (3) إنشاء الوكلاء (اختياري)، (4) وضع الطابور في مخطط الاتصال (مطلوب)، (5) تكوين تسجيل الوكيل (اختياري)، و (6) التحقق باستخدام agent show all و queue show (اختياري)](../images/14-queues-fig10.png)
+![مهام إعداد ACD: (1) إنشاء طابور المكالمات (مطلوب)، (2) تحديد معلمات الوكيل (اختياري)، (3) إنشاء الوكلاء (اختياري)، (4) وضع الطابور في الـ dialplan (مطلوب)، (5) إعداد تسجيل الوكيل (اختياري)، و(6) التحقق باستخدام agent show all و queue show (اختياري)](../images/14-queues-fig10.png)
 
-الخطوة 1: إنشاء طابور المكالمات في ملف queues.conf:
+الخطوة 1: إنشاء طابور المكالمات في الملف queues.conf:
 
 ```
 [telemarketing]
@@ -203,7 +204,7 @@ member => Agent/600
 member => Agent/601
 ```
 
-الخطوة 2: تعريف معلمات الوكيل في ملف agents.conf:
+الخطوة 2: تحديد معلمات الوكيل في الملف agents.conf:
 
 ```
 debian:/etc/asterisk# cat agents.conf
@@ -253,7 +254,7 @@ autologoff=15
 ;group=
 ```
 
-الخطوة 3: إنشاء الوكلاء في ملف agents.conf:
+الخطوة 3: إنشاء الوكلاء في الملف agents.conf:
 
 ```
 ;agent => agentid,agentpassword,name
@@ -264,7 +265,7 @@ agent => 600,600,Test Ver - 600
 agent => 601,601,Test Ver . 601
 ```
 
-الخطوة 4: إدراج الطابور في مخطط الاتصال، في الملف `extensions.conf`:
+الخطوة 4: إدراج الطابور في الـ dialplan، في الملف `extensions.conf`:
 
 ```
 ; Telemarketing queue.
@@ -283,11 +284,11 @@ exten => 9000,1,Wait(1)
 exten => 9000,2,AgentLogin()
 ```
 
-### تكوين تسجيل الطابور
+### إعداد تسجيل الطابور
 
-يمكن تسجيل المكالمات باستخدام تطبيق MixMonitor الخاص بـ Asterisk. (تم إزالة تطبيق Monitor المستقل في Asterisk 22، وخيار queues.conf `monitor-type` الآن يقبل فقط MixMonitor.) يمكن تمكين التسجيل من داخل تطبيق الطابور، بدءًا عندما يتم الرد على المكالمة فعليًا. تُسجل المكالمات الناجحة فقط، ولا يتم إجراء أي تسجيلات أثناء استماع الأشخاص إلى MOH. لتمكين المراقبة، ما عليك سوى تحديد monitor-format. هذه الميزة غير مفعلة بخلاف ذلك. يمكنك تعيين اسم الملف للتسجيل باستخدام `Set(MONITOR_FILENAME=<filename>)`؛ وإلا سيستخدم `MONITOR_FILENAME=${UNIQUEID}`.
+يمكن تسجيل المكالمات باستخدام تطبيق MixMonitor الخاص بـ Asterisk. (تمت إزالة تطبيق Monitor المستقل في Asterisk 22، وأصبح خيار `monitor-type` في ملف queues.conf يقبل الآن MixMonitor فقط.) يمكن تفعيل التسجيل من داخل تطبيق الطابور، ليبدأ عند الرد الفعلي على المكالمة. يتم تسجيل المكالمات الناجحة فقط، ولا يتم إجراء أي تسجيلات أثناء استماع المتصلين إلى MOH. لتفعيل المراقبة، ما عليك سوى تحديد monitor-format. هذه الميزة معطلة بخلاف ذلك. يمكنك تعيين اسم ملف التسجيل باستخدام `Set(MONITOR_FILENAME=<filename>)`؛ وإلا فسيتم استخدام `MONITOR_FILENAME=${UNIQUEID}`.
 
-في ملف queues.conf:
+في الملف queues.conf:
 
 ```
 monitor-format = wav
@@ -295,28 +296,28 @@ monitor-type = MixMonitor
 monitor-join = yes
 ```
 
-## تشغيل الصف
+## تشغيل قائمة الانتظار (Queue)
 
-الأمثلة التالية توضح كيفية استخدام الصف.
+تشرح الأمثلة التالية كيفية استخدام قائمة الانتظار.
 
-1. تسجيل دخول الوكيل. مثال: وكيل في صف التسويق الهاتفي يرفع السماعة ويطلب #9000. يسمع الوكيل رسالة تسجيل دخول غير صالحة ويُطلب منه اسمه وكلمة المرور. يتبع صف التدقيق نفس الإجراء.
-2. الصف. بمجرد الدخول إلى الصف، سيستمع الوكيل إلى موسيقى الانتظار إذا تم تعريفها. عندما يرد اتصال إلى صف التسويق الهاتفي، سيصدر صوت صفير للوكيل وسيتم ربطه بذلك الاتصال.
-3. إنهاء المكالمة. عندما ينتهي الوكيل من المكالمة، يمكنه:
-   - الضغط على ‘*’ للقطع والبقاء في الصف.
-   - قطع الهاتف، وبالتالي قطع الاتصال بالصف.
+1. تسجيل دخول الوكيل (Agent). مثال: يقوم وكيل في قائمة انتظار التسويق عبر الهاتف برفع سماعة الهاتف وطلب #9000. يسمع الوكيل رسالة تفيد بأن تسجيل الدخول غير صالح ويُطلب منه إدخال اسمه وكلمة المرور الخاصة به. تتبع قائمة انتظار التدقيق نفس الإجراء.
+2. قائمة الانتظار (Queue). بمجرد دخول قائمة الانتظار، سيسمع الوكيل موسيقى الانتظار (MOH)، إذا تم تعريفها. عندما ترد مكالمة إلى قائمة انتظار التسويق عبر الهاتف، سيسمع الوكيل نغمة تنبيه وسيتم توصيله بتلك المكالمة.
+3. إنهاء المكالمة. عندما ينهي الوكيل المكالمة، يمكنه/يمكنها القيام بما يلي:
+   - الضغط على ‘*’ لقطع الاتصال والبقاء في قائمة الانتظار.
+   - فصل الهاتف، وبالتالي قطع الاتصال من قائمة الانتظار.
    - الضغط على #8000 لتحويل المكالمة للتدقيق.
 
 ## موارد متقدمة
 
-نظام طابور Asterisk يحتوي على بعض الميزات المتقدمة لتفضيل بعض العملاء والوكلاء بالإضافة إلى تمكين قائمة مستخدم.
+يحتوي نظام الطوابير في Asterisk على بعض الميزات المتقدمة لتحديد أولويات عملاء ووكلاء معينين، بالإضافة إلى تمكين قائمة للمستخدم.
 
 ### قائمة المستخدم
 
-يمكنك تعريف قائمة لمستخدم أثناء الانتظار في الطابور باستخدام امتدادات ذات رقم واحد. لتمكين هذا الخيار، عرّف سياقًا في تكوين الطابور في ملف queues.conf.
+يمكنك تحديد قائمة للمستخدم أثناء انتظاره في الطابور باستخدام extension مكونة من رقم واحد. لتمكين هذا الخيار، قم بتعريف context في إعدادات الطابور داخل ملف queues.conf.
 
-### العقوبة
+### العقوبة (Penalty)
 
-يمكن تكوين الوكلاء بعقوبة. سيُرسل الطابور المكالمات أولاً إلى المستخدمين الذين لديهم قيم عقوبة أقل. على سبيل المثال، بما أننا نعلم أن عملائنا يحبون سوزان وصوتها الناعم، قد نختار تعيين أولوية 0 لها. بدلاً من ذلك، الوكيل المسمى أوبير، الذي يملك خبرة أقل، يكون أقل تفضيلاً لخدمة العملاء؛ لذلك نُعطيه أولوية 10. في ملف queues.conf:
+يمكن تهيئة الوكلاء باستخدام خاصية Penalty. سيقوم الطابور بإرسال المكالمات أولاً إلى المستخدمين ذوي قيم Penalty الأقل. على سبيل المثال، بما أننا نعلم أن عملاءنا يحبون Susan وصوتها الناعم، فقد نختار تعيين أولوية 0 لها. بدلاً من ذلك، الوكيل المسمى Uber، الذي يمتلك خبرة أقل، هو الأقل تفضيلاً لخدمة العملاء؛ لذلك، نقوم بتعيين أولوية 10 لهذا الوكيل. في ملف queues.conf:
 
 ```
 [customerservice]
@@ -324,9 +325,9 @@ member=300,0,Susan the excellent agent
 member=300,10,Uber the new guy
 ```
 
-### الأولوية
+### الأولوية (Priority)
 
-تعمل الطوابير في وضع FIFO (الأول يدخل أولاً يخرج). إذا أردت إعطاء أولوية لعملاء خاصين (بلاتيني، ذهبي) يمكنك إعداد أولويات متميزة. للعملاء البلاتينيين أو الذهبيين:
+تعمل الطوابير بنظام FIFO (الأول في الدخول، الأول في الخروج). إذا كنت ترغب في منح أولوية لعملاء مميزين (بلاتيني، ذهبي)، يمكنك إعداد أولويات متباينة. بالنسبة للعملاء البلاتينيين أو الذهبيين:
 
 ```
 exten=>111,1,Playback(welcome)
@@ -334,7 +335,7 @@ exten=>111,2,Set(QUEUE_PRIO=10)
 exten=>111,3,Queue(customerservice)
 ```
 
-العملاء الزرقاء:
+العملاء الزرق:
 
 ```
 exten=>112,1,Playback(welcome)
@@ -342,15 +343,15 @@ exten=>112,2,Set(QUEUE_PRIO=5)
 exten=>112,3,Queue(customerservice)
 ```
 
-## تم إزالة تطبيق agentcallbacklogin()
+## تمت إزالة التطبيق agentcallbacklogin()
 
-تم إهمال التطبيق `agentcallbacklogin()` من قبل Digium في Asterisk 1.4 (يوليو 2006) ولم يعد متاحًا في Asterisk 22. النهج الموصى به هو استخدام `AddQueueMember()` مع واجهة PJSIP لإضافة أعضاء بنمط الاسترجاع إلى قائمة الانتظار بشكل ديناميكي. تم تضمين المستند `queues-with-callback-members.txt` في أدلة Asterisk `/doc` القديمة لتوجيه عملية الترحيل.
+تم إيقاف دعم التطبيق `agentcallbacklogin()` من قبل Digium في Asterisk 1.4 (يوليو 2006) وهو لم يعد متاحاً في Asterisk 22. النهج الموصى به هو استخدام `AddQueueMember()` مع واجهة PJSIP لإضافة أعضاء بنمط الاتصال العكسي (callback) إلى طابور الانتظار بشكل ديناميكي. تم تضمين المستند `queues-with-callback-members.txt` في أدلة Asterisk `/doc` القديمة لتقديم إرشادات حول الانتقال.
 
-تم أيضًا إزالة برنامج تشغيل القناة `chan_agent`؛ وقد أُعيد كتابة وظائفه في الوحدة `app_agent_pool`، وهي التي توفر `AgentLogin()`، `AgentRequest()` ووظيفة dialplan `AGENT()` في Asterisk 22 (هذه لا تزال موجودة — `app_agent_pool.so` تُشحن مع بناء 22 القياسي). بالنسبة لمراكز الاتصال الحديثة، فإن النمط القياسي هو تخطي قنوات الوكيل تمامًا وإضافة جهاز PJSIP الخاص بالوكيل مباشرة إلى القائمة باستخدام `AddQueueMember()`/`RemoveQueueMember()` (ثابتًا في `queues.conf`، أو ديناميكيًا من dialplan أو AMI). هذا أبسط، ويتكامل بشكل نظيف مع حالة جهاز PJSIP، وهو النهج المستخدم طوال هذا الفصل.
+تمت إزالة برنامج تشغيل القناة `chan_agent` القديم بالمثل؛ حيث أُعيدت كتابة وظائفه كوحدة `app_agent_pool`، وهي التي توفر `AgentLogin()` و `AgentRequest()` ودالة dialplan المسماة `AGENT()` في Asterisk 22 (لا تزال هذه العناصر موجودة — حيث يتم شحن `app_agent_pool.so` مع إصدار 22 القياسي). ومع ذلك، بالنسبة لمراكز الاتصال الحديثة، فإن النمط القياسي هو تخطي قنوات الوكيل (agent channels) تماماً وإضافة جهاز PJSIP الخاص بالوكيل مباشرة إلى طابور الانتظار باستخدام `AddQueueMember()`/`RemoveQueueMember()` (سواء بشكل ثابت في `queues.conf`، أو بشكل ديناميكي من الـ dialplan أو AMI). هذا النهج أكثر بساطة، ويتكامل بشكل نظيف مع حالة جهاز PJSIP، وهو النهج المستخدم في جميع أنحاء هذا الفصل.
 
-## إحصائيات الطابور
+## إحصائيات طوابير الانتظار
 
-جميع الأحداث من الطوابير تُسجل في ‎/var/log/asterisk/queue_log. تم نشر تنسيق سجل الطابور في المستند ‎queuelog.txt‎ داخل دليل ‎/doc‎ من وثائق Asterisk. أدناه بعض أهم الأحداث المسجلة.
+يتم تسجيل جميع الأحداث الصادرة عن طوابير الانتظار في الملف /var/log/asterisk/queue_log. تم نشر تنسيق سجل طابور الانتظار في المستند queuelog.txt الموجود في المجلد /doc ضمن وثائق Asterisk. فيما يلي بعض أهم الأحداث التي يتم تسجيلها.
 
 - ABANDON(position|origposition|waittime)
 - AGENTDUMP
@@ -370,59 +371,59 @@ exten=>112,3,Queue(customerservice)
 - RINGNOANSWER(ringtime)
 - SYSCOMPAT
 
-يمكنك بناء أداة خاصة لمعالجة هذه الأحداث أو استخدام حزمة إحصائيات جاهزة للتنفيذ:
+يمكنك بناء أداتك الخاصة لمعالجة هذه الأحداث أو استخدام حزمة إحصائيات جاهزة للتشغيل:
 
-- **QueueMetrics** (<https://www.queuemetrics.com/>) – حزمة تجارية تُصان بانتظام وتقوم بتحليل `queue_log` وتظل واحدة من أكثر أدوات التقارير اكتمالاً لمراكز اتصال Asterisk.
-- **Roll your own** – لأن تنسيق `queue_log` أعلاه ثابت وموثّق جيداً، فمن السهل تحليله باستخدام سكربت صغير (Python، إلخ) وإدخال الأحداث إلى قاعدة بيانات أو لوحة معلومات.
+- **QueueMetrics** (<https://www.queuemetrics.com/>) – حزمة تجارية يتم صيانتها بنشاط، تقوم بتحليل `queue_log` وتظل واحدة من أكثر أدوات إعداد التقارير اكتمالاً لمراكز اتصالات Asterisk.
+- **بناء أداتك الخاصة** – نظراً لأن تنسيق `queue_log` المذكور أعلاه مستقر وموثق جيداً، فمن السهل تحليله باستخدام برنامج نصي صغير (مثل Python، إلخ) وتغذية الأحداث إلى قاعدة بيانات أو لوحة تحكم.
 
-لنهج أكثر توجهاً نحو الأحداث مقارنةً بمتابعة `queue_log`، تسمح **واجهة Asterisk REST (ARI)** وعمليات **AMI** `QueueSummary`/`QueueStatus` لك ببناء لوحات طابور حية وتكاملات مخصصة ضد حالة الطابور في الوقت الحقيقي بدلاً من تحليل السجلات بعد حدوثها. ARI هي الواجهة الحديثة المدعومة لهذا النوع من العمل في Asterisk 22.
+للحصول على نهج أكثر اعتماداً على الأحداث بدلاً من مراقبة `queue_log`، تتيح لك واجهة **Asterisk REST Interface (ARI)** وإجراءات **AMI** `QueueSummary`/`QueueStatus` بناء لوحات تحكم حية لطوابير الانتظار وعمليات تكامل مخصصة بناءً على حالة طابور الانتظار في الوقت الفعلي بدلاً من تحليل السجلات بعد وقوع الأحداث. تُعد ARI واجهة التكامل الحديثة والمدعومة لهذا النوع من العمل في Asterisk 22.
 
-## الملخص
+## ملخص
 
-في هذا الفصل تعلمت كيفية استخدام ACD، وهيكليته، وكيفية تكوينه. كما تم تقديم بعض الميزات المتقدمة مثل الأولويات والعقوبات.
+في هذا الفصل، تعلمت كيفية استخدام ACD، وبنيته الهيكلية، وكيفية تهيئته. كما تم عرض بعض الميزات المتقدمة مثل الأولويات والعقوبات.
 
-## Quiz
+## اختبار
 
-1. أي من استراتيجيات توزيع الطابور التالية صالحة في `queues.conf` (اختر كل ما ينطبق)؟
+1. أي مما يلي يُعد من استراتيجيات توزيع المكالمات الصالحة في `queues.conf` (اختر كل ما ينطبق)؟
    - A. ringall
    - B. roundrobin
    - C. leastrecent
    - D. fewestcalls
    - E. rrmemory
    - F. linear
-2. يمكنك تسجيل محادثة بين الوكيل والعميل من داخل الطابور عن طريق ضبط خيار ___ في ملف `queues.conf`.
-3. أي من `strategy` يرن للأعضاء بالترتيب الدقيق الذي تم إدراجهم به في `queues.conf`؟
+2. يمكنك تسجيل محادثة بين وكيل وعميل من داخل قائمة الانتظار عن طريق ضبط خيار ___ في ملف `queues.conf`.
+3. أي `strategy` يقوم برنين الأعضاء بالترتيب الدقيق الذي تم إدراجهم به في `queues.conf`؟
    - A. random
    - B. wrandom
    - C. linear
    - D. fewestcalls
-4. عندما ينتهي الوكيل من المكالمة في مثال التسويق الهاتفي، أي من الإجراءات يمكنه اتخاذها (اختر كل ما ينطبق)؟
-   - A. اضغط `*` لفصل الاتصال والبقاء في الطابور
-   - B. إنهاء المكالمة وفصل الاتصال عن الطابور
-   - C. اضغط `#8000` لتحويل المكالمة للتدقيق
-   - D. اضغط `#` لتسجيل الخروج من جميع الطوابير فورًا
-5. أي مهمتين *مطلوبتين* للحصول على طابور يعمل (اختر كل ما ينطبق)؟
-   - A. إنشاء الطابور
+4. عندما ينهي الوكيل مكالمة في مثال التسويق عبر الهاتف، ما هي الإجراءات التي يمكنه اتخاذها (اختر كل ما ينطبق)؟
+   - A. الضغط على `*` لقطع الاتصال والبقاء في قائمة الانتظار
+   - B. إنهاء المكالمة وقطع الاتصال من قائمة الانتظار
+   - C. الضغط على `#8000` لتحويل المكالمة للتدقيق
+   - D. الضغط على `#` لتسجيل الخروج من جميع قوائم الانتظار فوراً
+5. ما هي المهمتان *المطلوبتان* للحصول على قائمة انتظار تعمل (اختر كل ما ينطبق)؟
+   - A. إنشاء قائمة الانتظار
    - B. إنشاء الوكلاء
-   - C. تكوين معلمات الوكيل
-   - D. تكوين التسجيل
-   - E. وضع الطابور في مخطط الاتصال
-6. في طابور المكالمات يمكنك تقديم قائمة رقمية أحادية يمكن للمتصل اختيارها أثناء الانتظار. يتم تمكين ذلك بتعريف ___ في قسم `queues.conf` الخاص بالطابور:
+   - C. تهيئة معلمات الوكيل
+   - D. تهيئة التسجيل
+   - E. وضع قائمة الانتظار في الـ dialplan
+6. في قائمة انتظار المكالمات، يمكنك توفير قائمة خيارات ذات رقم واحد يمكن للمتصل طلبها أثناء الانتظار. يتم تمكين ذلك عن طريق تحديد ___ في قسم `queues.conf` الخاص بقائمة الانتظار:
    - A. agent
    - B. menu
    - C. context
    - D. application
-7. تُستخدم تطبيقات الدعم `AddQueueMember()` و`RemoveQueueMember()` في ___ لإضافة أو إزالة الأعضاء أثناء التشغيل:
-   - A. مخطط الاتصال
-   - B. واجهة سطر الأوامر
+7. تُستخدم تطبيقات الدعم `AddQueueMember()` و `RemoveQueueMember()` في ___ لإضافة أو إزالة الأعضاء أثناء وقت التشغيل:
+   - A. dial plan
+   - B. command-line interface
    - C. queues.conf
    - D. agents.conf
-8. بما أن chan_sip أُزيل في Asterisk 21، يجب أن يشير عضو الطابور الثابت إلى قناة مثل ___ بدلاً من `SIP/1001`.
-9. المعامل `wrapuptime` هو الحد الأدنى للوقت بعد أن يفصل الوكيل المكالمة قبل أن يرسل الطابور لهذا الوكيل مكالمة جديدة.
-   - A. True
-   - B. False
-10. يمكن إعطاء المتصل موقعًا أعلى في نفس الطابور عن طريق ضبط متغير القناة `QUEUE_PRIO` قبل استدعاء `Queue()`.
-    - A. True
-    - B. False
+8. نظراً لإزالة chan_sip في Asterisk 21، يجب أن يشير عضو قائمة الانتظار الثابت إلى قناة مثل ___ بدلاً من `SIP/1001`.
+9. المعلمة `wrapuptime` هي الحد الأدنى من الوقت بعد قيام الوكيل بقطع مكالمة قبل أن ترسل قائمة الانتظار إلى ذلك الوكيل مكالمة جديدة.
+   - A. صواب
+   - B. خطأ
+10. يمكن منح المتصل مركزاً أعلى في نفس قائمة الانتظار عن طريق ضبط متغير القناة `QUEUE_PRIO` قبل استدعاء `Queue()`.
+    - A. صواب
+    - B. خطأ
 
-**Answers:** 1 — A, C, D, E, F (roundrobin is not a documented strategy; in Asterisk 22 it survives only as a deprecated alias for rrmemory) · 2 — `monitor-format` (recording from the queue is enabled by specifying `monitor-format`; in Asterisk 22 `monitor-type` only supports MixMonitor) · 3 — C (linear) · 4 — A, B, C (`*` disconnects and stays; `#` is not a log-off-all key) · 5 — A, E · 6 — C (the `context` option) · 7 — A (the dial plan) · 8 — `PJSIP/1001` (any `PJSIP/` interface) · 9 — True · 10 — True
+**الإجابات:** 1 — A, C, D, E, F (roundrobin ليست استراتيجية موثقة؛ في Asterisk 22 تبقى فقط كاسم مستعار مهمل لـ rrmemory) · 2 — `monitor-format` (يتم تمكين التسجيل من قائمة الانتظار عن طريق تحديد `monitor-format`؛ في Asterisk 22 يدعم `monitor-type` فقط MixMonitor) · 3 — C (linear) · 4 — A, B, C (`*` يقطع الاتصال ويبقى؛ `#` ليس مفتاحاً لتسجيل الخروج من الجميع) · 5 — A, E · 6 — C (خيار `context`) · 7 — A (الـ dial plan) · 8 — `PJSIP/1001` (أي واجهة `PJSIP/`) · 9 — صواب · 10 — صواب

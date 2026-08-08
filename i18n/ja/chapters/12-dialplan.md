@@ -1,131 +1,131 @@
-# ダイヤルプラン高度機能
+# Dial Planの高度な機能
 
-Chapter 3 ではダイヤルプランの基本について説明しました。教育上の理由から、すべての機能を解説したわけではなく、最も重要なものだけを取り上げました。本章ではダイヤルプランをさらに掘り下げ、上級テクニックや新しいアプリケーション、概念について詳述します。
+第3章では、dialplanの基礎について説明しました。教育的な理由から、すべての機能ではなく、最も重要な機能のみを解説しました。本章では、dialplanをより深く掘り下げ、高度なテクニック、新しいアプリケーション、そして概念について説明します。
 
-## 目的
+## Objectives
 
-この章の終わりまでに、次のことができるようになります：
+この章を読み終えることで、以下のことができるようになります。
 
-- 拡張エントリを簡素化する
-- ダイヤルプランのセキュリティと拡張のフィルタリングに対処する
-- IVR メニューを使用して着信を受け取る
-- 不要な書き換えを避けるためにサブルーチンを使用する
-- “Include” を使用したダイヤルプランのセキュリティを実装する
-- AsteriskDB を使用したフォローミーを実装する
-- 勤務時間外の動作を PBX に実装する
+- extension のエントリを簡素化する
+- dialplan のセキュリティと extension のフィルタリングに対処する
+- IVR メニューを使用して着信を受ける
+- サブルーチンを使用して不要な書き換えを回避する
+- Include を使用して dialplan のセキュリティを実装する
+- AsteriskDB を使用して follow-me を実装する
+- PBX で営業時間外の動作を実装する
 - switch コマンドを使用して別の PBX に転送する
-- プライバシーマネージャーを実装する
-- ボイスメールを実装する
-- 社内ディレクトリを実装する
+- privacy manager を実装する
+- voicemail を実装する
+- 企業ディレクトリを実装する
 
-## ダイヤルプランの簡素化
+## dialplan の簡素化
 
-ダイヤルプランを簡素化するには、キーワード “same” を使用してエクステンションを定義します。これにより、ダイヤルプラン内のタイプミスの数が減少するはずです。以下の例をご確認ください：
+キーワード「same」を使用することで、extension を定義する dialplan を簡素化できます。これにより、dialplan 内のタイプミスを減らすことができるはずです。以下の例を確認してください。
 
 ```
 exten => 4000,1,NoOp()
 same  =>      n,Dial(PJSIP/005C2B313E22)
 ```
 
-## Dial Plan Security
+## Dial Planのセキュリティ
 
-Asterisk のダイヤルプランに、ユーザーが新しいチャネルとダイヤル番号をインジェクトできる欠陥が発見されました。サーバーに `exten=>_X.,1,Dial(PJSIP/${EXTEN})` という行があり、悪意のあるユーザーがソフトフォンで番号 `3000&DAHDI/1/011551123456789` をダイヤルしたとします。SIP プロトコルはデフォルトで任意の英数字を受け付けるため、ダイヤルされた内線は実際には 2 つの呼び出しをトリガーします。1 つはチャネル PJSIP/3000、もう 1 つは国際番号であるチャネル DAHDI/011551123456789 です。したがって、内線へのアクセス権を持つユーザーは実質的に世界中のどこへでも電話をかけることができます。この動作を回避する最も簡単な方法は、dial アプリケーションを呼び出す前に番号をフィルタリングすることです。関数 FILTER() が非常に便利です。例:
+Asteriskのdialplanにおいて、ユーザーが新しいチャネルを注入し、dialplan内の番号へ発信できてしまうという欠陥が発見されました。サーバーの`exten=>_X.,1,Dial(PJSIP/${EXTEN})`に以下の行があり、悪意のあるユーザーがsoftphoneで`3000&DAHDI/1/011551123456789`という番号にダイヤルしたと仮定します。SIPプロトコルはデフォルトで任意の英数字を受け入れるため、ダイヤルされたextensionは実際には2つの通話を引き起こします。1つはチャネルPJSIP/3000への通話、もう1つは国際電話番号であるチャネルDAHDI/011551123456789への通話です。したがって、extensionへのアクセス権を持つユーザーであれば誰でも、世界中のどこへでもダイヤルできてしまいます。この挙動を回避する最も簡単な方法は、dialアプリケーションを呼び出す前に番号をフィルタリングすることです。FILTER()関数は、この目的のために非常に便利です。例：
 
 ```
 exten=>_X.,1,DIAL(PJSIP/${FILTER(0-9,${EXTEN})})
 ```
 
-filter アプリケーションは、ダイヤルされた番号から 0 から 9 までの数字以外のすべての文字を除去できます。詳細は、Asterisk から入手可能な README‑SERIOUSLY.bestpractices.txt ファイルをご参照ください。
+このアプリケーションフィルタを使用すると、ダイヤルされた番号から0から9までの数字以外のすべての文字を除去できます。詳細については、Asteriskから入手可能なファイルREADME-SERIOUSLY.bestpractices.txtを参照してください。
 
-## IVR メニューを使用した着信の受信。
+## IVRメニューを使用した着信の受信
 
-前のセクションでは、DID またはオペレーターへの転送で全ての着信を受け取っていました。ここでは、IVR メニューの実装方法と自動応答サービスの作成方法を学びます。具体的な内容に入る前に、新しいアプリケーションをいくつか確認しておきましょう。読者の利便性を考えて、コマンド `core show application` の出力を以下に示しています。これらの説明は、`core show application <application_name>` を使用して自分でも取得できます。
+前節では、DIDを使用するか、オペレーターに転送することで、すべての着信を受信しました。ここでは、IVRメニューの実装方法と、自動応答サービスの作成方法を学びます。詳細に入る前に、いくつかの新しいアプリケーションについて確認しましょう。読者の利便性を高めるため、コマンド`core show application`の出力を以下に記載します。これらの説明は、自身で`core show application <application_name>`を使用して取得することも可能です。
 
 ### Background() アプリケーション
 
-このアプリケーションは、呼び出し元チャネルが番号をダイヤルするのを待ちながら、指定されたファイルのリストを再生します。このアプリケーションの再生が終了した後も数字の入力待ちを続けるには、`WaitExten` アプリケーションを使用する必要があります。`langoverride` オプションは、要求されたサウンドファイルに使用する言語を明示的に指定します。指定されたコンテキストは、ダイヤルされたエクステンションに退出する際にこのアプリケーションが使用するダイヤルプランコンテキストとなります。要求されたサウンドファイルのいずれかが存在しない場合、コール処理は終了します。Options:
+このアプリケーションは、指定されたファイルのリストを再生しながら、呼び出し側のチャネルによってextensionがダイヤルされるのを待機します。このアプリケーションによるファイルの再生終了後も数字の入力を待機し続けるには、WaitExtenアプリケーションを使用する必要があります。langoverrideオプションは、要求された音声ファイルに対して試行する言語を明示的に指定します。指定されたcontextは、ダイヤルされたextensionへ移行する際にこのアプリケーションが使用するdialplanのcontextとなります。要求された音声ファイルのいずれかが存在しない場合、通話処理は終了します。オプション：
 
-- s - チャネルが「up」状態でない場合（つまり、まだ応答されていない場合）にメッセージの再生をスキップさせます。この場合、アプリケーションは直ちに戻ります。  
-- n - ファイルを再生する前にチャネルに応答しません。  
-- m - 入力された数字が宛先コンテキストの1桁エクステンションと一致したときだけブレークします。
+- s - チャネルが 'up' 状態（つまり、まだ応答されていない）でない場合、メッセージの再生をスキップします。この場合、アプリケーションは直ちに終了します。
+- n - ファイルを再生する前にチャネルに応答しません。
+- m - 入力された数字が宛先context内の1桁のextensionと一致した場合にのみ中断します。
 
 ### Record() アプリケーション
 
-このアプリケーションは、チャンネルから指定されたファイル名に録音します。ファイルが既に存在する場合、上書きされます。
+このアプリケーションは、チャネルから指定されたファイル名へ録音を行います。ファイルが存在する場合は上書きされます。
 
-![10-ダイヤルプラン高度機能 図 1](../images/10-dialplan-advanced-features-img01.png)
+![10-dialplan-advanced-features figure 1](../images/10-dialplan-advanced-features-img01.png)
 
-- ‘format’ は記録するファイルタイプの形式です（wav、gsm など）。
-- ‘silence’ は、戻るまでに許容される無音の秒数です。
-- ‘maxduration’ は最大録音時間（秒）です。省略または 0 の場合、最大時間はありません。
-- ‘options’ には以下の文字のいずれかを含めることができます:
-    - `a` — 既存の録音に追加し、置き換えません
-    - `n` — 応答しないが、ラインがまだ応答されていなくても録音します
-    - `q` — 静かに（ビープ音を鳴らさない）
-    - `s` — ラインがまだ応答されていない場合は録音をスキップします
-    - `t` — デフォルトの`#`の代わりに代替の`*`終端キー（DTMF）を使用します
-    - `x` — すべての終端キー（DTMF）を無視し、ハングアップするまで録音し続けます
+- 'format' は、録音するファイル形式（wav、gsmなど）です。
+- 'silence' は、終了するまでに許容される無音の秒数です。
+- 'maxduration' は、秒単位での最大録音時間です。省略または0の場合、制限はありません。
+- 'options' には以下の文字を含めることができます：
+    - `a` — 既存の録音を置き換えるのではなく、末尾に追加します
+    - `n` — 応答しないが、回線がまだ応答されていない場合でも録音します
+    - `q` — 静音（ビープ音を鳴らさない）
+    - `s` — 回線がまだ応答されていない場合は録音をスキップします
+    - `t` — デフォルトの`#`の代わりに、代替の`*`終了キー（DTMF）を使用します
+    - `x` — すべての終了キー（DTMF）を無視し、切断されるまで録音を続けます
 
-If filename contains %d, these characters will be replaced with a number incremented by one each time the file is recorded. Use core show file formats to see the available formats on your system. The user can press # to terminate the recording and continue to the next priority. If the user hangs up during a recording, all data will be lost and the application will terminate.
+ファイル名に %d が含まれている場合、ファイルが録音されるたびに、これらの文字は1ずつ増加する数字に置き換えられます。システムで使用可能な形式を確認するには、core show file formats を使用してください。ユーザーは # を押すことで録音を終了し、次の優先順位に進むことができます。録音中にユーザーが切断した場合、すべてのデータは失われ、アプリケーションは終了します。
 
 ### Playback() アプリケーション
 
-このアプリケーションは指定されたファイル名（拡張子は含めない）を再生します。パイプ記号の後にオプションを付けることもできます。'skip' オプションは、チャネルが 'up' 状態でない場合（つまり、まだ応答されていない場合）にメッセージの再生をスキップさせます。
+このアプリケーションは、指定されたファイル名（拡張子は含めない）を再生します。パイプ記号の後にオプションを含めることもできます。'skip' オプションは、チャネルが 'up' 状態（つまり、まだ応答されていない）でない場合にメッセージの再生をスキップさせます。
 
-![10-dialplan-advanced-features 図 2](../images/10-dialplan-advanced-features-img02.png)
+![10-dialplan-advanced-features figure 2](../images/10-dialplan-advanced-features-img02.png)
 
-![10-dialplan-advanced-features 図 3](../images/10-dialplan-advanced-features-img03.png)
+![10-dialplan-advanced-features figure 3](../images/10-dialplan-advanced-features-img03.png)
 
-もし `skip` が指定されている場合、チャンネルがフックオフ状態でないときはアプリケーションは直ちに戻ります。`noanswer` が指定されていない限り、サウンドが再生される前にチャンネルは応答されます。すべてのチャンネルがフックオンのままでメッセージを再生できるわけではありません。`j` が指定されている場合、ファイルが存在しないときに（存在する場合）アプリケーションは優先度 n+101 にジャンプします。このアプリケーションは完了時に次のチャンネル変数を設定します：
+'skip' が指定されている場合、チャネルがオフフック状態でなければ、アプリケーションは直ちに終了します。それ以外の場合、'noanswer' が指定されていない限り、音声が再生される前にチャネルが応答されます。すべてのチャネルがオンフック状態でメッセージの再生をサポートしているわけではありません。'j' が指定されている場合、ファイルが存在しない場合に優先順位 n+101 にジャンプします。このアプリケーションは、完了時に以下のチャネル変数を設定します：
 
-- PLAYBACKSTATUS — 再生試行のステータスをテキスト文字列で表したもので、次のいずれかです:
+- PLAYBACKSTATUS — 再生試行のステータスを示すテキスト文字列。以下のいずれか：
     - `SUCCESS`
     - `FAILED`
 
 ### Read() アプリケーション
 
-このアプリケーションは、ユーザーから指定された変数へ、事前に決められた数の文字列数字を、所定回数読み取ります。
+このアプリケーションは、ユーザーから指定された回数だけ、あらかじめ決められた桁数の数字を読み取り、指定された変数に格納します。
 
-- filename -- オプション i で数字またはトーンを読み取る前に再生するファイル
-- maxdigits -- 許容できる最大桁数。maxdigits が入力されると読み取りを停止します（ユーザーが # キーを押す必要はありません）。デフォルトは 0 で、制限なし（ユーザーが # キーを押すまで待ちます）。0 未満の値も同様の意味です。許容される最大値は 255 です。
+- filename -- 数字やトーンを読み取る前に再生するファイル（オプション i を使用）
+- maxdigits -- 許容される最大桁数。maxdigits に達すると読み取りを停止します（ユーザーが # キーを押す必要はありません）。デフォルトは 0（制限なし）で、ユーザーが # キーを押すのを待ちます。0 未満の値も同様です。最大許容値は 255 です。
 
-![10-ダイヤルプラン-高度機能 図 4](../images/10-dialplan-advanced-features-img04.png)
+![10-dialplan-advanced-features figure 4](../images/10-dialplan-advanced-features-img04.png)
 
-![10-dialplan-advanced-features 図 5](../images/10-dialplan-advanced-features-img05.png)
+![10-dialplan-advanced-features figure 5](../images/10-dialplan-advanced-features-img05.png)
 
-- option -- options are `s`, `i`, `n`:
-    - `s` — 回線がアップしていない場合は直ちに戻ります
-    - `i` — `indications.conf`からインジケーショントーンとしてファイル名を再生します
-    - `n` — 回線がアップしていなくても数字を読み取ります
-- attempts -- 1 より大きい場合、データが入力されなかったときに行われる試行回数
-- timeout -- デジット応答を待つ秒数の整数です。0 より大きい場合、その値がデフォルトのタイムアウトを上書きします。
+- option -- オプションは`s`、`i`、`n`です：
+    - `s` — 回線が up 状態でなければ直ちに終了します
+    - `i` — filename を`indications.conf`からの通知トーンとして再生します
+    - `n` — 回線が up 状態でなくても数字を読み取ります
+- attempts -- 1 より大きい場合、データが入力されなかった場合に試行される回数です
+- timeout -- 数字の応答を待機する秒数（整数）。0 より大きい場合、その値がデフォルトのタイムアウトを上書きします。
 
-The read() アプリケーションは、関数が失敗したりエラーが発生した場合に切断すべきです。
+関数が失敗またはエラーになった場合、read() アプリケーションは切断されるべきです。
 
 ### Gotoif() アプリケーション
 
-このアプリケーションは、指定された条件の評価に基づいて、呼び出しチャンネルをダイヤルプラン内の指定された位置へジャンプさせます。条件が真の場合は labeliftrue に、偽の場合は 'labeliffalse' に続きます。ラベルは Goto アプリケーションで使用されるのと同じ構文で指定します。条件によって選択されたラベルが省略された場合、ジャンプは行われず、ダイヤルプランの次のプライオリティで実行が続行されます。
+このアプリケーションは、指定された条件の評価に基づいて、呼び出し側のチャネルをdialplan内の指定された場所にジャンプさせます。条件が真であれば labeliftrue に、偽であれば 'labeliffalse' にチャネルが継続します。ラベルは Goto アプリケーション内で使用されるものと同じ構文で指定されます。条件によって選択されたラベルが省略された場合、ジャンプは実行されず、dialplan内の次の優先順位で実行が継続されます。
 
-### Lab: IVR メニューをステップバイステップで構築
+### ラボ：IVRメニューの段階的な構築
 
-IVRメニューを次の機能で作成しましょう。ダイヤルされたとき、IVRは音声ファイルを再生し、メッセージ「Welcome to the XYZ Corporation; press 1 for sales, 2 for tech support, 3 for training, or wait to speak to a representative.」を流します。数字は発信者を次のようにルーティングします：
+以下の機能を持つIVRメニューを作成しましょう。ダイヤルされると、IVRは「XYZコーポレーションへようこそ。営業は1を、技術サポートは2を、トレーニングは3を押してください。担当者につながるまでお待ちください」という音声ファイルを再生します。数字によって発信者は以下のようにルーティングされます：
 
 - `1` — 営業へ転送 (PJSIP/4001)
-- `2` — テクニカルサポートへ転送 (PJSIP/4002)
+- `2` — 技術サポートへ転送 (PJSIP/4002)
 - `3` — トレーニングへ転送 (PJSIP/4003)
-- 数字が押されなかった場合 — オペレーターへ転送 (PJSIP/4000)
+- 数字が押されない場合 — オペレーターへ転送 (PJSIP/4000)
 
-**ステップ1 – プロンプトを記録する**
+**ステップ 1 – プロンプトの録音**
 
-プロンプトを録音するためのエクステンションを作成しましょう。プロンプトを録音するには、ソフトフォンから`9003<filename>`へダイヤルします（例: `9003welcome`）。ビープ音が聞こえたら録音を開始し、`#`を押して停止します。ビープ音が鳴り、システムが録音されたプロンプトを再生します。
+プロンプトを録音するためのextensionを作成しましょう。プロンプトを録音するには、softphoneから`9003<filename>`（例：`9003welcome`）にダイヤルします。ビープ音が聞こえたら録音を開始し、`#`を押して停止します。ビープ音が鳴り、システムが録音されたプロンプトを再生します。
 
-**ステップ2 – メニュー ロジックの作成**
+**ステップ 2 – メニューロジックの作成**
 
-When dialing the 9004 extension, processing jumps to the menu in the `s` extension, priority 1.
+9004 extensionにダイヤルすると、処理は`s` extensionの優先順位1のメニューにジャンプします。
 
-### ダイヤル時のマッチング
+### ダイヤル中のマッチング
 
-これは、着信を受け取るための会社設定メニューです。 `Background()` アプリケーションはウェルカムプロンプトを再生し、その後、発信者がダイヤルした番号を現在のコンテキストで定義されたエクステンションと照合しながら、数字入力を待ちます。
+これは着信を受信するための会社設定メニューです。`Background()`アプリケーションはウェルカムプロンプトを再生し、その後数字を待機し、発信者がダイヤルした内容を現在のcontextで定義されたextensionと照合します。
 
 ```
 [incoming]
@@ -138,41 +138,41 @@ exten=>31,1,Dial(DAHDI/5)
 exten=>32,1,Dial(DAHDI/6)
 ```
 
-When you dial this company, the welcome message is played first. After that, Asterisk waits for a digit to be dialed:
+この会社にダイヤルすると、最初にウェルカムメッセージが再生されます。その後、Asteriskは数字がダイヤルされるのを待機します：
 
-| ダイヤル番号 | Asterisk アクション |
+| ダイヤルされた番号 | Asteriskの動作 |
 |---------------|-----------------|
-| 1 | すぐに `Dial(DAHDI/1)` を呼び出す |
-| 2 | タイムアウトを待ち、次に `Dial(DAHDI/2)` を呼び出す |
-| 21 | すぐに `Dial(DAHDI/3)` を呼び出す |
-| 22 | すぐに `Dial(DAHDI/4)` を呼び出す |
-| 3 | タイムアウトを待ち、切断する |
-| 31 | すぐに `Dial(DAHDI/5)` を呼び出す |
-| 32 | すぐに `Dial(DAHDI/6)` を呼び出す |
+| 1 | 直ちに`Dial(DAHDI/1)`を呼び出す |
+| 2 | タイムアウトまで待機し、その後`Dial(DAHDI/2)`を呼び出す |
+| 21 | 直ちに`Dial(DAHDI/3)`を呼び出す |
+| 22 | 直ちに`Dial(DAHDI/4)`を呼び出す |
+| 3 | タイムアウトまで待機し、その後切断する |
+| 31 | 直ちに`Dial(DAHDI/5)`を呼び出す |
+| 32 | 直ちに`Dial(DAHDI/6)`を呼び出す |
 
-It is important to avoid ambiguity in the menus. Everybody wants to be answered quickly. For this reason, you should not use numbers 2, 21, or 22.
+メニュー内の曖昧さを避けることは重要です。誰もが迅速に応答されることを望んでいます。このため、番号 2、21、または 22 を使用すべきではありません。
 
 ### ラボ：Read() アプリケーションの使用
 
-Please try the lab with the read() application. Read accept digits from the user and inserts them into the specified variable; you can then use the gotoif application to redirect the call.
+read() アプリケーションを使用したラボを試してください。Readはユーザーから数字を受け取り、指定された変数に挿入します。その後、gotoif アプリケーションを使用して通話をリダイレクトできます。
 
-## コンテキストのインクルード
+## Context inclusion
 
-コンテキストは別のコンテキストの内容を取り込むことができます。上記の例では、任意のチャンネルが internal コンテキスト内の任意のエクステンションにダイヤルできますが、4003 チャンネルだけが国際エクステンションにダイヤルできます。コンテキストのインクルードを使用すると、ダイヤルプランの作成が容易になります。コンテキストのインクルードを利用して、誰がどのエクステンションにアクセスできるかを制御できます。
+Contextは、別のContextの内容をインクルード（含める）ことができます。上記の例では、どのチャネルもinternal Context内のどのextensionにもダイヤルできますが、国際電話のextensionにダイヤルできるのは4003チャネルだけです。Context inclusionを使用すると、dialplanの作成が容易になります。Context inclusionを利用することで、誰がどのextensionにアクセスできるかを制御できます。
 
-### メッセージ “number not found” のトラブルシューティング
+### “number not found” メッセージのトラブルシューティング
 
-“number not found” というメッセージを受け取ることは非常に一般的です。多くの人がインクルードされたコンテキストの概念を混同しますが、これは直感的ではありません。経験則として、まず incoming チャンネルの設定ファイル（例: `pjsip.conf`、`chan_dahdi.conf`、`iax.conf`）を開き、現在のコンテキストを確認します。その後、extensions.conf ファイル内のダイヤルプランに移動し、ダイヤルされた番号がそのコンテキストに存在するかをチェックします。存在しない場合、ダイヤルプランに問題があります。コンテキストの黄金律は次のとおりです。1. チャンネルは同じコンテキスト内の番号しかダイヤルできません。2. 呼び出しが処理されるコンテキストは、incoming チャンネルの設定ファイル（`chan_dahdi.conf`、`iax.conf`、`pjsip.conf`）で定義されています。
+“number not found” というメッセージを受け取ることは非常によくあります。多くの人は、included contextの概念を混同してしまいます。これは直感的ではないためです。経験則として、まずは `pjsip.conf`、`chan_dahdi.conf`、`iax.conf` といった着信チャネルの設定ファイルを確認し、現在のContextを特定してください。次に、extensions.conf ファイル内の dialplan に移動し、ダイヤルした番号がその Context 内で見つかるかどうかを確認します。もし見つからない場合、dialplan に何らかの問題があります。Context に関する黄金律は以下の通りです。1. チャネルは、そのチャネルと同じ Context 内の番号にしかダイヤルできない。2. 通話が処理される Context は、着信チャネルの設定ファイル（`chan_dahdi.conf`、`iax.conf`、`pjsip.conf`）で定義される。
 
-## スイッチ文の使用
+## switch ステートメントの使用
 
-スイッチコマンドを使用して、ダイヤルプランの処理を別のサーバーに送信できます。別のサーバーの名前とキーが必要です。コンテキストは宛先コンテキストです。
+switch コマンドを使用すると、dialplan の処理を別のサーバーに送信できます。その際、相手先サーバーの名前とキーが必要になります。context は送信先の context です。
 
-![10-dialplan-advanced-features 図 6](../images/10-dialplan-advanced-features-img06.png)
+![10-dialplan-advanced-features figure 6](../images/10-dialplan-advanced-features-img06.png)
 
-## ダイヤルプランの処理順序
+## dialplan の処理順序
 
-Asterisk が着信を受け取ると、チャンネルで定義されたコンテキストを参照します。場合によっては、ダイヤルされた番号に対して複数のパターンが一致すると、Asterisk は期待通りに呼び出しを処理できないことがあります。`dialplan show` CLI コマンドを使用すると、マッチング順序を確認できます。例: 912 をアナログトランク (DAHDI/1) にルーティングし、9 で始まるその他のすべての番号を別のアナログトランク (DAHDI/2) にルーティングしたいとします。その場合は次のように記述します。
+Asterisk が着信を受けると、そのチャネルで定義された context 内を検索します。場合によっては、ダイヤルされた番号に複数のパターンが一致してしまい、Asterisk が意図した通りに呼び出しを処理できないことがあります。CLI コマンドの `dialplan show` を使用すると、一致の優先順位を確認できます。例として、912 をダイヤルした場合はアナログ trunk (DAHDI/1) にルーティングし、9 で始まるその他のすべての番号は別のアナログ trunk (DAHDI/2) にルーティングしたいとします。その場合、以下のように記述します。
 
 ```
 [example]
@@ -180,29 +180,29 @@ exten=>_912.,1,Dial(DAHDI/1/${EXTEN})
 exten=>_9.,1,Dial(DAHDI/2/${EXTEN})
 ```
 
-2 つのパターンが同じエクステンションにマッチした場合、インクルードされたコンテキストを使用して、どのエクステンションを先に処理するかを制御できます。インクルードされたコンテキストは、同じコンテキスト内のパターンよりも後に処理されます。
+2 つのパターンが同じ extension に一致する場合、included context を使用することで、どの extension を先に処理するかを制御できます。included context は、同じ context 内のパターンよりも後に処理されます。
 
-## #INCLUDE 文
+## #INCLUDE ステートメント
 
-大きなファイルを使うべきか、複数のファイルに分けるべきか？ extensions.conf に他のファイルを取り込むには #include <filename> 文を使用できます。例えば、ローカルユーザー用に users.conf を、特別なサービス用に services.conf を作成できます。#include <filename> を以下のものと混同しないよう注意してください。
+大きなファイルを1つ使うべきでしょうか、それとも複数のファイルに分けるべきでしょうか？ `extensions.conf` 内で `#include <filename>` ステートメントを使用すると、他のファイルを読み込むことができます。例えば、ローカルユーザー用に `users.conf` を、特別なサービス用に `services.conf` を作成するといったことが可能です。#include <filename> と混同しないよう注意してください。
 
 ```
 include=>context statement.
 ```
 
-## Subroutines with GOSUB
+## GOSUBによるサブルーチン
 
-古いバージョンの Asterisk では Macro コマンドがありました。このコマンドは長い間前に非推奨となり、GOSUB に置き換えられました。ここでは、ボイスメール処理用のサブルーチンを簡単かつ整理された方法で作成する方法を示します。コマンド形式:
+古いバージョンの Asterisk には Macro というコマンドがありました。このコマンドは随分前に非推奨となり、現在は GOSUB が推奨されています。ここでは、ボイスメール処理のためのサブルーチンを簡単かつ整理された方法で作成する方法を説明します。コマンドの形式は以下の通りです。
 
 ```
 gosub([[context,]exten,]priority[(arg1[,...][,argN])])
 ```
 
-GOSUB コマンドは Asterisk 1.6 以降で利用可能で、引数を渡すことができます（サブルーチン内では `${ARG1}`、`${ARG2}` などとして参照できます）。引数を使用すれば、従来の Macro コマンドを完全に置き換えることが可能です。Macro（`app_macro`）は Asterisk 21 で削除されました；サブルーチンには GOSUB を使用しなければなりません。
+GOSUB コマンドは Asterisk 1.6 から利用可能であり、引数の受け渡し（サブルーチン内では `${ARG1}`、 `${ARG2}` などとして利用可能）をサポートしています。引数を使用することで、古い Macro コマンドを完全に置き換えることが可能になりました。Macro（`app_macro`）は Asterisk 21 で削除されたため、サブルーチンには必ず GOSUB を使用しなければなりません。
 
-### Creating the subroutine
+### サブルーチンの作成
 
-定義は非常に似ています。以下に、名前を stdexten としたボイスメール用サブルーチンの例を示します（好きな名前に変更してください）。最初の引数（チャンネル名）で Dial コマンドを呼び出した後、${DIALSTATUS} を確認して次のステップへ処理を送ります。
+定義方法は非常によく似ています。以下は、stdexten という名前（好きな名前を選択してください）で定義されたボイスメール用のサブルーチンです。第1引数（チャネル名）を指定して Dial コマンドを呼び出した後、${DIALSTATUS} をチェックして、通話ロジックを次のステップへ送ります。
 
 ```
 [stdexten]
@@ -218,9 +218,9 @@ exten=>s,n(CHANUNAVAIL),hangup
 exten=>s,n(CONGESTION),hangup
 ```
 
-### Calling a subroutine
+### サブルーチンの呼び出し
 
-サブルーチンを呼び出す際は、パラメータの前に丸括弧を付けることに注意してください。
+サブルーチンを呼び出す際は、パラメータの前に括弧を使用することに注意してください。
 
 ```
 exten=>6000,1,Gosub(stdexten,s,1(PJSIP/6000,${EXTEN}))
@@ -231,11 +231,11 @@ exten=>6003,1,Gosub(stdexten,s,1(PJSIP/6003,${EXTEN}))
 
 ## Using Asterisk DB
 
-コールフォワードやブラックリストを実装するには、データを保存・復元する手段が必要です。幸い、Asterisk には AstDB と呼ばれる組み込みデータベースからデータを保存・取得する仕組みが用意されています。最新の Asterisk（Asterisk 22 を含む）では AstDB は **SQLite3**（ファイル `/var/lib/asterisk/astdb.sqlite3`）で裏付けられています。Asterisk 1.8 以前は Berkeley DB v1 が使用されていました。これは、ファミリとキーの階層概念を使用する Windows レジストリ データベースに似ています。データは Asterisk の再起動間で永続化されます。ファミリ/キー API は古いバックエンドから変更されておらず、ディスク上の保存形式だけが変わっています。
+コール転送やブラックリストを実装するには、データを保存および復元する手段が必要です。幸いなことに、AsteriskにはAstDBと呼ばれる組み込みデータベースからデータを保存および取得するためのメカニズムが用意されています。最新のAsterisk（Asterisk 22を含む）では、AstDBは **SQLite3** （ファイル `/var/lib/asterisk/astdb.sqlite3`）によってバックアップされています。Asterisk 1.8以前ではBerkeley DB v1が使用されていました。これは、familyとkeyの階層概念を使用するWindowsレジストリデータベースに似ています。データはAsteriskの再起動後も保持されます。family/key APIは古いバックエンドから変更されておらず、ディスク上のストレージ形式のみが変更されました。
 
 ### Functions, applications, and CLI commands
 
-AstDB と連携する関数、アプリケーション、CLI コマンドがいくつかあります。
+AstDBを操作するための関数、アプリケーション、およびCLIコマンドがいくつか存在します。
 
 - variable=${DB(<family/key>)}
 - DB(<family/key>)=value
@@ -248,14 +248,14 @@ exten=_*21*XXXX,1,Set(DB(CFIM/${CALLERID(num)})=${EXTEN:4})
 exten=s,1,Set(temp=${DB(CFIM/${EXTEN})})
 ```
 
-AstDB を操作できるアプリケーションの例:
+AstDBを操作するために使用できるアプリケーションもあります。
 
-- DB_DELETE(<family/key>) — 単一キーを返して削除する関数
-- DBdeltree(<family>) — ファミリ/サブツリー全体を削除するアプリケーション
+- DB_DELETE(<family/key>) — 単一のキーを返して削除する関数
+- DBdeltree(<family>) — family全体/サブツリー全体を削除するアプリケーション
 
-古い `DBdel()` アプリケーションは Asterisk 22 では存在しません。単一キーの削除は `DB_DELETE()` ダイヤルプラン関数で行います — 例: `Set(x=${DB_DELETE(family/key)})` または、書き込み操作として `Set(DB_DELETE(family/key)=)`。`DBdeltree()`（ファミリ/サブツリー全体の削除）は依然としてアプリケーションです。
+古い `DBdel()` アプリケーションはAsterisk 22には存在しません。単一のキーを削除するには `DB_DELETE()` dialplan関数を使用します。例： `Set(x=${DB_DELETE(family/key)})` 、または書き込み操作として `Set(DB_DELETE(family/key)=)` を使用します。 `DBdeltree()` （family全体/サブツリー全体の削除）は現在もアプリケーションとして存在します。
 
-CLI コマンドでもキーの設定や削除が可能です:
+CLIコマンドを使用してキーを設定および削除することも可能です。
 
 - database del
 - database put
@@ -270,19 +270,19 @@ CLI コマンドでもキーの設定や削除が可能です:
 
 ### Implementing Call Forward, DND, and Blacklists
 
-この例では、コールフォワード即時とコールフォワードビジーの実装方法を学びます。*21* を使ってコールフォワード即時を、*61* を使ってコールフォワードビジーをプログラムします。プログラムをキャンセルするには、それぞれ #21# と #61# を使用します。上記の例を使ってデータベースに情報を登録します。使用するファミリは次のとおりです。
+この例では、無条件転送（Call Forward Immediate）と話中時転送（Call Forward on Busy）の実装方法を学びます。無条件転送のプログラムには *21* を、話中時転送のプログラムには *61* を使用します。プログラムをキャンセルするには、それぞれ #21# と #61# を使用します。上記の例を使用してデータベースに値を設定してください。使用するfamilyは以下の通りです。
 
-- CFIM – Call Forward Immediate
-- CFBS – Call Forward on Busy status
-- DND – Do Not Disturb
+- CFIM – Call Forward Immediate（無条件転送）
+- CFBS – Call Forward on Busy status（話中時転送）
+- DND – Do Not Disturb（おやすみモード）
 
-次の番号をダイヤルしてデータベースに情報を登録してみてください。
+以下のダイヤル操作でデータベースに値を設定してみてください。
 
-- *21*（コールフォワード即時の宛先エクステンション）
-- *61*（コールフォワードビジーの宛先エクステンション）
-- *41*（取り込み禁止にするエクステンション）
+- *21* （無条件転送先のextension）
+- *61* （話中時転送先のextension）
+- *41* （おやすみモードにするextension）
 
-CLI コマンド `database show` を使用して、追加されたファミリ、キー、値を確認できます。
+CLIコマンド database show を使用して、追加されたfamily、key、および値を確認してください。
 
 ![10-dialplan-advanced-features figure 9](../images/10-dialplan-advanced-features-img09.png)
 
@@ -290,15 +290,15 @@ CLI コマンド `database show` を使用して、追加されたファミリ�
 
 ### Call Forward, Blacklist, DND
 
-このサブルーチンは、データベースに CFIM、CFBS、または DND に対応する key:value ペアが存在するかを確認し、適切に処理します。以下のサブルーチンがダイヤリングルーチンを呼び出します:
+このサブルーチンは、データベースにCFIM、CFBS、またはDNDに対応するkey:valueペアが含まれているかどうかを検証し、それに応じて適切に処理します。以下のサブルーチンはダイヤルルーチンを呼び出します。
 
 ```
 exten=_4XXX,1,gosub(stdexten,s,1(${EXTEN}))
 ```
 
-## Using a blacklist
+## ブラックリストの使用
 
-古い`LookupBlacklist()`アプリケーションは **削除** されました（レガシーな「priority+101 jump」メカニズムと共に消失しました）。Asterisk 22 では`DB_EXISTS()`関数（キーの存在をテストし、見つかった場合はその値を`${DB_RESULT}`で取得できる）と`GotoIf`を組み合わせて直接ブラックリストを構築します。ブロックする各番号を`blacklist`ファミリのキーとして保存し、受信コンテキストの先頭で発信者IDをチェックします：
+古い `LookupBlacklist()` アプリケーションは Asterisk から **削除** されました（これはレガシーな「priority+101ジャンプ」メカニズムとともに廃止されました）。Asterisk 22 では、ブラックリストを `DB_EXISTS()` 関数（キーの存在をテストし、見つかった場合はその値を `${DB_RESULT}` に展開します）と `GotoIf` を組み合わせて直接構築します。ブロックする各番号を `blacklist` ファミリーのキーとして保存し、着信用の context の先頭で発信者番号を確認します。
 
 ```
 [incoming]
@@ -311,9 +311,9 @@ exten => s,2,Playback(blockedcall)
 exten => s,3,Hangup()
 ```
 
-`DB_EXISTS(blacklist/${CALLERID(num)})`は、発信者番号がデータベースに存在する場合は`1`（`blocked`コンテキストへコールを送信）を返し、存在しない場合は`0`を返すので、コールは通常の`Dial()`へ進みます。
+`DB_EXISTS(blacklist/${CALLERID(num)})` は、発信者の番号がデータベースに存在する場合に `1` を返し（通話を `blocked` context に送信します）、それ以外の場合は `0` を返すため、通話は通常の `Dial()` へと進みます。
 
-ブラックリストに番号を追加するには、以前と同じリソースを使用し、*31* の後にブラックリストに登録したい内線番号を入力します。番号を削除するには、#31# の後に削除したい番号を入力してください。
+ブラックリストに番号を追加するには、以前と同じリソースを使用し、*31* に続けてブラックリストに追加する extension を入力します。ブラックリストから番号を削除するには、#31# に続けて削除する番号を入力します。
 
 ```
 [apps]
@@ -323,13 +323,13 @@ exten=>_#31#X.,1,Set(x=${DB_DELETE(blacklist/${EXTEN:4})})
 exten=>_#31#X.,2,Hangup()
 ```
 
-コンソール CLI からもブラックリストに番号を追加できます：
+コンソールの CLI を使用してブラックリストに番号を挿入することもできます。
 
 ```
 *CLI>database put blacklist <name/number> 1
 ```
 
-※ 任意の値をキーに関連付けることができます。`DB_EXISTS()`テストは値ではなくキーを検索します。ブラックリストから番号を削除するには、次のコマンドを使用します：
+注意: キーには任意の値を関連付けることができます。`DB_EXISTS()` テストは値ではなくキーを検索します。ブラックリストから番号を消去するには、以下を使用できます。
 
 ```
 *CLI>database del blacklist <name/number>
@@ -337,75 +337,75 @@ exten=>_#31#X.,2,Hangup()
 
 ## 時間ベースのコンテキスト
 
-以下の図では、3つのコンテキストを持つダイヤルプランを示しています。`[incoming]` コンテキストは通常、着信が受け取られる場所です。システム時刻に応じて動作を変更する4行を含めており、例は次のとおりです：
+以下の図では、3つのコンテキストを持つdialplanを示しています。 [incoming] コンテキストは、通常、通話が着信する場所です。以下に例示するように、システム時刻に応じて動作を変更する4つの行を含めています。
 
 ```
 include => context,<times>,<weekdays>,<mdays>,<months>
 ```
 
-Modern Asterisk（22 を含む）は、時間インクルードフィールドを **コンマ** で区切ります。レガシーのパイプ形式（`include => context|times|weekdays|mdays|months`）は、単なるリテラルのコンテキスト名として解析され、時間条件が適用されずに黙って失敗します。
+最新の Asterisk（22を含む）では、time-include フィールドをパイプではなく**カンマ**で区切ります。従来のパイプ形式（`include => context|times|weekdays|mdays|months`）は、単なるリテラルのコンテキスト名として解析され、時間条件は適用されずに黙示的に失敗します。
 
-通常の勤務時間中は、処理は `mainmenu` にリダイレクトされ、恐らく着信を処理する IVR が呼び出されます。営業時間外に通話が行われた場合は、`${SECURITY}` 変数で定義されたセキュリティエクステンションが呼び出されます。セキュリティエクステンションが応答しない場合、オペレーターのボイスメールに転送されます。
+通常の営業時間中は、処理が mainmenu にリダイレクトされ、そこで着信を処理するために IVR が呼び出されるのが一般的です。営業時間外に通話が行われた場合は、${SECURITY} 変数で定義された security extension が呼び出されます。もし security extension が応答しない場合は、オペレーターの voicemail に転送されます。
 
 ![10-dialplan-advanced-features figure 11](../images/10-dialplan-advanced-features-img11.png)
 
 ![10-dialplan-advanced-features figure 12](../images/10-dialplan-advanced-features-img12.png)
 
-## Time-based messages using gotoiftime()
+## gotoiftime() を使用した時間ベースのメッセージ
 
-The GotoIfTime() syntax is shown below.
+GotoIfTime() の構文を以下に示します。
 
 ```
 GotoIfTime(times,weekdays,mdays,months[,timezone]?[labeliftrue][:labeliffalse])
 ```
 
-In Asterisk 22 the field separator is a **comma**, not a pipe (the pipe form was deprecated in Asterisk 1.6). An optional `timezone` field is supported, and each branch label uses the usual `[[context,]extension,]priority` form.
+Asterisk 22 では、フィールド区切り文字はパイプではなく**カンマ**です（パイプ形式は Asterisk 1.6 で非推奨となりました）。オプションの `timezone` フィールドがサポートされており、各分岐ラベルは通常の `[[context,]extension,]priority` 形式を使用します。
 
-This application can replace the time-based context and seems easier to understand and read. You can specify the time as follows:
+このアプリケーションは時間ベースの context を置き換えることができ、理解しやすく読みやすいものとなっています。時間は以下のように指定できます。
 
 - <timerange>=<hour>':'<minute>'-'<hour>':'<minute> |"*"
 - <daysofweek>=<dayname>|<dayname>'-'<dayname>|"*"
 - <dayname>="sun"|"mon"|"tue"|"wed"|"thu"|"fri"|"sat"
 - <daysofmonth>=<daynum>|<daynum>'-'<daynum> |"*"
-- <daynum>=number from 1 to 31
-- <hour>=number from 0 to 23
-- <minute>=number from 0 to 59
+- <daynum>=1 から 31 までの数値
+- <hour>=0 から 23 までの数値
+- <minute>=0 から 59 までの数値
 - <months>=<monthname>|<monthname>'-'<monthname>|"*"
 - <monthname>="jan"|"feb"|"mar"|"apr"|"may"|"jun"|"jul"|"aug"|"sep"|"oct"|"nov"|"dec"
 
-Names for days and months are not case sensitive.
+曜日と月の名前は大文字と小文字を区別しません。
 
 ```
 exten=>s,1,GotoIfTime(8:00-18:00,mon-fri,*,*?normalhours,s,1)
 ```
 
-The previous statement transfers the processing to the extension s in the normalhours context if the call is between 08:00AM and 06:00PM from Monday to Friday.
+上記のステートメントは、月曜日から金曜日の午前8時から午後6時の間に通話があった場合、処理を normalhours context 内の extension s に転送します。
 
-## DISA を使用して新しいダイヤルトーンを取得する
+## DISAを使用して新しいダイヤルトーンを取得する
 
-DISA（“direct inward system access”）は、ユーザーが第2のダイヤルトーンを受け取ることを可能にするシステムです。ユーザーは再度ダイヤルして別の宛先に接続できます。これは、週末に技術サポートのために長距離電話をかける技術者がよく使用します。自宅から直接宛先へダイヤルする代わりに、オフィスの DISA 番号に電話し、ダイヤルトーンを受け取ってから宛先へ電話します。長距離料金は自宅電話ではなく会社側で負担されます。
+DISA（Direct Inward System Access：ダイレクトインワードシステムアクセス）は、ユーザーが2つ目のダイヤルトーンを受け取ることができるシステムです。これにより、ユーザーは別の宛先へ再度ダイヤルすることが可能になります。これは、技術者が週末にテクニカルサポートのために長距離電話をかける際によく使用されます。自宅から直接宛先にダイヤルする代わりに、オフィスのDISA番号に電話をかけてダイヤルトーンを受け取り、そこから宛先に発信します。その結果、長距離通話料金は自宅の電話ではなく会社側に請求されます。
 
 ```
 DISA(passcode|filename[,context[,cid[,mailbox[@context][,options]]]])
 ```
 
-例:
+例：
 
 ```
 exten => s,1,DISA(no-password,default)
 ```
 
-上記の文を使用すると、ユーザーは PBX にダイヤルし、パスワードを要求されることなくダイヤルトーンを受け取ります。DISA を使用したすべての呼び出しは `default` コンテキストで処理されます。このアプリケーションの引数には、グローバルパスワードまたはファイル内の個別パスワードが含まれます。コンテキストが指定されていない場合は `disa` コンテキストがデフォルトとして使用されます。パスワードファイルを使用する場合は、完全なパスを指定しなければなりません。DISA の外部ダイヤリング用に発信者番号を指定することもできます。例:
+上記のステートメントを使用すると、ユーザーはPBXにダイヤルし、パスワードを要求されることなくダイヤルトーンを受け取ります。DISAを使用した通話はすべて、`default` contextを使用して処理されます。このアプリケーションの引数には、グローバルパスワードまたはファイル内の個別パスワードが含まれます。contextが指定されていない場合は、`disa` contextが想定されます。パスワードファイルを使用する場合は、完全なパスを指定する必要があります。DISAによる外部発信には、発信者番号（Caller ID）を指定することも可能です。例：
 
 ```
 exten => s,1,DISA(numeric-passcode,default,"Flavio" <4830258590>)
 ```
 
-Asterisk 22 は引数の区切り文字としてカンマを使用します（パイプ形式は 1.6 で非推奨となりました）。最初の引数は単一のパスコードかパスコードファイルへのパスで、何も指定されない場合のデフォルトコンテキストは `disa` です。
+Asterisk 22では、引数の区切り文字としてカンマを使用します（パイプ形式は1.6で非推奨となりました）。最初の引数は単一のパスコードかパスコードファイルへのパスのいずれかであり、何も指定されない場合のデフォルトのcontextは`disa`です。
 
 ## 同時通話数の制限
 
-GROUP() 関数を使用すると、同一グループ内で同時にアクティブなチャンネル数をカウントできます。例: リオデジャネイロに支店があり、電話番号が「_214X」のパターンに従う場合。この拠点は専用回線で接続され、音声帯域として 64K が確保されています。この場合、許容できる最大通話数は 2 本です（G.729、1 本あたり約 31.2K）。リオへの通話を 2 本に制限するには:
+GROUP() 関数を使用すると、特定のグループ内で同時にアクティブなチャネルがいくつあるかをカウントできます。例として、リオデジャネイロに支店があり、電話番号が「_214X」というパターンに従っているとします。この拠点には専用線が引かれており、音声帯域幅として64Kが確保されています。この場合、許可される最大通話数は2（G.729を使用し、1通話あたり約31.2K）となります。リオへの通話を2つまでに制限するには、以下のように設定します。
 
 ```
 exten=>_214X,1,set(GROUP()=Rio)
@@ -418,39 +418,39 @@ exten=>_214X,n,hangup
 
 ## Voicemail
 
-Voicemail は、着信音声メッセージを録音し、ディスクに保存または e‑mail で送信するコンピュータ化された電話応答システムです。ディレクトリがあり、名前で voicemail ボックスを検索できることもあります。かつては voicemail システムは非常に高価でしたが、IP 電話の普及により、voicemail は標準機能となりつつあります。
+Voicemailは、着信した音声メッセージを録音し、ディスクに保存したり電子メールで送信したりするコンピュータ化された電話応答システムです。名前でボイスメールボックスを検索できるディレクトリ機能が備わっていることもあります。かつて、Voicemailシステムは非常に高価なものでした。現在では、IP電話の普及により、Voicemailは標準的な機能になりつつあります。
 
-voicemail を設定するには、以下の手順を実行してください。
+Voicemailを設定するには、以下の手順を実行する必要があります。
 
-**Step 1: Edit `voicemail.conf` and set the general parameters.**
+**ステップ 1: `voicemail.conf`を編集し、一般的なパラメータを設定します。**
 
-- `format` — codec used to record the message (e.g., wav49, wav, gsm)
-- `serveremail` — who the e-mail notification should appear to come from
-- `maxmsg` — maximum number of messages in the mailbox; after this threshold, messages are discarded
-- `maxsecs` — maximum length of a voicemail message, in seconds
-- `minsecs` — minimum length of a message, in seconds; below this threshold, no message is recorded
-- `maxsilence` — how many seconds of silence to treat as the end of the message
+- `format` — メッセージの録音に使用するcodec（例: wav49, wav, gsm）
+- `serveremail` — 電子メール通知の送信元として表示される名前
+- `maxmsg` — メールボックスに保存できるメッセージの最大数。このしきい値を超えると、メッセージは破棄されます
+- `maxsecs` — Voicemailメッセージの最大長（秒単位）
+- `minsecs` — メッセージの最小長（秒単位）。このしきい値を下回ると、メッセージは録音されません
+- `maxsilence` — メッセージの終了とみなす無音時間（秒単位）
 
-**Step 2: Edit `voicemail.conf` and create the users’ mailboxes.**
+**ステップ 2: `voicemail.conf`を編集し、ユーザーのメールボックスを作成します。**
 
 ### Voicemail.conf
 
-A mailbox is defined with one line per mailbox, in the form:
+メールボックスは、1行につき1つのメールボックスを以下の形式で定義します。
 
 ```
 mailboxID => pincode,fullname,email,pager-email,options
 ```
 
-The fields are:
+各フィールドの意味は以下の通りです。
 
-- **MailboxID** — usually the extension number
-- **Pincode** — password to access the voicemail system
-- **Full name** — used by the directory application
-- **E-mail** — address for voicemail notification
-- **Pager e-mail** — address for notification via an SMS gateway or pager
-- **Options** — per-mailbox options (the same options as in `[general]`, but applied to this mailbox)
+- **MailboxID** — 通常はextension番号
+- **Pincode** — Voicemailシステムにアクセスするためのパスワード
+- **Full name** — ディレクトリアプリケーションで使用される名前
+- **E-mail** — Voicemail通知用のアドレス
+- **Pager e-mail** — SMSゲートウェイやポケットベル経由の通知用アドレス
+- **Options** — メールボックスごとのオプション（`[general]`と同じオプションですが、このメールボックスにのみ適用されます）
 
-Voicemail has several options that control its behavior. For now, we will stick to the default options and concentrate on the mailbox definition. After the `[general]` section in the file, you start configuring the mailbox IDs, each in its own context. Example:
+Voicemailには、その動作を制御するためのいくつかのオプションがあります。ここではデフォルトのオプションを使用し、メールボックスの定義に集中します。ファイル内の`[general]`セクションの後に、それぞれのcontext内でメールボックスIDの設定を開始します。例:
 
 ```
 [general]
@@ -458,25 +458,25 @@ Voicemail has several options that control its behavior. For now, we will stick 
 1234=>1234,SomeUser,email@address.com,pager@address.com,saycid=yes|dialout=fromvm|callback=fromvm|review=yes|operator=yes
 ```
 
-Please check for advanced options in the file `voicemail.conf`.
+詳細なオプションについては、ファイル`voicemail.conf`を確認してください。
 
-**Step 3: Configure the file `extensions.conf`.**
+**ステップ 3: ファイル`extensions.conf`を設定します。**
 
-The `stdexten` subroutine shown earlier (under *Subroutines with GOSUB*) is exactly the call/voicemail handler you need here: it dials the extension and uses the value of the channel variable `${DIALSTATUS}` to redirect the call flow to the proper voicemail greeting (`b` for busy, `u` for unavailable). Call it with `Gosub(stdexten,s,1(PJSIP/<device>,<mailbox>))` from each extension in `extensions.conf`.
+前述の（*Subroutines with GOSUB*の項にある）サブルーチン`stdexten`は、ここで必要となる通話/Voicemailハンドラそのものです。これはextensionを呼び出し、チャネル変数`${DIALSTATUS}`の値を使用して、通話フローを適切なVoicemail応答へリダイレクトします（話中時は`b`、不在時は`u`）。`extensions.conf`内の各extensionから`Gosub(stdexten,s,1(PJSIP/<device>,<mailbox>))`を使用して呼び出してください。
 
-## Using the VoiceMailMain() application
+## VoiceMailMain() アプリケーションの使用
 
-The application voicemailmain() is used to configure the voicemail mailbox. Users can dial the application, record their greeting, and listen to their voicemail. To call the application in the dial plan, use:
+voicemailmain() アプリケーションは、voicemail メールボックスを設定するために使用されます。ユーザーはこのアプリケーションをダイヤルすることで、自身の応答メッセージを録音したり、voicemail を聴取したりできます。dialplan でこのアプリケーションを呼び出すには、以下のように記述します。
 
 ```
 exten=>9000,1,VoiceMailMain()
 ```
 
-Below you will find a list of the options available for the application.
+以下に、このアプリケーションで使用可能なオプションの一覧を示します。
 
-### Voicemail application syntax
+### Voicemail アプリケーションの構文
 
-This application allows the calling party to leave a message for a specified list of mailboxes. When multiple mailboxes are specified, the greeting will be taken from the first specified mailbox. The dial plan execution will stop if the specified mailbox does not exist. The syntax is shown below:
+このアプリケーションを使用すると、発信者は指定されたメールボックスのリストに対してメッセージを残すことができます。複数のメールボックスが指定された場合、応答メッセージは最初に指定されたメールボックスのものが使用されます。指定されたメールボックスが存在しない場合、dialplan の実行は停止します。構文は以下の通りです。
 
 ```
  [Synopsis]
@@ -502,7 +502,7 @@ VoiceMail(mailbox[@context][&mailbox[@context][&...]][,options])
 options
 ```
 
-![10-dialplan-advanced-features 図13](../images/10-dialplan-advanced-features-img13.png)
+![10-dialplan-advanced-features figure 13](../images/10-dialplan-advanced-features-img13.png)
 
 ```
     b: Play the 'busy' greeting to the calling party.
@@ -518,52 +518,52 @@ options
     P: Mark message as 'PRIORITY'.
 ```
 
-In all cases, the beep.gsm file will be played before the recording begins. Voicemail messages will be stored in the inbox directory.
+いずれの場合も、録音が開始される前に beep.gsm ファイルが再生されます。voicemail メッセージは inbox ディレクトリに保存されます。
 
 ```
 /var/spool/asterisk/voicemail/context/boxnumber/INBOX/
 ```
 
-If a caller presses 0 (zero) during the announcement, it will be moved to the ‘o’ (out) extension in the voicemail current context. This can be used to exit to the operator. If during the recording the caller presses # or the silence limit times out, recording is stopped and the call goes to the next priority. Make sure that you handle the call after the voicemail is played, as shown below.
+アナウンス中に発信者が 0 （ゼロ）を押すと、現在の voicemail context 内の 'o' (out) extension に転送されます。これはオペレーターに接続するために使用できます。録音中に発信者が # を押すか、無音制限時間が経過すると、録音は停止し、通話は次の優先順位へ進みます。以下に示すように、voicemail が再生された後の通話処理を必ず記述するようにしてください。
 
 ```
 exten=>somewhere,5,Playback(Goodbye)
 exten=>somewhere,6,Hangup
 ```
 
-### Tagging voicemail messages as urgent
+### voicemail メッセージを緊急としてタグ付けする
 
-You may tag some messages as “urgent.” Two methods are available for this:
+一部のメッセージを「緊急」としてタグ付けすることができます。これには2つの方法があります。
 
-- Pass the option ‘U’ in the application voicemail()
-- Specify review=yes in the file voicemail.conf. If using this option, the user will be able to tag the message as urgent after recording the voice instructions.
+- voicemail() アプリケーションで 'U' オプションを渡す
+- voicemail.conf ファイルで review=yes を指定する。このオプションを使用すると、ユーザーは音声ガイダンスの録音後にメッセージを緊急としてタグ付けできるようになります。
 
-## Sending voicemail to e-mail
+## ボイスメールの電子メール送信
 
-一部のケース（私の場合など）では、voicemailmain() アプリケーションを使ってメールを読むことはせず、すべてのメッセージを音声添付でメール送信する方がシンプルで実用的です。`attach` と `delete` パラメータを使用すれば、メールを送信しながらメールボックスから削除できます。
+（私の場合のように）ボイスメールを確認するために `voicemailmain()` アプリケーションを使用しないケースもあります。すべてのメッセージを音声ファイルとして添付し、電子メールで送信する方が、よりシンプルで実用的です。`attach` および `delete` パラメータを使用することで、すべてのメールを電子メールに送信し、メールボックスから削除することができます。
 
 ```
 attach=yes
 delete=yes
 ```
 
-ボイスメールをメールで送信する際、voicemail アプリケーションはオペレーティングシステムのコンポーネントであるメッセージ転送エージェント（MTA）を利用します。Debian では MTA として Exim が使用されています。メール送信に使用するアプリケーションは `mailcmd` パラメータで定義します。
+ボイスメールを電子メールに送信するために、voicemail アプリケーションはオペレーティングシステムのコンポーネントであるメッセージ転送エージェント（MTA）を使用します。Debian では MTA として Exim を使用します。電子メールを送信するアプリケーションは `mailcmd` パラメータで定義されます。
 
 ```
 mailcmd =/usr/sbin/sendmail -t
 ```
 
-Linux の Debian ディストリビューションでは MTA は Exim です。Debian で Exim を設定するには、次のコマンドを使用します。
+Linux の Debian ディストリビューションでは、MTA は Exim です。Debian で Exim を設定するには、以下を使用します。
 
 ```
 dpkg-reconfigure exim4-config
 ```
 
-MTA が SMTP 直接送信するか、スマートホスト（通常は社内のメールサーバ）を経由して送信するかを選択できます。Asterisk サーバからメールサーバへメールを送信する最適な方法については、メール管理者に確認してください。
+MTA が SMTP を介して直接電子メールを送信するように設定するか、スマートホスト（通常は会社のメールサーバー）を経由するように設定するかを選択できます。Asterisk サーバーから電子メールサーバーへ電子メールを送信する最適な方法については、電子メール管理者に確認してください。
 
-## カスタマイズされたメールメッセージ
+## 電子メールメッセージのカスタマイズ
 
-メールの送信方法は、次の変数を設定することで制御できます。メールの件名と本文に使用する変数:
+以下の変数を設定することで、メッセージの送信方法を制御できます。電子メールの件名および本文用の変数です。
 
 - VM_NAME
 - VM_DUR
@@ -574,9 +574,9 @@ MTA が SMTP 直接送信するか、スマートホスト（通常は社内の�
 - VM_CALLERID
 - VM_DATE
 
-メール本文と件名は、`[general]`セクションの`voicemail.conf`で設定したテンプレートから構築されます。本文と件名の両方を変更できますが、メッセージのサイズ上限は 512 バイトです。テンプレート内では、`\n`が改行を、`\t`がタブを挿入します。
+電子メールの本文と件名は、`voicemail.conf`の`[general]`セクションで設定するテンプレートから構築されます。本文と件名の両方を変更できますが、メッセージのサイズ制限は 512 バイトです。テンプレート内では、`\n`で改行を挿入し、`\t`でタブを挿入します。
 
-以下の`emailsubject`例はシンプルです。`emailbody`例はデフォルトに非常に近く、デフォルトでは CIDNAME が null でない場合にそれだけが表示され、そうでなければ CIDNUM が表示され、両方が null の場合は「不明な発信者」と表示されます。
+以下の`emailsubject`の例は単純なものです。`emailbody`の例はデフォルト設定に非常に近いものです。デフォルトでは、CIDNAME が null でない場合は CIDNAME を表示し、そうでない場合は CIDNUM を表示します。両方が null の場合は「an unknown caller」と表示されます。
 
 ```
 emailsubject=[PBX]: New message ${VM_MSGNUM} in mailbox ${VM_MAILBOX}
@@ -586,45 +586,45 @@ emailbody=Dear ${VM_NAME}:\n\n\tjust wanted to let you know you were just left a
 
 ## Voicemail Web interface
 
-ソース配布に含まれる Perl スクリプト`vmail.cgi`は、Asterisk ソースツリーの`contrib/scripts/vmail.cgi`にあります（Asterisk 22 でもまだ同梱されています）。コマンド`make install`はこのインターフェースをインストールしません。ソースディレクトリから`make webvmail`を実行する必要があります。このスクリプトは Perl コマンドインタプリタと、サーバ上にインストールされたウェブサーバ（Apache など）を必要とします。
+Asteriskのソース配布物には、Asteriskソースツリー内の`contrib/scripts/vmail.cgi`に配置されている`vmail.cgi`というPerlスクリプトが含まれています（これはAsterisk 22にも同梱されています）。`make install`コマンドではこのインターフェースはインストールされません。ソースディレクトリから`make webvmail`を実行する必要があります。このスクリプトを使用するには、サーバーにPerlコマンドインタープリタとWebサーバー（Apacheなど）がインストールされている必要があります。
 
 ```
 make webvmail
 ```
 
-`make webvmail`ターゲットは、スクリプト（setuid root）をウェブサーバの CGI ディレクトリ（`HTTP_CGIDIR`）にインストールし、サポート画像を`images/*.gif`から`HTTP_DOCSDIR/_asterisk`へ（デフォルトは`/var/www/html/_asterisk`）コピーします。これらのパスがウェブサーバのレイアウトと合わない場合は、ターゲットを実行する前に上位レベルの`Makefile`内の`HTTP_CGIDIR`と`HTTP_DOCSDIR`変数を編集してください。
+`make webvmail`ターゲットは、スクリプトを（setuid rootで）WebサーバーのCGIディレクトリ（`HTTP_CGIDIR`）にインストールし、サポート用の画像を`images/*.gif`から`HTTP_DOCSDIR/_asterisk`（デフォルトでは`/var/www/html/_asterisk`）へコピーします。これらのパスがWebサーバーの構成と一致しない場合は、ターゲットを実行する前に、トップレベルの`Makefile`にある`HTTP_CGIDIR`および`HTTP_DOCSDIR`変数を編集してください。
 
 ## Voicemail notification
 
-You can configure voicemail to send a notify message to your phone when you have new voicemail. In Asterisk 22, Message Waiting Indication (MWI) works with PJSIP and SIP phones as well as DAHDI phones. To indicate an unheard voicemail, an indicator light may blink or the phone may play a shutter tone. You need to configure the mailbox in the corresponding channel configuration file. Example: `pjsip.conf` (in the endpoint section):
+新しいボイスメールが届いた際に電話機へ通知メッセージを送信するようにボイスメールを設定できます。Asterisk 22では、Message Waiting Indication (MWI) はPJSIPおよびSIP電話機、そしてDAHDI電話機で動作します。未聴のボイスメールがあることを示すために、インジケーターライトが点滅したり、電話機がシャッター音を鳴らしたりすることがあります。対応するチャネル設定ファイルでメールボックスを設定する必要があります。例: `pjsip.conf` (endpointセクション内):
 
 ```
 mailboxes=8590
 ```
 
-In PJSIP the mailbox hint is set with the `mailboxes` option inside the endpoint section of `pjsip.conf`, rather than the old `mailbox=` of `sip.conf`. MWI subscriptions are handled by the `res_pjsip_mwi` module.
+PJSIPでは、メールボックスのヒントは`sip.conf`の古い`mailbox=`ではなく、`pjsip.conf`のendpointセクション内にある`mailboxes`オプションで設定されます。MWIサブスクリプションは`res_pjsip_mwi`モジュールによって処理されます。
 
-![The Comedian Mail web interface (`vmail.cgi`): the Asterisk Web-Voicemail login — enter your mailbox and password to play, save, forward, or delete voicemail from a browser. It still ships with Asterisk 22 and is installed with `make webvmail`.](../images/10-dialplan-advanced-features-img14.png)
+![The Comedian Mail Webインターフェース (`vmail.cgi`): Asterisk Web-Voicemailのログイン画面 — メールボックスとパスワードを入力して、ブラウザからボイスメールの再生、保存、転送、削除を行います。これはAsterisk 22にも同梱されており、`make webvmail`でインストールされます。](../images/10-dialplan-advanced-features-img14.png)
 
-### Lab: Message Notification in the Phone
+### ラボ: 電話機でのメッセージ通知
 
-This lab was tested using a SIP softphone.
+このラボはSIP softphoneを使用してテストされました。
 
-1. Edit `pjsip.conf` and add `mailboxes=4401` in the endpoint section for the device named 4401.
-2. Edit the `extensions.conf` and create an extension to record a voicemail to 4401 extensions.
+1. `pjsip.conf`を編集し、4401という名前のデバイスのendpointセクションに`mailboxes=4401`を追加します。
+2. `extensions.conf`を編集し、4401 extensionへのボイスメールを録音するためのextensionを作成します。
 
 ```
 exten=9008,1,voicemail(4401,b)
 ```
 
-3. Go to the console and reload.
-4. In the SipPulse Softphone, open the SIP account settings and enable voicemail (message-waiting) checking for the account.
-5. Dial 9008 and leave a message.
-6. Observe the message icon on the phone.
+3. コンソールに移動し、リロードします。
+4. SipPulse Softphoneで、SIPアカウント設定を開き、そのアカウントのボイスメール (message-waiting) チェックを有効にします。
+5. 9008にダイヤルし、メッセージを残します。
+6. 電話機のメッセージアイコンを確認します。
 
-## ディレクトリアプリケーションの使用
+## directory アプリケーションの使用
 
-このアプリケーションを使用すると、ダイヤルすべきユーザーをすばやく検索できます。名前と対応する内線番号の一覧は、voicemail 設定ファイル voicemail.conf から取得されます。アプリケーションの構文は、`core show application directory` で表示できます。
+このアプリケーションを使用すると、ダイヤルするユーザーを素早く検索できます。名前とそれに対応する extension のリストは、voicemail の設定ファイルである voicemail.conf から取得されます。このアプリケーションの構文は、core show application directory を使用して確認できます。
 
 ```
 -= Info about application 'Directory' =-
@@ -673,9 +673,9 @@ options
     '3'.
 ```
 
-### ラボ: ディレクトリアプリケーションの使用
+### 実習: directory アプリケーションの使用
 
-1. voicemail.conf ファイルを編集し、ダイヤルプランに 2 つの内線を追加します
+1. voicemail.conf ファイルを編集し、dialplan に2つの extension を追加します。
 
 ```
 [default]
@@ -685,7 +685,7 @@ options
 4401=>4401,John Wayne,jwayne@voip.school
 ```
 
-2. これらの内線をダイヤルプランに作成します
+2. dialplan にこれらの extension を作成します。
 
 ```
 exten=9006,1,VoiceMailMain()
@@ -694,26 +694,26 @@ exten=9007,1,Directory(default,default)
 exten=9007,n,Hangup()
 ```
 
-3. コンソールに移動してリロードします
-4. 9006 をダイヤルし、各内線（4400、4401）の名前を録音します
-5. 9007 をダイヤルし、ある内線の姓の最初の 3 文字（Eas=327）を選択します。正しいオプションであれば、‘1’ を押して名前に転送します。
+3. コンソールに移動し、リロードを実行します。
+4. 9006 にダイヤルし、各 extension (4400, 4401) の名前を録音します。
+5. 9007 にダイヤルし、いずれかの extension の姓の最初の3文字を選択します (Eas=327)。これが正しい選択肢であれば、「1」を押してその名前に転送します。
 
 ## Lab: Putting it all together
 
-Thus far, you have learned several dial plan concepts. Let’s put all the applications, functions, and concepts in a dial plan example so you can understand how they are used together. Let’s guide you through the whole PBX configuration for the scenario below.
+これまでに、dialplanのいくつかの概念を学習してきました。これまでに学んだすべてのアプリケーション、関数、概念を1つのdialplanの例にまとめ、それらがどのように組み合わせて使用されるかを理解しましょう。以下のシナリオに基づき、PBX設定の全体を通してガイドします。
 
-- 4 analog trunks
-- 16 SIP-based extensions
-- 3 service classes:
-    - restrict (internal, local, and 1-800)
-    - ld (long distance)
-    - ldi (international)
-- After-hours message
-- Auto attendant
+- 4つのアナログtrunk
+- 16のSIPベースのextension
+- 3つのサービスクラス:
+    - restrict (内線、市内通話、および 1-800)
+    - ld (長距離通話)
+    - ldi (国際通話)
+- 営業時間外メッセージ
+- 自動応答 (Auto attendant)
 
 ### Step 1 – Configuring channels
 
-**Analog trunks (`chan_dahdi.conf`).** First, we will configure the analog trunks in the DAHDI channel configuration file `chan_dahdi.conf`. In this case, we will use a T400P Digium card with 4 FXO interfaces. Let’s assume that the driver is already loaded and the driver configuration file (/etc/dahdi/system.conf) is correctly configured.
+**アナログtrunk (`chan_dahdi.conf`)。** まず、DAHDIチャネル設定ファイル `chan_dahdi.conf` でアナログtrunkを設定します。ここでは、4つのFXOインターフェースを備えたT400P Digiumカードを使用します。ドライバはすでにロードされており、ドライバ設定ファイル (/etc/dahdi/system.conf) が正しく設定されているものとします。
 
 ![10-dialplan-advanced-features figure 16](../images/10-dialplan-advanced-features-img16.png)
 
@@ -725,13 +725,9 @@ group=1
 channel => 1-4
 ```
 
-**SIP channels (`pjsip.conf`).** We have chosen the dial plan numbering from 2000 to 2099. Two codecs will be used: G.729 and G.711 ulaw. The first one will be used for phones using Asterisk over the Internet or WAN while the second one will be used for phones using the local network. In `pjsip.conf`, we will arbitrate which devices will belong to each class of service (restrict, ld, ldi). To reduce the vulnerability to brute force attacks, we will use the phone’s MAC addresses as device names. I strongly advise that you use strong passwords to avoid brute force attacks!
+**SIPチャネル (`pjsip.conf`)。** dialplanの番号体系として 2000 から 2099 を選択しました。G.729 と G.711 ulaw の2つのcodecを使用します。前者はインターネットまたはWAN経由で Asterisk を使用する電話機用、後者はローカルネットワークを使用する電話機用です。`pjsip.conf` では、どのデバイスがどのサービスクラス (restrict, ld, ldi) に属するかを決定します。ブルートフォース攻撃に対する脆弱性を減らすため、デバイス名として電話機のMACアドレスを使用します。ブルートフォース攻撃を避けるため、強力なパスワードを使用することを強く推奨します！
 
-We define a transport and three reusable templates — an endpoint base with the
-shared codecs, a digest auth, and a single-contact AOR — then attach each device
-to the templates and override only what differs (its class-of-service context and
-credentials). `host=dynamic` becomes an AOR that the phone registers against, and
-`directmedia` becomes `direct_media`:
+トランスポートと3つの再利用可能なテンプレート（共有codecを持つendpointベース、ダイジェスト認証、および単一のcontact AOR）を定義し、各デバイスをテンプレートに紐付けて、異なる部分（サービスクラスのcontextと認証情報）のみを上書きします。`host=dynamic` は電話機が登録を行うAORとなり、`directmedia` は `direct_media` となります：
 
 ```ini
 ; pjsip.conf
@@ -789,7 +785,7 @@ password=#s3cr3t#
 
 ### Step 2 – Configure the dial plan
 
-Now let’s start to configure the extensions.conf. Define internal extensions and local dialing
+それでは extensions.conf の設定を開始しましょう。内線番号と市内通話のダイヤルを定義します。
 
 ```
 [restrict]
@@ -800,7 +796,7 @@ exten=>_9XXXXXXX,1,Dial(DAHDI/g1/${EXTEN:1},20) ; local calls
 exten=>_91800.,1,Dial(DAHDI/g1/${EXTEN:1},20); 1-800
 ```
 
-Define LD (long distance)
+LD（長距離通話）を定義します。
 
 ```
 [ld]
@@ -808,7 +804,7 @@ Include=>restrict
 exten=>_9NXXNXXXXXX,1,Dial(DAHDI/g1/${EXTEN:1},20)
 ```
 
-Define international calls
+国際通話を定義します。
 
 ```
 [ldi]
@@ -818,7 +814,7 @@ exten=>_901X.,1,Dial(DAHDI/g1/${EXTEN:1},20)
 
 ### Step 3 - Receiving calls using an auto-attendant
 
-To receive calls, use two contexts. The first one is for normal-hours operation, where the call will be received by an auto-attendant. The second one is for after hours, where the caller will receive a message such as “you have called company XYZ, our normal hours are from 08:00 AM to 06:00 PM; if you know the destination extension number you can try dialing it now or hang up.” Menus: Normal-hours, After-hours In the menus below, the system will play a message warning the caller that the company was reached after regular working hours, allowing the caller to dial the destination extension number (someone may be working after regular working hours).
+着信を受けるには、2つのcontextを使用します。1つ目は通常営業時間用で、自動応答が着信を受けます。2つ目は営業時間外用で、発信者は「XYZ社にお電話ありがとうございます。当社の営業時間は午前8時から午後6時までです。内線番号をご存知の場合はそのままダイヤルするか、電話をお切りください」といったメッセージを受け取ります。メニュー：通常営業時間、営業時間外。以下のメニューでは、システムが発信者に対して営業時間外であることを警告するメッセージを再生し、発信者が内線番号をダイヤルできるようにします（営業時間外でも誰かが働いている可能性があるためです）。
 
 ```
 [incoming]
@@ -836,7 +832,7 @@ exten=>t,1,hangup()
 include=>restrict
 ```
 
-Menus: Main and Sales During normal working hours, the call is answered by an auto-attendant menu, receiving a message such as “welcome to XYZ Company; dial 1 for sales, 2 for tech support, 3 for training, or the desired extension number”.
+メニュー：メインおよび営業。通常営業時間中、着信は自動応答メニューによって応答され、「XYZ社へようこそ。営業は1を、技術サポートは2を、トレーニングは3を、またはご希望の内線番号をダイヤルしてください」といったメッセージが流れます。
 
 ```
 [globals]
@@ -861,46 +857,46 @@ exten=>s,1,Dial(${TECHSUPPORT},20,Tt)
 exten=>s,1,Dial(${TRAINING},20,Tt)
 ```
 
-With all these statements, the functionality of your dialing plan is now ready. In the next section, we will demonstrate how to operate the PBX.
+これらのステートメントにより、dialplanの機能は準備完了です。次のセクションでは、PBXの操作方法を説明します。
 
-## Summary
+## まとめ
 
-この章では、IVR や自動応答装置を使用して着信を受け取る方法を学びました。コンテキストインクルージョンの概念を検討し、いくつかの例を実装しました。サブルーチンを使用して繰り返し入力を回避し、Asterisk データベース（AstDB、Asterisk 22 では SQLite3 がバックエンド）をデータ保存が必要な機能（例：転送、取り込み禁止、ブラックリスト）に利用しました。最後に、営業時間外の動作を実装し、これらの概念を組み合わせた完全なダイヤルプランを実装しました。
+本章では、IVRや自動音声応答装置を使用して着信を処理する方法を学びました。また、contextのインクルードという概念を学習し、いくつかの実装例を確認しました。繰り返し入力を避けるためにサブルーチンを使用し、データ保存が必要な機能（転送、着信拒否、ブラックリストなど）にはAsteriskデータベース（Asterisk 22ではSQLite3でバックアップされるAstDB）を使用しました。最後に、営業時間外の動作を実装する方法を学び、これらの概念を組み合わせて完全なdialplanを実装しました。
 
-## Quiz
+## クイズ
 
-1. 時間依存コンテキストの include は `include => context,<times>,<weekdays>,<mdays>,<months>` という形式を使用します。 `include => normalhours,08:00-18:00,mon-fri,*,*` は何を行いますか？
-   - A. 月曜から金曜の 08:00 から 18:00 まで拡張子を実行する
-   - B. すべての月の毎日オプションを実行する
-   - C. 何もしない；形式が無効である
-2. 現代の Asterisk（Asterisk 22 を含む）では、時間ベースの `include =>` と `GotoIfTime()` のフィールドはどの文字で区切られますか？
+1. 時間依存の context include は `include => context,<times>,<weekdays>,<mdays>,<months>` という形式を使用します。では `include => normalhours,08:00-18:00,mon-fri,*,*` は何を行いますか？
+   - A. 月曜日から金曜日の 08:00 から 18:00 まで extension を実行する
+   - B. 毎日、すべての月でオプションを実行する
+   - C. 何もしない。この形式は無効である
+2. 最新の Asterisk (Asterisk 22 を含む) において、時間ベースの `include =>` および `GotoIfTime()` のフィールドはどの文字で区切られますか？
    - A. パイプ `|`
    - B. カンマ `,`
    - C. セミコロン `;`
    - D. スラッシュ `/`
-3. 複数のチャンネルを同時にダイヤル（同時にリング）するには、 `Dial()` 内で ___ 文字で区切ります。
-4. 発信者が番号をダイヤルするのを待つ間にプロンプトを再生する音声メニューは、通常 ___ アプリケーションで作成します。
-5. `extensions.conf` 内で別ファイルの内容を取り込むには、___ 文を使用します（※`include =>` コンテキスト文とは異なります）。
-6. Asterisk 22 では、組み込みの AstDB データベースは次によってサポートされています：
+3. 複数のチャンネルに同時にダイヤル（一斉呼び出し）するには、それらを `Dial()` 内で ___ という文字で区切ります。
+4. 発信者が extension をダイヤルするのを待つ間にプロンプトを再生する音声メニューは、通常 ___ アプリケーションを使用して作成されます。
+5. 別のファイルの内容を `extensions.conf` 内に含めるには、___ ステートメントを使用します（注：これは `include =>` context ステートメントとは異なります）。
+6. Asterisk 22 において、組み込みの AstDB データベースのバックエンドは何ですか？
    - A. Berkeley DB v1
    - B. MySQL
    - C. SQLite3
    - D. PostgreSQL
-7. `Dial(type1/identifier1&type2/identifier2)` を使用すると、Asterisk は各チャンネルを順番にダイヤルし、間に 20 秒待機します。
+7. `Dial(type1/identifier1&type2/identifier2)` を使用すると、Asterisk は各チャンネルを順番にダイヤルし、その間で 20 秒間待機します。
    - A. 偽
    - B. 真
-8. Background() アプリケーションでは、メッセージの再生が終了するまで DTMF キーを押してオプションを選択できません。
+8. Background() アプリケーションを使用する場合、DTMF の数字を押してオプションを選択するには、メッセージの再生が終了するまで待たなければなりません。
    - A. 偽
    - B. 真
-9. 構文 `Goto([[context,]extension,]priority)` が与えられたとき、次のうち Goto() アプリケーションの有効な呼び出しはどれですか？（該当するものすべてにマーク）
+9. 構文 `Goto([[context,]extension,]priority)` が与えられた場合、Goto() アプリケーションの呼び出しとして有効なものはどれですか？（該当するものすべてを選択してください）
    - A. Goto(context,extension)
    - B. Goto(context,extension,priority)
    - C. Goto(extension,priority)
    - D. Goto(priority)
-10. Asterisk 22 のダイヤルプランで AstDB から単一キーを削除するには、次のどれを使用しますか：
+10. Asterisk 22 の dialplan で AstDB から単一のキーを削除するには、以下を使用します：
     - A. `DBdel()` アプリケーション
     - B. `DB_DELETE()` 関数
     - C. `DBdeltree()` アプリケーション
     - D. `LookupBlacklist()` アプリケーション
 
-**Answers:** 1 — A · 2 — B · 3 — `&` · 4 — Background() · 5 — #include · 6 — C · 7 — A · 8 — A · 9 — B, C, D · 10 — B
+**回答:** 1 — A · 2 — B · 3 — `&` · 4 — Background() · 5 — #include · 6 — C · 7 — A · 8 — A · 9 — B, C, D · 10 — B

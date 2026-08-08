@@ -1,31 +1,33 @@
-# Extending Asterisk with AMI and AGI
+# AMIとAGIによるAsteriskの拡張
 
-いくつかの状況では、外部アプリケーションを使用して Asterisk の機能を拡張する必要がある場合があります。拡張方法は多数存在します。本章では、Asterisk と他システムを統合する古典的な方法のうち、2 つである AMI – Asterisk Manager Interface と AGI – Asterisk Gateway Interface を取り上げます。また、`asterisk –rx` コマンドと `system()` アプリケーションについても説明します。どの方法で Asterisk と統合するかは、対象となるアプリケーション次第です。AGI の場合、最も一般的なアプリケーションはデータベースに接続した IVR です。AMI では、ダイヤラーが最も人気のあるアプリです。3 番目の、よりモダンなインターフェースである ARI、Asterisk REST Interface については、次章で別途取り上げます。
+いくつかの状況において、外部アプリケーションを使用してAsteriskの機能を拡張する必要が生じることがあります。Asteriskを拡張する方法は数多く存在します。本章では、Asteriskを他のシステムと統合するための古典的な2つの方法、すなわちAMI（Asterisk Manager Interface）とAGI（Asterisk Gateway Interface）について解説します。また、`asterisk -rx`コマンドと`system()`アプリケーションについても見ていきます。どの方法でAsteriskと統合するかは、アプリケーションによって異なります。AGIの場合、最も一般的な用途はデータベースに接続されたIVRです。AMIの場合、ダイヤラーが最も一般的なアプリケーションです。より現代的な3つ目のインターフェースであるARI（Asterisk REST Interface）については、次章で別途解説します。
 
 ## Objectives
 
-この章の終わりまでに、読者は以下ができるようになること：
+この章を読み終えることで、読者は以下のことができるようになります。
 
-- 外部プログラムへのアクセスオプションを説明できること
-- `asterisk –rx` コマンドを使用してコンソールコマンドを実行できること
-- dialplan で `system()` アプリを使って外部プログラムを呼び出せること
-- AMI が何か、そしてその動作原理を説明できること
-- `manager.conf` ファイルを設定し、AMI を有効化できること
-- PHP プログラムから AMI コマンドを実行できること
-- Asterisk manager proxy が何か、そしてその動作原理を説明できること
-- 異なる AGI フレーバー（DeadAGI、AGI、EAGI、FastAGI）を説明できること
-- PHP で作成したシンプルな AGI プログラムを実行できること
+- 外部プログラムへのアクセスオプションについて説明する
+- `asterisk –rx` コマンドを使用してコンソールコマンドを実行する
+- dialplan 内で `system()` アプリケーションを使用して外部プログラムを呼び出す
+- AMI とは何か、そしてそれがどのように動作するかを説明する
+- `manager.conf` ファイルを設定し、AMI を有効にする
+- PHP プログラムから AMI コマンドを実行する
+- Asterisk manager proxy とは何か、そしてそれがどのように動作するかを説明する
+- さまざまな AGI の種類（DeadAGI、AGI、EAGI、FastAGI）について説明する
+- PHP で作成した単純な AGI プログラムを実行する
 
-## Asterisk を拡張する主な方法
+## Asteriskを拡張する主な方法
 
-- Linux コマンドラインと Asterisk コンソール
+Asteriskには、外部プログラムと連携するためのさまざまな方法があります。本章では、以下について解説します。
+
+- LinuxコマンドラインおよびAsteriskコンソール
 - System() アプリケーション
 - AMI
 - AGI
 
-## コンソールCLIでAsteriskを拡張する
+## コンソールCLIによるAsteriskの拡張
 
-アプリケーションは、以下のコマンドを使用してLinuxシェルから簡単にAsteriskを呼び出すことができます。
+アプリケーションからLinuxシェルを使用して、以下のコマンドで簡単にAsteriskを呼び出すことができます。
 
 ```
 asterisk -rx <command>
@@ -37,7 +39,7 @@ asterisk -rx <command>
 asterisk -rx "stop now"
 ```
 
-出力を伴うコマンドでも呼び出すことができます:
+出力のあるコマンドであっても、以下のように呼び出すことが可能です。
 
 ```
 asterisk:~# asterisk -rx "pjsip show endpoints"
@@ -57,7 +59,7 @@ Endpoint:  <Endpoint/CID.....................................>  <State.....>  <C
 
 ## System() アプリケーションを使用した Asterisk の拡張
 
-The system() application enables Asterisk to call an external application.
+system() アプリケーションを使用すると、Asterisk から外部アプリケーションを呼び出すことができます。
 
 ```
 asterisk*CLI> core show application System
@@ -72,7 +74,7 @@ Result of execution is returned in the SYSTEMSTATUS channel variable:
    SUCCESS      Specified command successfully executed
 ```
 
-Example: This application does a screen-pop using netbios WindowsPopup.
+例: このアプリケーションは、netbios の WindowsPopup を使用してスクリーンポップを実行します。
 
 ```
 exten => 9000,1,System(/bin/echo -e "'Incoming Call From -> ${CALLERID(num)}
@@ -81,34 +83,34 @@ exten => 9000,2,Dial(PJSIP/9000,15,t)
 exten => 9000,3,Hangup
 ```
 
-## AMI とは？
+## AMIとは何か？
 
-AMI はクライアントプログラムが Asterisk インスタンスに接続し、TCP 接続上でコマンドを送信したりイベントを取得したりできるようにします。システムインテグレータは、チャンネル状態の追跡にこれらのリソースが有用であると感じるでしょう。AMI は、TCP 上で key:value ペアを使用するシンプルなラインプロトコルの概念に依存しています。Asterisk 単体ではこのインターフェース上で多数の接続を処理する準備ができていません。AMI への接続が多数ある場合は、Asterisk manager proxy の使用を検討してください。
+AMIは、クライアントプログラムがAsteriskインスタンスに接続し、TCP接続を介してコマンドの発行やイベントの読み取りを行うことを可能にします。システムインテグレーターにとって、これらのリソースはチャネルの状態を追跡するのに役立ちます。AMIは、TCP上で key:value ペアを使用するシンプルな行プロトコルという概念に基づいています。Asterisk単体では、このインターフェースを介した多数の接続を処理する準備ができていません。AMIへの接続数が多い場合は、Asterisk manager proxyの使用を検討してください。
 
-### AMI に使用する言語
+### AMIに使用する言語
 
-プログラミング言語の選択は近年難しくなっています。選択肢が多すぎます—Java、PHP、Perl、C、C#、Python、その他多数。ソケットまたは telnet インターフェースをサポートしていれば、どの言語でも AMI を使用できます。本書では、人気が高いことから PHP を選びました。
+今日、プログラミング言語を選択するのは難しい場合があります。Java、PHP、Perl、C、C#、Pythonなど、選択肢が多すぎるためです。ソケットまたはtelnetインターフェースをサポートする言語であれば、どの言語でもAMIを使用することが可能です。本書では、その普及度からPHPを選択しました。
 
-### AMI プロトコルの動作
+### AMIプロトコルの動作
 
-- Asterisk にコマンドを送る前に、AMI セッションを確立する必要があります
-- クライアントから送信されるパケットの最初の行はキー “Action” を持ちます
-- Asterisk から送られるパケットの最初の行はキー “Response” または “Event” を持ちます
-- 認証後は、任意の方向にパケットを送受信できます
+- Asteriskにコマンドを送信する前に、AMIセッションを確立する必要があります
+- クライアントから送信されるパケットの最初の行には、キー「Action」が含まれます
+- Asteriskから送信されるパケットの最初の行には、キー「Response」または「Event」が含まれます
+- 認証後、パケットはどちらの方向にも送信可能です
 
 ### パケットタイプ
 
-パケットのタイプは以下のキーの有無で決まります。
+パケットのタイプは、以下のキーの存在によって決定されます。
 
-- Action: AMI に接続したクライアントが特定のアクションを要求するために送るパケット。クライアントが利用できるアクションは有限で、ロードされたモジュールがこれらを決定します。パケットはアクション名とそのパラメータを含みます。
-- Response: クライアントが送った最後の Action に対して Asterisk が返す応答。
-- Event: Asterisk コアまたはモジュールが生成したイベントに属するデータ。
+- Action: AMIに接続されたクライアントから、特定の動作を要求するために送信されるパケットです。クライアントが利用可能なアクションには有限のセットがあります。これらのアクションは、ロードされたモジュールによって決定されます。パケットには、アクション名とそのパラメータが含まれます。
+- Response: クライアントから送信された最後のアクションに対して、Asteriskから送信される応答です。
+- Event: Asteriskコアまたはモジュールによって生成されたイベントに属するデータです。
 
-クライアントが Action タイプのパケットを送るときは、ActionID というパラメータが含まれます。Asterisk から送られる応答の順序は予測できないため、ActionID を使ってアクションと応答を関連付けます。Event パケットは二つの異なるコンテキストで使用されます。第一に、イベントはクライアントに Asterisk の変化（例：新規作成されたチャンネル、切断されたチャンネル、キューへのエージェントのログイン・ログアウト）を通知します。第二に、イベントはクライアントのアクションに対する応答を転送するために使用されます。
+クライアントがActionタイプのパケットを送信する際、ActionIDというパラメータが含まれます。Asteriskから送信される応答の順序は予測できないため、ActionIDはアクションと応答を関連付けるために使用されます。Eventパケットは、2つの異なるコンテキストで使用されます。第一に、イベントはAsterisk内の変更（例：新しく作成されたチャネル、切断されたチャネル、キューにログインまたはログアウトするエージェントなど）をクライアントに通知します。第二に、イベントはクライアントのアクションに対する応答を転送するために使用されます。
 
-## Configuring users and permissions
+## ユーザーと権限の設定
 
-AMI にアクセスするには、TCP ポート（通常は 5038）でリッスンする TCP 接続を確立する必要があります。/etc/asterisk/manager.conf ファイルを設定してユーザーアカウントと権限を作成します。権限は「read」「write」またはその両方の有限集合です。これらの権限は
+AMIにアクセスするには、TCPポート（通常は 5038）でリッスンしているTCP接続を確立する必要があります。ユーザーアカウントと権限を作成するには、/etc/asterisk/manager.conf ファイルを設定する必要があります。権限には「read」、「write」、またはその両方という限られたセットがあります。これらの権限は以下で定義されます。
 
 ```
 manager.conf file.
@@ -124,9 +126,9 @@ deny=0.0.0.0/0.0.0.0
 permit=127.0.0.1/255.255.255.255
 ```
 
-### Logging in to the AMI
+### AMIへのログイン
 
-AMI にログインして認証するには、manager.conf で作成したユーザー名とアカウントを使用して login タイプのアクションパケットを送信する必要があります。
+AMIにログインして認証を行うには、manager.conf で作成したユーザー名とアカウントを使用して、login タイプのActionパケットを送信する必要があります。
 
 ```
 Action:login
@@ -134,7 +136,7 @@ Username:admin
 Secret:password
 ```
 
-例: php を使用した AMI へのログイン
+例: php を使用したAMIへのログイン
 
 ```
 <?php
@@ -145,7 +147,7 @@ fputs($socket, "Secret: senha\r\n\r\n");
 ?>
 ```
 
-イベントを受信する必要がない場合は “Events Off” を使用できます。
+イベントを受信する必要がない場合は、「Events Off」を使用できます。
 
 ```
 <?php
@@ -157,9 +159,9 @@ fputs($socket, "Events: off\r\n\r\n");
 ?>
 ```
 
-### Action packets
+### Actionパケット
 
-Asterisk にアクションパケットを送信する際、アクションの後に key:value ペアを渡すことで追加のキー（例: 呼び出し番号）を提供できます。また、チャネル変数やグローバル変数をダイヤルプランに渡すことも可能です。
+AsteriskにActionパケットを送信する際、Actionの後に key:value ペアを渡すことで、追加のキー（例: 発信番号など）を指定できます。また、channel変数やグローバル変数を dialplan に渡すことも可能です。
 
 ```
 Action: <action type><CRLF>
@@ -171,9 +173,9 @@ Variable: <Variable 2>=<Value 2><CRLF>
 <CRLF>
 ```
 
-### Action commands
+### Actionコマンド
 
-CLI コマンド `manager show` を使用して利用可能なアクションを一覧表示できます。Asterisk 22 ではコアセットのコマンドは次のとおりです（このリストは代表的なもので、ロードされたモジュールがさらに追加します）：
+CLI命令の manager show commands を使用すると、利用可能なActionの一覧を表示できます。Asterisk 22 におけるコアコマンドセットには以下が含まれます（このリストは代表的なものであり、ロードされたモジュールによってさらに追加されます）。
 
 ```
 Action Privilege Synopsis
@@ -254,7 +256,7 @@ Action Privilege Synopsis
   ParkedCalls      <none>           List parked calls
 ```
 
-特定のコマンドパラメータを知りたい場合は `manager show command <command>` を使用します。例：
+特定のコマンドパラメータを知る必要がある場合は、manager show command <command> を使用してください。例:
 
 ```
 asterisk*CLI> manager show command Originate
@@ -336,29 +338,31 @@ originate,all
 OriginateResponse
 ```
 
-### Event packets
+### イベントパケット
 
-イベントはマネージャインターフェース上で Asterisk で何かが起こるたびに生成されます――チャネルが作成または状態変更されたとき、2 つのチャネルがブリッジまたはブリッジ解除されたとき、登録が変更されたとき、キューのメンバーが追加されたとき、などです。各イベントは`Key: value`行からなるブロックで、`Event:`ヘッダーで始まります。
+イベントは、Asterisk内で何らかの事象が発生するたびにmanagerインターフェース上で生成されます。例えば、channelの作成や状態変化、2つのchannelのブリッジまたはブリッジ解除、登録状況の変化、queueメンバーの追加などです。各イベントは、以下のヘッダーで始まる`Key: value`行のブロックです。
 
-正確なイベントの集合はロードされたモジュールと Asterisk のバージョンに依存するため、すぐに古くなるリストを再現するよりも、実行中のサーバーに対して権威ある集合を問い合わせる方が良いでしょう：
+`Event:`
+
+正確なイベントセットは、ロードされているモジュールや Asterisk のバージョンに依存します。すぐに古くなってしまうリストを転載するよりも、実行中のサーバーに対して信頼できるセットを問い合わせるのが確実です。
 
 ```
 asterisk*CLI> manager show events             ; list every event this build can emit
 asterisk*CLI> manager show event BridgeEnter  ; describe one event and its fields
 ```
 
-例えば、コールブリッジは`BridgeCreate`、`BridgeEnter`、`BridgeLeave`、`BridgeDestroy`イベントで報告されます（`BridgeEnter`は「チャネルがブリッジに入ったときに発生」）。古い`Link`/`Unlink`イベントは Asterisk 12 で削除されました。
+例えば、通話のブリッジは`BridgeCreate`、`BridgeEnter`、`BridgeLeave`、および`BridgeDestroy`イベントを通じて報告されます（`BridgeEnter`は「channelがブリッジに入ったときに発生する」イベントです）。古い`Link`/`Unlink`イベントは Asterisk 12 で削除されました。
 
 ## Asterisk Gateway Interface
 
-AGI は、ウェブサーバーで使用される CGI に似た Asterisk へのゲートウェイインターフェースです。Perl、PHP、Python などの高級言語を使用して Asterisk の機能を拡張することができます。CGI の主な用途は IVR の構築です。AGI には次の 4 種類があります。
+AGIは、Webサーバーで使用されるCGIに似たAsterisk用のゲートウェイインターフェースです。Perl、PHP、Pythonといった高水準言語を使用してAsteriskの機能を拡張できます。CGIの主な用途はIVRの構築です。AGIには4つのタイプがあります。
 
-- Normal AGI、Asterisk のボックス内でプログラムを呼び出すもの。
-- Fast AGI、TCP ソケットを使用して別サーバー上の AGI を呼び出すもの。
-- EAGI、AGI からサウンドチャンネルへのアクセスと制御を可能にするもの。
-- DeadAGI、hangup() 後でもチャンネルへのアクセスを提供するもの。通常は ‘h’ エクステンションで呼び出されます。Asterisk 22 では `DeadAGI` アプリケーションは非推奨となっており、通常の `AGI` アプリケーションがハングアップしたチャンネルを検出し、自動的に「dead」モードでスクリプトを実行するため、新しいダイヤルプランでは `AGI()` を呼び出すだけで構いません。
+- Normal AGI: Asteriskボックス内のプログラムを呼び出します。
+- Fast AGI: TCPソケットを使用して別のサーバー上のAGIを呼び出します。
+- EAGI: AGIから音声チャネルへのアクセスと制御を可能にします。
+- DeadAGI: hangup()の後でもチャネルへのアクセスを許可します。通常は「h」extensionで呼び出されます。Asterisk 22では`DeadAGI`アプリケーションが非推奨となっている点に注意してください。通常の`AGI`アプリケーションがハングアップしたチャネルを検出し、自動的に「dead」モードでスクリプトを実行するため、新しいdialplanでは代わりに`AGI()`を呼び出すべきです。
 
-Application format:
+アプリケーションの形式:
 
 ```
 asterisk*CLI> core show application AGI
@@ -388,7 +392,7 @@ AGI(command[,arg1[,arg2[,...]]])
 Use the CLI command 'agi show commands' to list available agi commands
 ```
 
-You can show the available AGI commands using the command `agi show commands` (output below is representative; Asterisk 22 adds a few additional commands):
+利用可能なAGIコマンドは、コマンド`agi show commands`を使用して表示できます（以下の出力は代表的なものです。Asterisk 22ではいくつかのコマンドが追加されています）。
 
 ```
 Dead                        Command   Description
@@ -441,27 +445,27 @@ stream
    No                          gosub   Execute a dialplan subroutine
 ```
 
-デバッグするには、agi debug を使用します。
+デバッグを行うには、agi debugを使用します。
 
-### AGI の使用
+### AGIの使用
 
-この例では、php-cli（PHP のコマンドライン版）を使用します。php-cli がまだインストールされていない場合はインストールしてください。php AGI スクリプトを使用する手順は以下の通りです。
+この例では、PHPのコマンドラインバージョンであるphp-cliを使用します。インストールされていない場合は、php-cliをインストールしてください。php AGIスクリプトを使用するには、以下の手順に従います。
 
-1. すべての AGI スクリプトは `/var/lib/asterisk/agi-bin` にあります
-2. 実行できるように権限を変更します
+1. すべてのAGIスクリプトは`/var/lib/asterisk/agi-bin`に配置されます。
+2. 実行を許可するように権限を変更します。
 
 ```
 chmod 755 *.php
 ```
 
-3. シェルインターフェース（php 固有）。スクリプトの最初の行は次のようにする必要があります：
+3. シェルインターフェース（PHP固有）。スクリプトの最初の行は次のようである必要があります。
 
 ```
 #!/usr/bin/php -q
 <?php
 ```
 
-4. I/O チャネルを開く:
+4. I/Oチャネルを開きます。
 
 ```
 $stdin = fopen('php://stdin', 'r');
@@ -469,7 +473,7 @@ $stdout = fopen('php://stdout', 'w');
 $stdlog = fopen('agi.log', 'w');
 ```
 
-5. Asterisk の出力を管理する。Asterisk は AGI が呼び出されるたびに情報セットを送信します。
+5. Asteriskの出力を管理します。AGIが呼び出されるたびに、Asteriskは設定された情報を送信します。
 
 ```
 agi_request:testephp
@@ -483,7 +487,7 @@ agi_extension: 4000
 agi_priority: 1
 ```
 
-送信された情報を保存する:
+送信された情報を保存します。
 
 ```
 while (!feof($stdin)) {
@@ -497,57 +501,56 @@ while (!feof($stdin)) {
 }
 ```
 
-前のスクリプトは $agi という配列を作成します。利用可能なオプションは次のとおりです：
+上記のスクリプトは、$agiという名前の配列を作成します。利用可能なオプションは以下の通りです。
 
-- agi_request – AGI ファイル名
-- agi_channel – AGI 発信元チャネル
+- agi_request – AGIファイル名
+- agi_channel – AGIの発信元チャネル
 - agi_language – 設定された言語
-- agi_type – チャネルタイプ（例：SIP、DAHDI）
-- agi_uniqueid – ユニーク識別子
-- agi_callerid – 発信者ID（例：Flavio <8590>）
-- agi_context – 発信元コンテキスト
-- agi_extension – 呼び出されたエクステンション
+- agi_type – チャネルタイプ（例: SIP, DAHDI）
+- agi_uniqueid – 一意の識別子
+- agi_callerid – CallerID（例: Flavio <8590>）
+- agi_context – 発信元context
+- agi_extension – 呼び出されたextension
 - agi_priority – 優先度
 - agi_accountcode – 発信元アカウントコード
 
-変数 agi_extensions を呼び出すには、$agi[agi_extensions] を使用します。
+agi_extensionsという名前の変数を呼び出すには、$agi[agi_extensions]を使用します。
 
-6. チャネル AGI を使用します。この時点で Asterisk と対話を開始できます。fputs コマンドで AGI にコマンドを送信できます。echo コマンドも使用可能です。
+6. チャネルAGIを使用します。この時点で、Asteriskとの対話を開始できます。fputsコマンドを使用してAGIにコマンドを送信します。echoコマンドを使用することも可能です。
 
 ```
 fputs($stdout,"SAY NUMBER 4000 '79#' \n");
 fflush($stdout);
 ```
 
-Notes about using quotes:
+引用符の使用に関する注意点:
 
-- AGI コマンドオプションは省略できません
+- AGIコマンドのオプションは省略できません
 - 一部のオプションは引用符で囲む必要があります <escape digits>
 - 一部のオプションは引用符で囲んではいけません <digit string>
-- 一部のオプションは両方の形式が使用可能です
-- シングルクオートも使用できます
+- 一部のオプションは両方の形式を使用できます
+- シングルクォートを使用できます
 
-Step 7 – Pass variables Channel variables can be set in the AGI, but cannot be used inside the AGI. The following example does not work inside an AGI.
+ステップ 7 – 変数の受け渡し。チャネル変数はAGI内で設定できますが、AGI内では使用できません。以下の例はAGI内では機能しません。
 
 ```
 SET VARIABLE MY_DIALCOMMAND "PJSIP/${EXTEN}"
 ```
 
-以下の例は動作します:
+以下の例は機能します。
 
 ```
 SET VARIABLE MY_DIALCOMMAND "PJSIP/4000"
 ```
 
-Step 8: Asterisk responses  
-以下は Asterisk からの応答を検証するために必要です：
+ステップ 8: Asteriskの応答。Asteriskからの応答を検証するには以下が必要です。
 
 ```
 $msg  = fgets($stdin,1024);
 fputs($stdlog,$msg . "\n");
 ```
 
-Step 9: ロックされた（ゾンビ）プロセスを終了する スクリプトが何らかの理由で失敗すると、プロセスがハングします。再テストする前に killproc コマンドを使用してクリーンアップしてください。
+ステップ 9: ロックされた（ゾンビ）プロセスを終了させる。何らかの理由でスクリプトが失敗すると、プロセスがハングアップします。再テストの前に、killprocコマンドを使用してクリーンアップしてください。
 
 ```
  #!/usr/bin/php -q
@@ -602,62 +605,62 @@ exit is possible
 
 ### DeadAGI
 
-DeadAGI はライブチャネルがない場合に使用します。通常、´h´ エクステンションで DeadAGI を実行します。Asterisk 22 では `DeadAGI` アプリケーションは非推奨となっており、将来のリリースで削除される可能性があります；標準の `AGI` アプリケーションがハングアップ（「dead」）チャネルを自動的に処理するようになったので、新しいダイヤルプランでは `AGI()` を使用することを推奨します。
+DeadAGIは、アクティブなチャネルがない場合に使用されます。通常は「h」extensionでDeadAGIを実行します。Asterisk 22では`DeadAGI`アプリケーションが非推奨となっており、将来のリリースで削除される可能性があります。標準の`AGI`アプリケーションがハングアップした（「dead」な）チャネルを自動的に処理するようになったため、新しいdialplanでは`AGI()`を優先してください。
 
 ### FASTAGI
 
-Fast AGI は TCP ポート（デフォルトは 4573）を入出力チャネルとして使用し、AGI を実装します。FastAGI の形式は (agi://) です。例えば：
+Fast AGIは、TCPポート（デフォルトは4573）をI/Oチャネルとして使用してAGIを実装します。FastAGIの形式は (agi://) です。例:
 
 ```
 exten => 0800400001, 1, Agi(agi://192.168.0.1)
 ```
 
-TCP 接続が失われるか切断されると、AGI は終了し TCP 接続が閉じられ、続いて通話が切断されます。このリソースは、外部サーバーでスクリプトを実行している Asterisk サーバーの CPU 負荷を軽減するのに役立ちます。FastAGI の詳細はソースコードディレクトリで確認できます（「agi/fastagi-test」ファイルをご参照ください）。Asterisk-Java ライブラリは Java 用の FastAGI サーバ実装を提供しています。詳しくは https://github.com/asterisk-java/asterisk-java をご覧ください。
+TCP接続が失われたり切断されたりすると、AGIは終了し、TCP接続が閉じられ、続いて通話が切断されます。このリソースは、外部サーバーでスクリプトを実行することでAsteriskサーバーのCPU負荷を軽減するのに役立ちます。FastAGIの詳細については、ソースコードディレクトリ（「agi/fastagi-test」ファイルを参照）で確認できます。Asterisk-Javaライブラリは、Java用のFastAGIサーバー実装を提供しています。詳細については、https://github.com/asterisk-java/asterisk-java を参照してください。
 
-ARI（モダンな REST/WebSocket インターフェース）は、次の章で取り上げます。
+モダンなREST/WebSocketインターフェースであるARIについては、次の章で説明します。
 
 ## ソースコードの変更
 
-Asterisk は C 言語（C++ ではありません）で開発されています。C プログラミングの指導は本書の範囲を超えますが、興味がある方は https://docs.asterisk.org にて関連ドキュメントを見つけることができます。そこでは、Asterisk にパッチを適用・作成する方法や、主に Doxygen ソフトウェアで生成された API ドキュメントに関する有用なヒントが提供されています。C プログラミングに慣れている方にとって、アプリケーションのソースコードを変更することは、Asterisk を拡張する最も強力（かつ危険）な手段となり得ます。
+AsteriskはC言語（C++ではありません）で開発されています。C言語のプログラミングを教えることは本書の範囲外です。興味がある場合は、https://docs.asterisk.org に関連ドキュメントがあります。そこには、Asteriskへのパッチの適用や作成方法に関する優れたヒントや、主にDoxygenソフトウェアによって生成されたAPIドキュメントが掲載されています。C言語のプログラミングに精通している人にとって、アプリケーションのソースコードを変更することは、Asteriskを拡張するための最も強力（かつ危険）な方法となり得ます。
 
-## 概要
+## まとめ
 
-この章では、外部プログラムを Asterisk PBX にインターフェースする方法を学びました。Linux シェルから Asterisk コンソールへコマンドを渡す `asterisk –rx` から始めました。次に、ダイヤルプランから外部プログラムを呼び出すことができる `System()` アプリケーションについて学びました。AMI は従来の PBX で一般的な CTI インターフェースに最も近いインターフェースです。ダイヤルプランからアプリケーションを呼び出すために、AGI を使用し、そのさまざまなフレーバーを体験しました：DeadAGI はデッドチャンネル用、EAGI はオーディオストリーミングの処理用、Fast AGI は TCP ソケットを入出力インターフェースとして使用するもの、通常の AGI は同じ Asterisk ボックス内でスクリプトを呼び出し処理するためのものです。次の章は ARI に専念しており、外部アプリケーションに Asterisk のチャンネルとブリッジを完全に制御できる最新の REST/WebSocket API です。
+本章では、外部プログラムを Asterisk PBX に接続する方法について学習しました。まず、Linux シェルから Asterisk コンソールへコマンドを渡す `asterisk -rx` について解説しました。次に、dialplan から外部プログラムを呼び出すことができる `System()` アプリケーションについて学びました。AMI は、従来の PBX で一般的な CTI インターフェースに最も近いものです。dialplan からアプリケーションを呼び出すために、AGI を使用し、そのさまざまなバリエーションについても触れました。具体的には、切断されたチャネル用の `DeadAGI`、オーディオストリーミングを処理するための `EAGI`、TCP ソケットを入力/出力インターフェースとして使用する `Fast AGI`、そして同じ Asterisk ボックス内でスクリプトを呼び出して処理するための通常の `AGI` です。次章では、外部アプリケーションから Asterisk のチャネルやブリッジを完全に制御できる、最新の REST/WebSocket API である ARI について解説します。
 
-## Quiz
+## クイズ
 
-1. Which of the following is NOT an interfacing method for Asterisk?
+1. 次のうち、Asteriskのインターフェース手法ではないものはどれですか？
    - A. AMI
    - B. AGI
    - C. `asterisk -rx`
    - D. System()
    - E. External()
-2. AMI allows passing Asterisk commands over TCP sockets, and this interface is enabled by default in a fresh Asterisk install.
+2. AMIはTCPソケット経由でAsteriskコマンドを渡すことを可能にし、このインターフェースはAsteriskの新規インストール時にデフォルトで有効になっています。
    - A. True
    - B. False
-3. AMI is very safe, because its authentication uses MD5 challenge/response.
+3. AMIの認証はMD5チャレンジ/レスポンスを使用しているため、非常に安全です。
    - A. True
    - B. False
-4. FastAGI lets the dial plan call external scripts on another machine over TCP sockets (usually port 4573).
+4. FastAGIを使用すると、dialplanからTCPソケット（通常はポート 4573）経由で別のマシン上の外部スクリプトを呼び出すことができます。
    - A. True
    - B. False
-5. DeadAGI is used on active channels. It can be used on DAHDI channels but not on SIP or IAX channels.
+5. DeadAGIはアクティブなチャネルで使用されます。これはDAHDIチャネルでは使用できますが、SIPやIAXチャネルでは使用できません。
    - A. True
    - B. False
-6. AGI supports only PHP as a scripting language.
+6. AGIはスクリプト言語としてPHPのみをサポートしています。
    - A. True
    - B. False
-7. The command ___ shows all available AGI commands.
-8. The command ___ shows all available AMI commands.
-9. In an AMI action packet, which header does the client include so that the asynchronous responses and events coming back from Asterisk can be correlated with the action that triggered them?
+7. コマンド ___ は、利用可能なすべてのAGIコマンドを表示します。
+8. コマンド ___ は、利用可能なすべてのAMIコマンドを表示します。
+9. AMIアクションパケットにおいて、クライアントはAsteriskから返される非同期のレスポンスやイベントを、それをトリガーしたアクションと関連付けるためにどのヘッダーを含める必要がありますか？
    - A. `ActionID`
    - B. `Variable`
    - C. `Secret`
    - D. `Event`
-10. Which AMI manager.conf permission class must a user have in order to run the `Originate` action and place an outbound call?
+10. ユーザーが `Originate` アクションを実行して発信通話を行うには、どのAMI manager.conf権限クラスが必要ですか？
     - A. `originate`
     - B. `verbose`
     - C. `log`
     - D. `reporting`
 
-**Answers:** 1 — E · 2 — B · 3 — B · 4 — A · 5 — B · 6 — B · 7 — `agi show commands` · 8 — `manager show commands` · 9 — A · 10 — A
+**回答:** 1 — E · 2 — B · 3 — B · 4 — A · 5 — B · 6 — B · 7 — `agi show commands` · 8 — `manager show commands` · 9 — A · 10 — A

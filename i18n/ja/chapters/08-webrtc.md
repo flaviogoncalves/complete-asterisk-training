@@ -1,62 +1,45 @@
 # WebRTC with Asterisk
 
-WebRTC（Web Real-Time Communication）を使用すると、プラグインや外部ソフトフォンを必要とせず、ウェブブラウザだけで通話の発信と受信が可能です。JavaScript、マイク、そして Asterisk への安全な接続さえあれば実現できます。Asterisk は Asterisk 11 以降 WebRTC サーバとして機能でき、PJSIP スタック（`res_pjsip`）が Asterisk 12 に導入されてからはそれが推奨される方法となりました。Asterisk 22 では設定がいくつかの分かりやすいオプションに整理されています。本章では、PJSIP エンドポイントをブラウザ電話に変換する方法、セキュアなメディアパスの仕組み、そして Asterisk の組み込み WebRTC サポートを使用すべきか、専用ゲートウェイを使用すべきかの判断基準を示します。
+WebRTC (Web Real-Time Communication) を使用すると、Webブラウザでプラグインや外部の softphone を使用することなく、通話の発着信が可能になります。必要なのは JavaScript、マイク、そして Asterisk へのセキュアな接続だけです。Asterisk は Asterisk 11 以降、WebRTC サーバーとして機能することが可能であり、Asterisk 12 で PJSIP スタック (`res_pjsip`) が導入されて以来、それが推奨される方法となっています。Asterisk 22 では、設定は十分に理解されたいくつかのオプションに集約されました。本章では、PJSIP endpoint をブラウザフォンに変える方法、セキュアなメディアパスの仕組み、そして Asterisk の組み込み WebRTC サポートを使用すべき場合と専用のゲートウェイを使用すべき場合について解説します。
 
-本章の内容はすべて本書の Asterisk 22 ラボで検証済みです。示されている設定は`lab/asterisk/etc`と同一です。
+本章の内容はすべて、本書の Asterisk 22 ラボ環境で検証済みです。示されている設定は `lab/asterisk/etc` と同一のものです。
 
-## 目的
+## Objectives
 
-By the end of this chapter, you should be able to:
+この章を読み終えることで、以下のことができるようになります。
 
-- Asterisk に WebRTC が追加する機能と使用すべきタイミングを説明する
-- WebRTC のメディアセキュリティ (DTLS-SRTP) と ICE が通常の SIP とどのように異なるかを説明する
-- Asterisk HTTP サーバーと安全な WebSocket (`wss`) エンドポイントを有効にする
-- `wss` PJSIP トランスポートと `webrtc=yes` を使用した WebRTC エンドポイントを設定する
-- ブラウザソフトフォン (SIP.js) を接続し、通話を発信する
-- Asterisk ネイティブの WebRTC と Janus などのメディアゲートウェイのどちらを使用するか判断する
+- WebRTCがAsteriskに何をもたらすのか、またいつそれを使用すべきかを説明できる
+- WebRTCのメディアセキュリティ（DTLS-SRTP）とICEが、通常のSIPとどのように異なるかを説明できる
+- AsteriskのHTTPサーバーとセキュアなWebSocket（`wss`）エンドポイントを有効にできる
+- `wss` PJSIPトランスポートとWebRTCエンドポイントを`webrtc=yes`で設定できる
+- ブラウザベースのsoftphone（SIP.js）を接続し、通話を発信できる
+- AsteriskネイティブのWebRTCと、Janusのようなメディアゲートウェイのどちらを選択すべきかを判断できる
 
-## Why WebRTC with Asterisk
+## AsteriskにおけるWebRTCの理由
 
-A WebRTC endpoint is, from Asterisk's point of view, just another PJSIP endpoint.
-What changes is *how* the browser reaches it and how media is secured. Typical
-uses include:
+Asteriskの観点から見ると、WebRTCのendpointは、単なるPJSIPのendpointに過ぎません。
+変わるのは、ブラウザがどのようにそこに到達するか、そしてメディアがどのように保護されるかという点です。典型的な用途には以下のようなものがあります。
 
-- **Click-to-call** on a website — a visitor calls a queue or an extension from a
-  web page.
-- **Web-based agents** — a contact-center agent works entirely in the browser, no
-  desktop softphone to install or update.
-- **Embedded calling** in your own web application — for example, the SipPulse web
-  softphone talking to Asterisk.
-- **Zero-install internal phones** — staff use a browser tab instead of a hardware
-  phone or installed client.
+- **Webサイトでのクリック・トゥ・コール** — 訪問者がWebページからキューやextensionに発信します。
+- **Webベースのエージェント** — コンタクトセンターのエージェントが完全にブラウザ上で業務を行い、デスクトップのsoftphoneをインストールしたり更新したりする必要がありません。
+- **独自のWebアプリケーションへの通話機能の組み込み** — 例えば、Asteriskと通信するSipPulse Web softphoneなどが挙げられます。
+- **インストール不要の社内電話** — スタッフがハードウェア電話やインストール型のクライアントの代わりに、ブラウザのタブを使用します。
 
-The big advantage is reach: every modern browser already speaks WebRTC. The cost
-is that WebRTC is strict — it *requires* encrypted media and a secure transport,
-so there is more to configure than a plain UDP SIP phone.
+最大の利点は到達範囲の広さです。現代のすべてのブラウザはすでにWebRTCに対応しています。その代償として、WebRTCは厳格であり、暗号化されたメディアとセキュアなトランスポートが*必須*となるため、通常のUDP SIP電話よりも多くの設定が必要になります。
 
-## How WebRTC differs from plain SIP
+## WebRTCと通常のSIPの違い
 
-通常の SIP 電話は UDP/TCP 上でシグナリングを行い、音声はプレーン RTP として運ばれます。WebRTC ブラウザクライアントは 3 つの重要な点で異なり、Asterisk はそれぞれに対応しなければなりません。
+通常のSIP電話はUDP/TCP上でシグナリングを行い、通常はプレーンなRTPとして音声を伝送します。WebRTCブラウザクライアントは、以下の3つの重要な点で異なっており、Asteriskはそれぞれに対応する必要があります。
 
-- **Signaling rides a WebSocket.** Instead of SIP over UDP port 5060, the browser
-  opens a secure WebSocket (`wss://`) to Asterisk's built-in HTTP server. SIP
-  messages travel inside that WebSocket.
-- **Media is always encrypted with DTLS-SRTP.** Browsers refuse plain RTP. The two
-  sides perform a DTLS handshake (authenticated by certificate fingerprints
-  exchanged in the SDP) and derive SRTP keys from it.
-- **Connectivity is negotiated with ICE.** Rather than assuming a reachable IP and
-  port, both sides gather candidate addresses (host, STUN-reflexive, TURN-relayed)
-  and probe them until one works. RTP and RTCP are usually multiplexed on a single
-  port (`rtcp_mux`).
+- **シグナリングはWebSocket上で実行される。** ブラウザはUDPポート 5060 を使用するSIPの代わりに、Asteriskの内蔵HTTPサーバーに対してセキュアなWebSocket（`wss://`）を開きます。SIPメッセージはそのWebSocket内を通過します。
+- **メディアは常にDTLS-SRTPで暗号化される。** ブラウザはプレーンなRTPを拒否します。双方はDTLSハンドシェイク（SDP内で交換された証明書のフィンガープリントによって認証される）を実行し、そこからSRTPキーを生成します。
+- **接続性はICEでネゴシエーションされる。** 到達可能なIPとポートを前提とするのではなく、双方が候補となるアドレス（ホスト、STUNリフレクティブ、TURNリレー）を収集し、機能するものが見つかるまでプローブを行います。RTPとRTCPは通常、単一のポート（`rtcp_mux`）上で多重化されます。
 
-The good news: in Asterisk 22 a single endpoint option, `webrtc=yes`, turns all of
-this on with sensible defaults. We will see exactly what it sets.
+朗報として、Asterisk 22では、単一のendpointオプションである`webrtc=yes`によって、これらすべてを適切なデフォルト設定で有効にできます。次に、これが具体的に何を設定するのかを見ていきます。
 
-## Step 1 — the HTTP server and the WebSocket
+## Step 1 — HTTPサーバーとWebSocket
 
-WebRTC signaling is served by Asterisk's built-in HTTP server (`res_http_websocket`  
-exposes the `/ws` path on it). Browsers require a *secure* WebSocket, so we enable  
-TLS. Edit `http.conf`:
+WebRTCのシグナリングは、Asteriskに組み込まれたHTTPサーバーによって提供されます（`res_http_websocket`は、その上で`/ws`パスを公開します）。ブラウザは*セキュア*なWebSocketを必要とするため、TLSを有効にします。`http.conf`を編集してください：
 
 ```
 [general]
@@ -71,7 +54,7 @@ tlscertfile=/etc/asterisk/keys/asterisk.crt
 tlsprivatekey=/etc/asterisk/keys/asterisk.key
 ```
 
-Reload (`module reload res_http_websocket` or restart) and confirm:
+リロード（`module reload res_http_websocket`または再起動）して確認します：
 
 ```
 *CLI> http show status
@@ -85,40 +68,32 @@ Enabled URI's:
 /ws => Asterisk HTTP WebSocket
 ```
 
-The browser will connect to `wss://your-asterisk:8089/ws`.
+ブラウザは`wss://your-asterisk:8089/ws`に接続します。
 
-### About the certificate
+### 証明書について
 
-The TLS certificate here secures the *WebSocket* (the signaling channel). In a lab  
-a self-signed certificate is fine — you accept it once in the browser. In  
-production use a real certificate (for example Let's Encrypt) whose name matches  
-the host the browser connects to, otherwise the browser will refuse the WebSocket.
+ここでのTLS証明書は、*WebSocket*（シグナリングチャネル）を保護するためのものです。ラボ環境では自己署名証明書で問題ありません。ブラウザで一度許可すればよいためです。本番環境では、ブラウザが接続するホスト名と一致する正規の証明書（Let's Encryptなど）を使用してください。そうしないと、ブラウザがWebSocket接続を拒否します。
 
-For the lab, `lab/make-certs.sh` generates a self-signed certificate with  
-`CN=localhost` (plus `localhost`/`127.0.0.1` SANs) and writes it to  
-`asterisk/etc/keys/`. For a public deployment, obtain a real certificate instead — for  
-example with Let's Encrypt:
+ラボ環境の場合、`lab/make-certs.sh`は`CN=localhost`（および`localhost`/`127.0.0.1`のSAN）を使用して自己署名証明書を生成し、`asterisk/etc/keys/`に書き込みます。公開環境へのデプロイでは、代わりに正規の証明書を取得してください。例えばLet's Encryptを使用する場合：
 
 ```
 certbot certonly --standalone -d voip.example.com
 ```
 
-Then point `http.conf` at the issued files and reload `res_http_websocket`:
+次に、`http.conf`を発行されたファイルに向け、`res_http_websocket`をリロードします：
 
 ```
 tlscertfile=/etc/letsencrypt/live/voip.example.com/fullchain.pem
 tlsprivatekey=/etc/letsencrypt/live/voip.example.com/privkey.pem
 ```
 
-Make sure the certificate name matches the host the browser connects to, and renew it  
-(certbot's timer does this automatically) before it expires, or the WebSocket will fail.
+証明書の名前がブラウザの接続先ホストと一致していることを確認し、有効期限が切れる前に更新してください（certbotのタイマーが自動的に行います）。そうしないと、WebSocket接続が失敗します。
 
-This certificate is **not** the same as the DTLS certificate used to encrypt the  
-media — Asterisk generates that one automatically, as we will see.
+この証明書は、メディアを暗号化するために使用されるDTLS証明書とは**別物**です。DTLS証明書は、後述するようにAsteriskが自動的に生成します。
 
-## Step 2 — WSSトランスポート
+## Step 2 — the WSS transport
 
-PJSIPは`wss`タイプのトランスポートが必要です。これを`pjsip.conf`に追加します:
+PJSIPには `wss` 型のトランスポートが必要です。これを `pjsip.conf` に追加してください：
 
 ```
 [transport-wss]
@@ -127,7 +102,7 @@ protocol=wss
 bind=0.0.0.0
 ```
 
-ロードされたことを確認します:
+読み込まれたことを確認します：
 
 ```
 *CLI> pjsip show transports
@@ -135,11 +110,11 @@ Transport:  transport-udp             udp      0      0  0.0.0.0:5060
 Transport:  transport-wss             wss      0      0  0.0.0.0:5060
 ```
 
-`wss`トランスポートに表示されている`0.0.0.0:5060`に惑わされないでください — WebSocketはポート5060で提供され**ません**。WebRTCシグナリングはステップ1で設定したHTTPサーバー（`wss`のポート8089）によって提供されます。PJSIP`wss`トランスポートは`res_http_websocket`上の薄いラッパーなので、そこに表示される`bind`アドレスは見た目上のものであり無視して構いません。重要なのは`http.conf`内の`tlsbindaddr`ポートです。
+`wss` トランスポートに対して表示される `0.0.0.0:5060` に惑わされないでください。WebSocketはポート 5060 では提供され**ません**。WebRTCのシグナリングは、Step 1で設定したHTTPサーバー（`wss` の場合はポート 8089）によって提供されます。PJSIPの `wss` トランスポートは `res_http_websocket` 上の薄いシム（shim）であるため、そのために表示される `bind` アドレスは装飾的なものであり無視して構いません。重要なポートは `http.conf` 内の `tlsbindaddr` です。
 
 ## Step 3 — the WebRTC endpoint
 
-Now the endpoint itself. The key is `webrtc=yes`:
+次に endpoint そのものです。鍵となるのは `webrtc=yes` です：
 
 ```
 [webrtc-1000]
@@ -163,8 +138,7 @@ type=aor
 max_contacts=1
 ```
 
-`webrtc=yes` is a convenience switch. It is equivalent to setting all of the
-WebRTC-required options by hand. You can confirm exactly what it turned on:
+`webrtc=yes` は便利なスイッチです。これは WebRTC に必要なすべてのオプションを手動で設定するのと同等です。何が有効になったのかは、以下で正確に確認できます：
 
 ```
 *CLI> pjsip show endpoint webrtc-1000
@@ -178,26 +152,18 @@ WebRTC-required options by hand. You can confirm exactly what it turned on:
  webrtc                             : yes
 ```
 
-Reading that output:
+その出力を読み解くと：
 
-- `media_encryption: dtls` and `dtls_auto_generate_cert: Yes` — media is DTLS-SRTP,
-  and Asterisk auto-generates the DTLS certificate, so you do **not** create one
-  yourself. The fingerprint is advertised in the SDP (`SHA-256`).
-- `ice_support: true` — Asterisk gathers and negotiates ICE candidates.
-- `rtcp_mux: true` — RTP and RTCP share one port, as browsers expect.
-- `use_avpf: true` — the AVPF RTP profile (feedback), required by WebRTC.
+- `media_encryption: dtls` および `dtls_auto_generate_cert: Yes` — メディアは DTLS-SRTP であり、Asterisk が自動的に DTLS 証明書を生成するため、自分で作成する必要は**ありません**。フィンガープリントは SDP (`SHA-256`) 内でアドバタイズされます。
+- `ice_support: true` — Asterisk が ICE candidates を収集し、ネゴシエーションを行います。
+- `rtcp_mux: true` — ブラウザの期待通り、RTP と RTCP が 1 つのポートを共有します。
+- `use_avpf: true` — WebRTC で必須となる AVPF RTP プロファイル (フィードバック) です。
 
-`allow=opus` is recommended — Opus is the codec browsers prefer. Asterisk 22 ships
-Opus *passthrough* in core (the `res_format_attr_opus` module), which is enough to
-relay Opus between two Opus-capable legs without re-encoding. *Transcoding* Opus to
-another codec requires the separate `codec_opus` module, which the official WebRTC
-guide lists as optional but highly recommended and which you install on top of the
-base build; see the codecs discussion in *Designing a VoIP network*. Keep `ulaw` as a
-fallback for bridging to non-WebRTC legs that cannot speak Opus.
+`allow=opus` が推奨されます。Opus はブラウザが優先する codec です。Asterisk 22 には Opus の *passthrough* 機能がコア (`res_format_attr_opus` モジュール) に含まれており、再エンコードなしで Opus 対応の 2 つのレグ間で Opus を中継するのに十分です。Opus を別の codec に *トランスコーディング* するには、別途 `codec_opus` モジュールが必要です。これは公式の WebRTC ガイドではオプションとされていますが、強く推奨されており、ベースビルドに追加でインストールします。*Designing a VoIP network* の codecs に関する議論を参照してください。Opus を話せない非 WebRTC レグへのブリッジ用フォールバックとして、`ulaw` を保持しておいてください。
 
 ## Step 4 — ICE, STUN and TURN
 
-フラットな LAN では、ホスト候補だけの ICE で十分であり、他に何も必要ありません。インターネット越しの場合は、通常 STUN サーバーを追加して Asterisk とブラウザーがパブリックアドレスを検出できるようにし、直接メディアが不可能なケース（対称 NAT、制限的なファイアウォール）に備えて TURN サーバーを用意します。Asterisk をそれらにポイントさせるには、`rtp.conf`をご参照ください。
+フラットなLAN環境であれば、ホスト候補を用いたICEだけで十分であり、他に何も必要ありません。インターネットを介する場合、通常はSTUNサーバーを追加してAsteriskとブラウザが自身のパブリックアドレスを検出できるようにし、さらに直接的なメディア通信が不可能な場合（対称型NATや制限の厳しいファイアウォール環境）に備えてTURNサーバーを追加します。これらを`rtp.conf`でAsteriskに指定します。
 
 ```
 [general]
@@ -208,11 +174,11 @@ stunaddr=stun.l.google.com:19302
 ; turnpassword=...
 ```
 
-ブラウザは JavaScript（`RTCPeerConnection` `iceServers` リスト）で独自の ICE サーバーを設定しています。純粋に内部だけの展開の場合、STUN/TURN は完全に省略できます。
+ブラウザ側は、JavaScript（`RTCPeerConnection`の`iceServers`リスト）で独自のICEサーバーを設定します。完全に内部向けのデプロイメントであれば、STUN/TURNを完全にスキップすることも可能です。
 
-`turnaddr` はオプションのポート（デフォルトは `3478`）を受け取り、`turnusername` と `turnpassword` がリレーに認証します。STUN はピアが自分のパブリックアドレスを *発見* するのにしか役立ちません — 両端が対称 NAT や制限の厳しいファイアウォールの背後にある場合、直接メディアは不可能で、TURN リレーだけが音声を流すことができます。
+`turnaddr`はオプションのポート（デフォルトは`3478`）を受け取ります。`turnusername`と`turnpassword`はリレーへの認証に使用されます。STUNはピアが自身のパブリックアドレスを*検出*するのを助けるだけです。両端が対称型NATや制限の厳しいファイアウォールの背後に存在する場合、直接的なメディア通信は不可能であり、音声を通すためにはTURNリレーが唯一の手段となります。
 
-**本番環境の推奨:** アドレス発見のためにパブリック STUN サーバー（Google のものなど）を使用して問題ありませんが、実際のトラフィックでパブリック TURN に依存しないでください — TURN リレーはすべてのメディアを中継するため、管理下に置く必要があります。自前の [coturn](https://github.com/coturn/coturn) サーバーを運用してください。長期認証情報を使用した最小構成の `/etc/turnserver.conf` は次のようになります:
+**本番環境への推奨事項:** アドレス検出には公開されているSTUNサーバー（Googleのものなど）で問題ありませんが、実際のトラフィックに公開TURNサーバーを**使用しないでください**。TURNはすべてのメディアを中継するため、自身の管理下にあるサーバーを使用する必要があります。独自の[coturn](https://github.com/coturn/coturn)サーバーを運用してください。長期認証情報を使用した最小限の`/etc/turnserver.conf`は以下のようになります。
 
 ```
 listening-port=3478
@@ -223,7 +189,7 @@ realm=voip.example.com
 external-ip=203.0.113.10
 ```
 
-それを`rtp.conf`で Asterisk に指示します:
+次に、`rtp.conf`でAsteriskにそのサーバーを指定します。
 
 ```
 [general]
@@ -234,15 +200,11 @@ turnusername=asterisk
 turnpassword=Strong-TURN-secret
 ```
 
-Give the browser the same TURN server in its `iceServers` list so both legs can relay.  
-For production with users on mobile networks or behind corporate firewalls, a  
-self-hosted coturn is effectively mandatory。
+両方のレグでリレーができるように、ブラウザの`iceServers`リストにも同じTURNサーバーを指定してください。モバイルネットワークや企業のファイアウォールの背後にいるユーザーを抱える本番環境では、セルフホスト型のcoturnの導入が事実上必須となります。
 
-## Step 5 — the browser client
+## Step 5 — ブラウザクライアント
 
-Any WebRTC SIP library works; two widely used ones are **SIP.js** and **JsSIP**. The
-lab includes a minimal SIP.js softphone at `lab/webrtc/index.html`. The essential
-part is the transport URL and the credentials:
+WebRTC SIPライブラリであればどれでも動作しますが、広く使われているものとして **SIP.js** と **JsSIP** があります。このラボには、最小限のSIP.js softphoneが`lab/webrtc/index.html`に含まれています。重要な部分は、トランスポートURLと認証情報です。
 
 ```javascript
 const ua = new SIP.UserAgent({
@@ -258,20 +220,16 @@ const inviter = new SIP.Inviter(ua, SIP.UserAgent.makeURI('sip:600@your-asterisk
 await inviter.invite();
 ```
 
-Two browser realities to remember:
+ブラウザに関して覚えておくべき2つの現実があります。
 
-- **Secure context.** `getUserMedia` (microphone access) only works on `https://`
-  pages or `http://localhost`. Serve the page over HTTPS in production.
-- **Accept the cert once.** With a self-signed lab certificate, visit
-  `https://your-asterisk:8089/ws` in the same browser first and accept the warning,
-  or the WebSocket will fail silently.
+- **セキュアコンテキスト。** `getUserMedia`（マイクへのアクセス）は、`https://`ページまたは`http://localhost`でのみ動作します。本番環境では、HTTPS経由でページを配信してください。
+- **証明書を一度承認する。** 自己署名のラボ用証明書を使用する場合、まず同じブラウザで`https://your-asterisk:8089/ws`にアクセスして警告を承認してください。そうしないと、WebSocketが警告なしに失敗します。
 
-The SipPulse web softphone is a production-grade reference client built on these same
-primitives.
+SipPulseウェブsoftphoneは、これらと同じプリミティブに基づいて構築された、本番環境グレードのリファレンスクライアントです。
 
-## WebRTC コールの検証
+## WebRTCコールの検証
 
-ブラウザが登録されると、`pjsip show contacts`は動的コンタクトを示し、コールがチャンネルを点灯させます:
+ブラウザが登録されると、`pjsip show contacts`に動的なコンタクトが表示され、コールによってチャネルがアクティブになります。
 
 ```
 *CLI> pjsip show contacts
@@ -280,94 +238,81 @@ primitives.
 PJSIP/webrtc-1000-00000001  internal  600  Up  Echo
 ```
 
-音声が片方向のみ、または全くない場合、ほとんどの場合 ICE または証明書が原因です — 以下のトラブルシューティングを参照してください。
+音声が片方向である、または聞こえない場合は、ほぼ間違いなくICEまたは証明書の問題です。以下のトラブルシューティングを参照してください。
 
-## Asterisk WebRTC とメディアゲートウェイ
+## Asterisk WebRTCとメディアゲートウェイの比較
 
-Asterisk は WebRTC を直接終端できるが、常に最適なツールとは限らない。
+AsteriskはWebRTCを直接終端できますが、常にそれが最適なツールであるとは限りません。
 
-- **Asterisk ネイティブの WebRTC を使用する** のは、ブラウザが PBX 上の *電話*、すなわちエージェントや内部エクステンション、ダイヤルプランに着地するクリック・トゥ・コールである場合。ブラウザは単なる別のエンドポイントとなり、キュー、ボイスメール、IVR などすべてが機能する。
-- **専用ゲートウェイ（例: Janus）を使用する** のは、コール制御とは別に多数のブラウザセッションをスケールさせる必要がある場合や、大規模会議/ストリーミングのために選択的転送を行う場合、またはメディアプレーンを PBX から分離したい場合である。ゲートウェイは WebRTC をプレーン SIP にブリッジし、Asterisk は普通の SIP レッグとして認識する。
+- **AsteriskネイティブのWebRTCを使用する場合**: ブラウザがPBX上の*電話機*として機能するケースです。エージェント、内線extension、dialplanに接続するクリック・トゥ・コールなどがこれに該当します。ブラウザは単なる別のendpointとして扱われ、すべての機能（キュー、voicemail、IVR）がそのまま利用可能です。
+- **専用ゲートウェイ（例: Janus）を使用する場合**: 通話制御とは独立して多数のブラウザセッションをスケーリングする必要がある場合や、大規模な会議やストリーミングのために選択的な転送を行う場合、あるいはメディアプレーンをPBXから分離しておきたい場合に適しています。ゲートウェイはWebRTCを通常のSIPにブリッジし、Asterisk側からは通常のSIPレグとして認識されます。
 
-多くの実際のシステムは両方を組み合わせている。Asterisk がコール制御を担当し、ゲートウェイがブラウザ側のメディアスケーリングを行う。（これは SipPulse の独自スタックの背後にあるアーキテクチャである。）
+多くの実運用システムでは、Asteriskによる通話制御と、ブラウザ側のメディアスケーリングのためのゲートウェイを組み合わせています。（これはSipPulse独自のスタックの背後にあるアーキテクチャです。）
 
 ## トラブルシューティング
 
-- **WebSocket won't connect:** ブラウザがTLS証明書を拒否しました。 `https://host:8089/ws` を直接開いて受け入れるか、信頼できる証明書をインストールしてください。
-- **Registers but no audio:** ICEが失敗しました — STUNを追加し、NAT越えの場合はTURNも追加してください。 `pjsip set logger on` を確認し、SDP候補を確認してください。
-- **One-way audio:** 通常は片側のNAT/ICE、または共通のコーデックがないことが原因です — `allow=opus,ulaw` を確実にしてください。
-- **Call drops at answer:** DTLSハンドシェイクが失敗しました；`dtls_auto_generate_cert` が `Yes` であることと、システム時計が正しいことを確認してください（証明書は時間に敏感です）。
+- **WebSocketが接続できない:** ブラウザがTLS証明書を拒否しました。直接 `https://host:8089/ws` を開き、証明書を承認するか、信頼された証明書をインストールしてください。
+- **登録はできるが音声が聞こえない:** ICEが失敗しました。STUNを追加し、NAT越えの場合はTURNを追加してください。 `pjsip set logger on` を確認し、SDP候補を調べてください。
+- **片方向音声:** 通常は片側のNAT/ICEの問題、または共通の codec が一致しないことが原因です。 `allow=opus,ulaw` を確認してください。
+- **応答時に通話が切断される:** DTLSハンドシェイクが失敗しました。 `dtls_auto_generate_cert` が `Yes` であること、およびシステム時刻が正しいこと（証明書は時間に依存します）を確認してください。
 
-## ラボ
+## 実習
 
-1. `./lab.sh up`を実行し、次に`bash lab/make-certs.sh`を実行してAsteriskを再起動します。
-2. `lab/webrtc/index.html`を提供し（`lab/webrtc`からの`python3 -m http.server`）、それを開きます；`https://localhost:8089/ws`で証明書を受け入れます。
-3. `webrtc-1000`として登録し、`600`に発信します（エコーテスト）— 自分の声が聞こえるはずです。
-4. `6001`として登録されたSipPulse Softphoneから、`1000`をダイヤルしてブラウザを鳴らします。
-5. 交渉を検査します：`pjsip set logger on`、通話を開始し、SDP内のDTLSフィンガープリントとICE候補を確認します。
+1. `./lab.sh up`を実行し、続いて`bash lab/make-certs.sh`を実行してから Asterisk を再起動します。
+2. `lab/webrtc/index.html`（`lab/webrtc`から`python3 -m http.server`）を配信して開き、`https://localhost:8089/ws`で証明書を承認します。
+3. `webrtc-1000`として登録し、`600`（エコーテスト）に発信します。自分の声が聞こえるはずです。
+4. `6001`として登録された SipPulse Softphone から`1000`にダイヤルし、ブラウザを呼び出します。
+5. ネゴシエーションを調査します。`pjsip set logger on`を実行して通話を発信し、SDP 内の DTLS フィンガープリントと ICE 候補を確認してください。
 
 ## 概要
 
-WebRTC はブラウザを Asterisk のファーストクラスエンドポイントに変えます。レシピは小さいですが厳格です：TLS を使用した HTTP サーバーを有効にしてブラウザが安全な WebSocket を開けるようにし、`wss` PJSIP トランスポートを追加し、エンドポイント上で`webrtc=yes` を設定します――これにより DTLS‑SRTP（自動生成証明書付き）、ICE、RTP/RTCP の多重化、AVPF プロファイルが有効になります。NAT を通過する場合は STUN/TURN を追加し、ページは HTTPS で提供し、SIP.js（または JsSIP）クライアントを`wss://asterisk:8089/ws` にポイントします。PBX 上のブラウザ電話には Asterisk ネイティブの WebRTC が最もシンプルなパスです；大規模メディアの場合はゲートウェイと組み合わせます。
+WebRTCは、ブラウザをAsteriskのファーストクラスのendpointへと変貌させます。その手順は小規模ですが厳格です。ブラウザがセキュアなWebSocketを開けるようにTLSを有効にしたHTTPサーバーを構築し、PJSIPのtransportを`wss`に追加し、endpointに`webrtc=yes`を設定します。これにより、DTLS-SRTP（自動生成された証明書を使用）、ICE、RTP/RTCP多重化、およびAVPFプロファイルが有効になります。NATを越える場合はSTUN/TURNを追加し、ページをHTTPS経由で提供し、SIP.js（またはJsSIP）クライアントを`wss://asterisk:8089/ws`に向けます。PBX上のブラウザフォンについては、AsteriskネイティブのWebRTCが最もシンプルな経路となります。大規模なメディアを扱う場合は、ゲートウェイと組み合わせてください。
 
-## Quiz
+## クイズ
 
-1. Which transport does a WebRTC browser client use to carry SIP signaling to
-   Asterisk?
-   - A. Plain UDP on port 5060
-   - B. A secure WebSocket (`wss://`) to Asterisk's HTTP server
-   - C. TLS on port 5061
-   - D. A raw TCP socket on port 8088
+1. WebRTCブラウザクライアントは、AsteriskへのSIPシグナリングを運ぶためにどのトランスポートを使用しますか？
+   - A. ポート 5060 でのプレーンな UDP
+   - B. AsteriskのHTTPサーバーへのセキュアな WebSocket (`wss://`)
+   - C. ポート 5061 での TLS
+   - D. ポート 8088 での生の TCP ソケット
 
-2. WebRTC media between the browser and Asterisk is encrypted using which mechanism?
-   - A. SDES-SRTP (keys exchanged in the SDP)
-   - B. DTLS-SRTP (keys derived from a DTLS handshake)
+2. ブラウザとAsterisk間のWebRTCメディアは、どのメカニズムを使用して暗号化されますか？
+   - A. SDES-SRTP (SDP内で交換される鍵)
+   - B. DTLS-SRTP (DTLSハンドシェイクから導出される鍵)
    - C. IPsec
-   - D. Plain RTP — WebRTC does not encrypt media
+   - D. プレーンな RTP — WebRTCはメディアを暗号化しない
 
-3. True or false: when you set `webrtc=yes`, you must manually generate and install
-   the DTLS certificate used to encrypt the media.
+3. 正か誤か：`webrtc=yes`を設定する場合、メディアの暗号化に使用されるDTLS証明書を手動で生成およびインストールする必要があります。
 
-4. On which port does the lab's Asterisk HTTP server expose the **secure** WebSocket
-   for WebRTC?
+4. ラボのAsterisk HTTPサーバーは、WebRTC用の**セキュアな** WebSocketをどのポートで公開していますか？
    - A. 5060
    - B. 5061
    - C. 8088
    - D. 8089
 
-5. Which of the following does `webrtc=yes` turn on by default? (Choose all that
-   apply.)
+5. `webrtc=yes`はデフォルトで以下のどれを有効にしますか？（該当するものをすべて選択してください。）
    - A. `media_encryption: dtls`
    - B. `ice_support: true`
    - C. `rtcp_mux: true`
    - D. `use_avpf: true`
    - E. `transport: transport-udp`
 
-6. Fill in the blank: WebRTC negotiates connectivity by having both sides gather and
-   probe candidate addresses (host, STUN-reflexive, TURN-relayed) using the
-   ________ framework.
+6. 空欄を埋めてください：WebRTCは、両側で候補アドレス（ホスト、STUNリフレクティブ、TURNリレー）を収集およびプローブすることで接続性をネゴシエーションします。これには ________ フレームワークを使用します。
 
-7. In `rtp.conf`, which two settings point Asterisk at an external server so it can
-   discover its public address and relay media when direct paths fail? (Choose all
-   that apply.)
+7. `rtp.conf`において、Asteriskがパブリックアドレスを検出し、直接パスが失敗したときにメディアをリレーできるように外部サーバーを指定する設定はどれですか？（該当するものをすべて選択してください。）
    - A. `icesupport=yes`
    - B. `stunaddr=`
    - C. `turnaddr=`
    - D. `tlsbindaddr=`
 
-8. The URL path that Asterisk's `res_http_websocket` exposes for WebRTC signaling is
-   ________.
+8. Asteriskの`res_http_websocket`がWebRTCシグナリングのために公開するURLパスは ________ です。
 
-9. According to the chapter, when should you reach for a dedicated media gateway
-   (such as Janus) instead of Asterisk-native WebRTC?
-   - A. Whenever any browser needs to make a call
-   - B. When you must scale many browser media sessions independently of call
-     control, do selective forwarding for large conferences, or keep the media plane
-     separate from the PBX
-   - C. Only when the browser does not support DTLS
-   - D. When you want voicemail and IVR to work for the browser endpoint
+9. 本章によると、AsteriskネイティブのWebRTCではなく、専用のメディアゲートウェイ（Janusなど）を使用すべきなのはどのような場合ですか？
+   - A. ブラウザが通話を行う必要があるときはいつでも
+   - B. 通話制御とは独立して多数のブラウザメディアセッションをスケーリングする必要がある場合、大規模会議のために選択的転送を行う場合、またはメディアプレーンをPBXから分離しておく必要がある場合
+   - C. ブラウザがDTLSをサポートしていない場合のみ
+   - D. ブラウザのendpointでvoicemailやIVRを動作させたい場合
 
-10. True or false: `getUserMedia` (microphone access) works on any `http://` page, so
-    serving the browser softphone over HTTPS is optional.
+10. 正か誤か：`getUserMedia`（マイクへのアクセス）はどの`http://`ページでも動作するため、ブラウザのsoftphoneをHTTPS経由で提供することは任意です。
 
-**Answers:** 1 — B · 2 — B · 3 — False (Asterisk auto-generates the DTLS cert; `dtls_auto_generate_cert: Yes`) · 4 — D · 5 — A, B, C, D · 6 — ICE · 7 — B, C · 8 — `/ws` · 9 — B · 10 — False (secure context required: `getUserMedia` only works on `https://` or `http://localhost`)
+**回答:** 1 — B · 2 — B · 3 — 誤 (Asteriskは自動的にDTLS証明書を生成します; `dtls_auto_generate_cert: Yes`) · 4 — D · 5 — A, B, C, D · 6 — ICE · 7 — B, C · 8 — `/ws` · 9 — B · 10 — 誤 (セキュアなコンテキストが必要です: `getUserMedia`は`https://`または`http://localhost`でのみ動作します)

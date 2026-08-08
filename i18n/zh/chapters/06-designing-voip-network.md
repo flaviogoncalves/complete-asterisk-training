@@ -1,161 +1,163 @@
-# Designing a VoIP network
+# 设计 VoIP 网络
 
-Voice over IP is quickly growing in the telephony market. The convergence paradigm is changing the way in which we communicate, reducing costs and enhancing the way in which we trade information. Voice is just the beginning of a full multimedia communication era, including voice, video, and presence. In the future, we are not going to transport people to work, but work to people because it is cleaner, faster, and cheaper. VoIP is just part of this revolution. Our challenge in this chapter is to design a VoIP network. To do this, we will have to understand concepts such as session protocols and codecs as well as how to dimension the number of circuits and bandwidth.
+VoIP 在电话通信市场中正迅速增长。融合范式正在改变我们的通信方式，在降低成本的同时提升了我们交换信息的方式。语音仅仅是全面多媒体通信时代的开端，该时代还包括语音、视频和状态呈现。未来，我们不再需要将人员运送到工作地点，而是将工作带给人员，因为这种方式更清洁、更快捷且成本更低。VoIP 只是这场革命的一部分。本章的挑战是设计一个 VoIP 网络。为此，我们需要理解诸如会话协议和 codec 之类的概念，以及如何规划电路数量和带宽。
 
 ## 目标
 
+在本章结束时，您应该能够：
+
 - 理解 VoIP 的优势
 - 描述 Asterisk 如何处理 VoIP
-- 描述 SIP 和 IAX 通道的概念
-- 为特定数据通道选择最合适的协议
-- 为特定数据通道选择最合适的编解码器
-- 估算所需的通道数量
+- 描述 SIP 和 IAX 通道（channel）的概念
+- 为特定的数据通道选择最合适的协议
+- 为特定的数据通道选择最合适的 codec
+- 确定所需的通道数量
 - 计算所需的带宽
 
-## VoIP benefits
+## VoIP 的优势
 
-为什么要关注 VoIP？VoIP 为公司和个人都提供了好处。成本降低无疑是其中之一，但在某些环境下，VoIP 还能简化计算机系统的集成。以下详细列出几项好处：
+为什么要关注 VoIP？VoIP 为企业和个人都带来了诸多益处。降低成本无疑是其中之一，但在某些环境下，VoIP 还简化了计算机系统的集成。以下详细介绍了其中的几项优势：
 
-### Convergence
+### 融合
 
-VoIP 的主要好处是将数据网络和语音网络合并以降低成本（convergence）。然而，仅仅分析语音通话费用可能不足以证明采用 VoIP 的合理性。运营商出售的通话分钟费用正迅速下降，这一点在决定采用 VoIP 前必须考虑。
+VoIP 的主要优势在于将数据网络与语音网络相结合，从而降低成本（即融合）。然而，仅分析语音通话的分钟成本可能不足以证明采用 VoIP 的合理性。电信公司提供的通话分钟单价正在迅速降低，在采用 VoIP 之前，这一点值得考虑。
 
-### Infrastructure costs
+### 基础设施成本
 
-使用单一网络基础设施可以降低新增、删除和变更相关的成本。随着 IP 的普及，VoIP 相关技术已被引入到多种新设备中，如手机、PDA、嵌入式系统和笔记本电脑。
+使用单一的网络基础设施可以降低与添加、移除和变更相关的成本。随着 IP 技术的普及，它已将 VoIP 相关技术带到了多种新设备上，例如手机、PDA、嵌入式系统和笔记本电脑。
 
-### Open Standards
+### 开放标准
 
-最后，VoIP 所基于的开放标准提供了选择不同供应商的自由。这一单一优势使得客户成为王者，而不再是 TELCOS 和 PBX 制造商的附属。
+最后，VoIP 所基于的开放标准提供了选择不同供应商的自由。这一单一优势使客户成为了主导者，而不再受制于 TELCOS 和 PBX 制造商。
 
-### Computer Telephony Integration
+### 计算机电话集成
 
-电话技术远早于计算技术。传统电话 PBX 基于电路交换，通常只有一台计算机用于监督。使用 VoIP，电话系统从底层就基于计算机标准构建。这使得计算机电话应用的使用比旧模式更便宜、更容易。您可以快速创建基于 Asterisk 的大量电话应用。您可以在传统 PBX 所需时间的一小部分内开发 IVR、ACD、CTI、拨号器、弹屏以及其他应用。
+电话技术比计算机技术古老得多。传统的 PBX 基于电路交换，通常除了用于监控的计算机外，没有其他集成。而对于 VoIP，电话技术从底层开始就是基于计算机标准构建的。这使得计算机电话应用的使用比旧模式更便宜、更简单。您可以基于 Asterisk 快速创建一系列电话应用。与传统 PBX 所需的时间相比，您可以以极短的时间开发 IVR、ACD、CTI、拨号器、屏幕弹窗以及其他应用程序。
 
 ## Asterisk VoIP 架构
 
-Asterisk 的架构如下所示。Asterisk 将所有 VoIP 协议视为通道。您可以使用任何编解码器或任何协议。这里需要学习的概念是，Asterisk 能够将任意类型的通道桥接到其他通道。因此，您可以在不同的编解码器之间相互转换信令协议，例如 SIP 和 IAX。举例来说，您可以将使用 G.711 编解码器的本地局域网内 SIP 电话的呼叫，转换为使用 G.729 编解码器的 SIP 中继，以连接到您的 VoIP 提供商。接下来的章节中，我们将详细说明 SIP 和 IAX 的架构。通过 chan_ooh323 插件提供的 H.323 支持仍然可用，但已日益少见；SIP/PJSIP 是现代部署的标准。
+Asterisk 的架构如下图所示。Asterisk 将所有 VoIP 协议视为通道（channel）。你可以使用任何 codec 或任何协议。此处需要学习的概念是，Asterisk 可以将任何类型的通道桥接到任何其他通道。因此，你可以转换 SIP 和 IAX 等信令协议，甚至可以使用不同的 codec 进行转换。例如，你可以将来自局域网内使用 G.711 codec 的 SIP softphone 的呼叫，转换为使用 G.729 codec 的通往 VoIP 提供商的 SIP trunk。在接下来的章节中，我们将详细解释 SIP 和 IAX 架构。H.323 支持（通过 chan_ooh323 插件）虽然可用，但已越来越少见；SIP/PJSIP 是现代部署的标准。
 
-![Asterisk 的模块化架构：应用程序和通道通过 API 连接到 PBX 交换核心，动态加载编解码器转换和文件格式模块。](../images/06-voip-network-fig01.png)
+![Asterisk 的模块化架构：应用程序和通道通过 API 连接到 PBX 交换核心，并动态加载 codec 转换和文件格式模块。]((../images/06-voip-network-fig01.png))
 
-## VoIP 协议与网络层次结构
+## VoIP 协议与网络栈
 
-VoIP 使用一组相互协作的不同协议。将它们对应到七层 OSI 参考模型上是很诱人的做法，许多较早的图示也正是如此——把 SIP 和 H.323 放在“会话”层，编解码器放在“表示”层。这种映射一直存在争议。标准化 SIP 的 IETF 并不使用 OSI 模型；它遵循更早的四层 TCP/IP（DoD）模型，RFC 3261 将 **SIP 定义为应用层协议**。媒体也遵循相同的模式：RTP 和编解码器位于应用负载中，通过 UDP 在传输层传输。下表将主要的 VoIP 协议映射到 IETF 实际使用的 TCP/IP 模型，并仅为参考给出大致的 OSI 等价层。
+VoIP 使用一组协同工作的不同协议。人们很容易将它们与七层 OSI 参考模型进行对比，许多旧的图表正是这样做的——将 SIP 和 H.323 放在“会话”层，将 codec 放在“表示”层。这种映射一直存在争议。制定 SIP 标准的 IETF 并不使用 OSI 模型；它遵循更古老的四层 TCP/IP (DoD) 模型，并且 RFC 3261 将 **SIP 定义为应用层协议**。媒体流遵循相同的模式：RTP 和 codec 存在于应用层载荷中，通过传输层的 UDP 进行承载。下表将主要的 VoIP 协议映射到 IETF 实际使用的 TCP/IP 模型上，粗略的 OSI 等效层仅供参考。
 
-| TCP/IP (IETF) 层 | 协议 | 大致 OSI 等价层 |
+| TCP/IP (IETF) 层 | 协议 | 粗略的 OSI 等效层 |
 |---|---|---|
-| Application | SIP, H.323, MGCP, IAX2 signaling; RTP/RTCP; codecs (G.711, G.729, Opus…) | Application / Presentation / Session |
-| Transport | UDP, TCP | Transport |
-| Internet | IP (with QoS such as DiffServ) | Network |
-| Link | Ethernet, PPP, Frame Relay… | Data link / Physical |
+| 应用层 | SIP, H.323, MGCP, IAX2 信号；RTP/RTCP；codec (G.711, G.729, Opus…) | 应用层 / 表示层 / 会话层 |
+| 传输层 | UDP, TCP | 传输层 |
+| 网络层 | IP (带有诸如 DiffServ 之类的 QoS) | 网络层 |
+| 链路层 | Ethernet, PPP, Frame Relay… | 数据链路层 / 物理层 |
 
-QoS 机制如 DiffServ 在 IP 层运行，以对语音数据包进行优先级排序并提升通话质量。以下是一些协议的具体说明：
+诸如 DiffServ 之类的 QoS 机制在 IP 层运行，以优先处理语音数据包并提高通话质量。以下是一些协议细节：
 
-- **SIP** 使用 UDP 或 TCP 的 5060 端口（TLS 使用 5061）来传输信令。音频则通过 RTP 在可配置的 UDP 端口范围内单独传输（Asterisk 附带的 `rtp.conf` 示例使用 10000 到 20000），并使用如 G.711 的编解码器进行编码。
-- **H.323** 通过 TCP（H.225 信令使用 1720 端口）传输呼叫信令，而 H.225 RAS 通道使用 UDP 的 1719 端口；RTP 负责音频传输。
-- **IAX2** 较为特殊：它在单一 UDP 端口（4569）上复用信令和媒体，这简化了 NAT 和防火墙的穿透。
+- **SIP** 使用 UDP 或 TCP 的 5060 端口（TLS 使用 5061 端口）来承载信号。音频由 RTP 通过可配置的 UDP 端口范围（Asterisk 附带的 `rtp.conf` 示例使用 10000 到 20000）单独承载，并使用诸如 G.711 之类的 codec 进行编码。
+- **H.323** 通过 TCP 承载呼叫信号（H.225 呼叫信号使用 1720 端口），而 H.225 RAS 通道使用 UDP 的 1719 端口；RTP 负责传输音频。
+- **IAX2** 很特别：它将信号和媒体多路复用到单个 UDP 端口 (4569) 上，这简化了 NAT 和防火墙的穿透。
 
 
-## How to choose a protocol
+## 如何选择协议
 
-鉴于协议众多，如何为你的网络选择最佳方案？本节将重点介绍每种协议的优势与不足。
+鉴于协议种类繁多，您该如何为您的网络选择最佳协议呢？在本节中，我们将重点介绍每种协议的优缺点。
 
 ### SIP - Session Initiated Protocol
 
-SIP 是由 Internet Engineering Task Force (IETF) 制定的开放标准，主要定义在 RFC 3261 中。大多数现代 VoIP 提供商使用 SIP；事实上，它正成为最流行的 VoIP 标准。SIP 的优势在于它是基于 IETF 的标准。与较旧的 H.323 相比，SIP 更轻量。SIP 的主要弱点是 NAT 穿透——这对大多数 SIP VoIP 提供商来说是一个挑战。IETF 创建 SIP 时并未考虑计费，而是面向对等方的开放通信。计费通常是 VoIP 提供商关注的问题。
+SIP 是互联网工程任务组（IETF）的一项开放标准，主要定义在 RFC 3261 中。大多数现代 VoIP 提供商都使用 SIP；事实上，它正成为最流行的 VoIP 标准。SIP 的优势在于它是一个基于 IETF 的标准。与较旧的 H.323 相比，SIP 非常轻量。SIP 的主要弱点是 NAT 穿越——这对大多数 SIP VoIP 提供商来说都是一个挑战。IETF 在创建 SIP 时并未考虑计费问题，而是为了对等方之间的开放通信。计费通常是 VoIP 提供商关心的问题。
 
 ### IAX – Inter Asterisk eXchange
 
-IAX 是一种最初由 Digium（现为 Sangoma）开发的开放协议。IAX 是一种“一体化”协议，因为它通过同一个 UDP 端口（4569）传输信令和媒体。Mark Spencer 将 IAX 设计为二进制协议，以降低带宽占用。IAX 的主要优势是其降低的带宽使用（它不使用 RTP）；由于只使用一个 UDP 端口（4569），它也非常容易实现 NAT 和防火墙穿透。
+IAX 是一种最初由 Digium（现为 Sangoma）开发的开放协议。IAX 是一种多合一协议，因为它通过同一个 UDP 端口 (4569) 传输信令和媒体。Mark Spencer 开发 IAX 是为了将其作为一种减少带宽占用的二进制协议。IAX 的主要优势在于其降低了带宽使用率（它不使用 RTP）；由于它仅使用一个 UDP 端口 (4569)，因此在 NAT 和防火墙穿越方面也非常容易。
 
-如果传统 PBX 厂商创建了 IAX，可能会把该协议宣传为“自冰激凌以来最好的东西”；在某些情况下，IAX 在中继模式下可以将语音带宽使用降低三分之一。IAX2（版本 2）仍通过 `chan_iax2` 模块随 Asterisk 22 提供，并在 Asterisk‑to‑Asterisk 中继、IAX2 电话以及 IAX 服务提供商中仍然有用，尽管它被视为遗留技术；新部署更倾向于使用 SIP/PJSIP。IAX2 在 [RFC 5456](https://www.rfc-editor.org/rfc/rfc5456)（信息性）中有规范。
+如果传统的 PBX 制造商创建了 IAX，他们可能会将其宣传为“有史以来最好的发明”；在某些情况下，处于 trunk 模式的 IAX 可以将语音带宽使用量减少三分之一。IAX2（第 2 版）仍然通过 `chan_iax2` 模块在 Asterisk 22 中提供，并且对于 Asterisk-to-Asterisk 的 trunk 仍然有用，尽管它已被视为传统技术；对于新的部署，首选 SIP/PJSIP。IAX2 在 [RFC 5456](https://www.rfc-editor.org/rfc/rfc5456)（信息性）中进行了规范。
 
 ### MGCP – Media Gateway Control Protocol
 
-MGCP 是一种与 H.323、SIP 和 IAX 配合使用的协议。其最大优势是可扩展性。它在呼叫代理而非网关上进行配置，从而简化了配置过程并实现集中管理。然而，Asterisk 对该协议的实现并不完整，且使用者并不多。
+MGCP 是一种与 H.323、SIP 和 IAX 结合使用的协议。它最大的优势是可扩展性。它是在呼叫代理（call agent）中配置的，而不是在网关中。这简化了配置过程并允许集中管理。然而，Asterisk 对它的实现并不完整，而且似乎并没有多少人在使用它。
 
 ### H.323
 
-H.323 在 VoIP 中仍被广泛使用。它是最早的 VoIP 协议之一，对连接基于网关的旧有 VoIP 基础设施至关重要。H.323 仍是网关市场的标准，尽管市场正逐步向 SIP 迁移。H.323 的优势包括广泛的市场采纳和成熟度。其劣势则与实现复杂性以及标准组织相关的成本有关。
+H.323 在 VoIP 中得到了广泛应用。它是最早的 VoIP 协议之一，对于连接基于网关的旧版 VoIP 基础设施至关重要。尽管市场正在缓慢向 SIP 迁移，但 H.323 仍然是网关市场的标准。H.323 的优势包括巨大的市场采用率和成熟度。H.323 的弱点与实现的复杂性以及标准机构的相关成本有关。
 
-### Protocol comparison table
+### 协议对比表
 
-以下表格概括了会话协议之间的差异。
+下表总结了各会话协议之间的差异。
 
-| Protocol | Standard body | Asterisk 22 module / status | Used for |
+| 协议 | 标准机构 | Asterisk 22 模块 / 状态 | 用途 |
 |----------|---------------|-----------------------------|----------|
-| SIP | IETF standard | `chan_pjsip` (core; the only SIP driver — `chan_sip` was removed in Asterisk 21) | SIP phones; connecting to SIP service providers |
-| IAX2 | RFC 5456 (Informational) | `chan_iax2` (core; still shipped, considered legacy) | Asterisk-to-Asterisk trunks; IAX2 phones; IAX service providers |
-| H.323 | ITU standard | `chan_ooh323` (external community add-on, not in the base build) | H.323 phones and gateways (can use an external gatekeeper, cannot be one) |
-| MGCP | IETF/ITU | `chan_mgcp` removed in Asterisk 21 — no longer available | (legacy MGCP phones) |
-| SCCP (Skinny) | Cisco proprietary | `chan_skinny` removed in Asterisk 21 — no longer available | (legacy Cisco phones) |
+| SIP | IETF 标准 | `chan_pjsip`（核心；唯一的 SIP 驱动程序 — `chan_sip` 已在 Asterisk 21 中移除） | SIP 电话；连接到 SIP 服务提供商 |
+| IAX2 | RFC 5456 (信息性) | `chan_iax2`（核心；仍在发布，被视为传统技术） | Asterisk-to-Asterisk trunk；IAX2 电话；IAX 服务提供商 |
+| H.323 | ITU 标准 | `chan_ooh323`（外部社区插件，不在基础构建中） | H.323 电话和网关（可以使用外部网守，但不能作为网守） |
+| MGCP | IETF/ITU | `chan_mgcp` 已在 Asterisk 21 中移除 — 不再可用 | （传统 MGCP 电话） |
+| SCCP (Skinny) | Cisco 专有 | `chan_skinny` 已在 Asterisk 21 中移除 — 不再可用 | （传统 Cisco 电话） |
 
-## One endpoint per device
+## 每个设备对应一个 endpoint
 
-在 Asterisk 22 中，PJSIP 堆栈将每部电话、干线或网关建模为`pjsip.conf`中的单个 **endpoint** 对象。一个 endpoint 既可以发起呼叫也可以接收呼叫；它的凭证存放在`auth`对象中，已注册的地址在`aor`中，网络路径在`transport`中。您为每个设备配置一个 endpoint 并附加它所需的各个部分——不存在需要区分的 “user” 与 “peer” 角色。（完整的对象模型在 *SIP & PJSIP in depth* 中有详细说明。）
+在 Asterisk 22 中，PJSIP 协议栈将每一部电话、trunk 或网关都建模为 `pjsip.conf` 中的单个 **endpoint** 对象。一个 endpoint 既可以拨打也可以接收呼叫；其凭据存储在 `auth` 对象中，其注册地址存储在 `aor` 中，而其网络路径则存储在 `transport` 中。你只需为每个设备配置一个 endpoint 并附加其所需的组件即可 —— 无需再考虑“用户 (user)”与“对端 (peer)”这种分离的角色。（完整的对象模型将在 *SIP & PJSIP in depth* 一章中详细介绍。）
 
-## Codecs and codec translation
+## Codecs 和 codec 转换
 
-您将使用编解码器将模拟波形的语音转换为数字信号。编解码器在音质、压缩率、带宽和计算需求等方面各不相同。服务、电话和网关通常支持这些方面的多种组合。G.729 编解码器非常流行。它不是标准 Asterisk 22 构建的一部分；而是作为外部附加模块（`codec_g729`）提供，需从 Digium（现为 Sangoma）下载。Asterisk 的`menuselect`源码将其列在`support_level=external`中，并明确说明：“从 Digium 下载 g729a 编解码器。此编解码器必须购买许可证。” 换言之，合法使用 G.729 需要为每个通道购买许可证。（还有一个开源替代方案`bcg729`。）
+您将使用 codec 将语音从模拟波转换为数字信号。Codec 在音质、压缩率、带宽和计算需求等方面各不相同。服务、电话和网关通常支持其中的若干方面。Codec G.729 非常流行。它不属于标准 Asterisk 22 构建的一部分；相反，它作为外部附加模块（`codec_g729`）提供，您可以从 Digium（现为 Sangoma）下载。Asterisk 的 `menuselect` 源代码将其与 `support_level=external` 一起列出，并明确指出：“从 Digium 下载 g729a codec。此 codec 必须购买许可证。”换句话说，合法使用 G.729 需要购买按通道计费的许可证。（也存在一种开源替代方案，`bcg729`。）
 
-![Pulse Code Modulation (PCM): a 4000 Hz analog signal is sampled 8000 times per second (Nyquist theorem) and coded into a 64 Kbps digital bitstream.](../images/06-voip-network-fig04.png)
+![脉冲编码调制 (PCM)：4000 Hz 的模拟信号每秒采样 8000 次（奈奎斯特采样定理），并编码为 64 Kbps 的数字比特流。](../images/06-voip-network-fig04.png)
 
-Asterisk 22 支持以下编解码器（以及其他）：
+Asterisk 22 支持以下 codec（以及其他 codec）：
 
-- GSM: 13 Kbps
-- iLBC: 13.3 Kbps
-- ITU G.711 (ulaw/alaw): 64 Kbps — 标准 PSTN 质量；ulaw 在北美常用，alaw 在欧洲和拉美常用
-- ITU G.722: 64 Kbps — 宽带（高清语音），在与 G.711 相同的带宽下提供良好音质
-- ITU G.723.1: 5.3/6.3 Kbps
-- ITU G.726: 16/24/32/40 Kbps
-- ITU G.729: 8 Kbps — 从 Digium/Sangoma 下载的外部`codec_g729`二进制模块（`support_level=external`；使用前必须购买许可证）
-- Speex: 2.15 to 44.2 Kbps
-- LPC10: 2.4 Kbps
-- **Opus**: 6–510 Kbps，可变 — 现代宽带/全频段编解码器；音质卓越且抗丢包；作为外部`codec_opus`二进制模块从 Digium/Sangoma 下载（`support_level=external`；不像 G.729 那样需要购买许可证）；推荐用于 WebRTC 和现代 SIP 端点。（GitHub 上还有开源构建替代方案。）
+- GSM：13 Kbps
+- iLBC：13.3 Kbps
+- ITU G.711 (ulaw/alaw)：64 Kbps — 标准 PSTN 质量；ulaw 在北美很常见，alaw 在欧洲和拉丁美洲很常见
+- ITU G.722：64 Kbps — 宽带（HD voice），在与 G.711 相同的带宽下提供良好的音质
+- ITU G.723.1：5.3/6.3 Kbps
+- ITU G.726：16/24/32/40 Kbps
+- ITU G.729：8 Kbps — 从 Digium/Sangoma 下载的外部 `codec_g729` 二进制模块（`support_level=external`；使用它必须购买许可证）
+- Speex：2.15 至 44.2 Kbps
+- LPC10：2.4 Kbps
+- **Opus**：6–510 Kbps，可变 — 现代宽带/全频带 codec；具有出色的音质和抗丢包能力；作为从 Digium/Sangoma 下载的外部 `codec_opus` 二进制模块提供（`support_level=external`；与 G.729 不同，无需购买许可证）；推荐用于 WebRTC 和现代 SIP endpoint。（GitHub 上存在开源构建替代方案。）
 
-此外，Asterisk 允许在编解码器之间进行转换。在某些情况下，这不可行，例如 g723，仅支持直通模式。将一种编解码器转换为另一种会消耗大量 CPU 资源。因此，尽可能避免此类转换。
+此外，Asterisk 允许在 codec 之间进行转换。在某些情况下，这是不可能的，例如 g723，它仅支持透传模式。从一种 codec 转换到另一种 codec 会消耗大量的 CPU 资源。因此，请尽可能避免这种情况。
 
-## How to choose a Codec
+## 如何选择 Codec
 
-Codec selection depends on several options, such as:
+Codec 的选择取决于多个选项，例如：
 
-- Sound quality
-- Licensing costs
-- CPU-processing consumption
-- Bandwidth requirements
-- Packet-loss concealment
-- Availability for Asterisk and phone devices
+- 音质
+- 许可成本
+- CPU 处理消耗
+- 带宽需求
+- 丢包隐藏（Packet-loss concealment）
+- Asterisk 和电话设备的可用性
 
-The following table compares the most popular codecs. The quality of these codecs is considered “toll”—in other words, similar to PSTN.
+下表比较了最流行的 Codec。这些 Codec 的质量被认为是“toll”级——换句话说，类似于 PSTN。
 
 | Codec | G.711 | G.722 | Opus | G.729A | iLBC | GSM |
 |---|---|---|---|---|---|---|
-| Audio band | Narrow | Wide (HD) | Narrow–full | Narrow | Narrow | Narrow |
-| Bandwidth (Kbps) | 64 | 64 | 6–510 | 8 | 13.33 | 13 |
-| Cost/channel | Free | Free | Free | License¹ | Free | Free |
-| Frame-erasure² | None | Low | Excellent | ~3% | ~5% | ~3% |
-| CPU cost | Very low | Low | Mod.–high | High | High | Low |
+| 音频频带 | 窄带 | 宽带 (HD) | 窄带至全频带 | 窄带 | 窄带 | 窄带 |
+| 带宽 (Kbps) | 64 | 64 | 6–510 | 8 | 13.33 | 13 |
+| 通道成本 | 免费 | 免费 | 免费 | 许可¹ | 免费 | 免费 |
+| 帧擦除² | 无 | 低 | 极佳 | ~3% | ~5% | ~3% |
+| CPU 成本 | 极低 | 低 | 中至高 | 高 | 高 | 低 |
 
-The Asterisk 22 modules are: G.711 `codec_ulaw` / `codec_alaw` (core), G.722 `codec_g722` (core), Opus `codec_opus` (external), G.729 `codec_g729` (external), iLBC `codec_ilbc` (core), and GSM `codec_gsm` (core). Opus is "Narrow–full" because it scales from narrowband up to fullband; its bandwidth (6–510 Kbps) is variable, and its frame-erasure resistance comes from built-in FEC/PLC.
+Asterisk 22 的模块包括：G.711 `codec_ulaw` / `codec_alaw` (核心)，G.722 `codec_g722` (核心)，Opus `codec_opus` (外部)，G.729 `codec_g729` (外部)，iLBC `codec_ilbc` (核心) 以及 GSM `codec_gsm` (核心)。Opus 被称为“窄带至全频带”，因为它能从窄带扩展到全频带；其带宽 (6–510 Kbps) 是可变的，且其帧擦除抵抗力源于内置的 FEC/PLC。
 
-The PSTN baseline is **G.711** — it is the reference for "toll" quality and transcodes for free inside Asterisk. **G.722** delivers wideband (HD) voice at the same 64 Kbps and is a good LAN/internal choice. **Opus** is the modern default for WebRTC and capable SIP endpoints: it adapts its bitrate, has built-in forward error correction, and resists packet loss well; it ships as the external `codec_opus` binary (free to download). **G.729** stays useful on low-bandwidth WAN trunks, but lawful use requires either Sangoma's licensed `codec_g729` (free to download, per-channel license to use) or the open-source **bcg729** implementation as an alternative.
+PSTN 的基准是 **G.711** —— 它是“toll”级质量的参考，并且在 Asterisk 内部可免费转码。**G.722** 以相同的 64 Kbps 带宽提供宽带 (HD) 语音，是 LAN/内部环境的理想选择。**Opus** 是 WebRTC 和支持该功能的 SIP endpoint 的现代默认选择：它能自适应比特率，具有内置的前向纠错功能，且能很好地抵抗丢包；它作为外部 `codec_opus` 二进制文件提供（可免费下载）。**G.729** 在低带宽 WAN trunk 上仍然很有用，但合法使用需要 Sangoma 的许可 `codec_g729`（可免费下载，使用需按通道购买许可）或开源的 **bcg729** 实现作为替代方案。
 
-¹ Sangoma's `codec_g729` binary is free to download but requires a purchased per-channel license to use lawfully. The open-source `bcg729` is a license-free alternative.
+¹ Sangoma 的 `codec_g729` 二进制文件可免费下载，但合法使用需要购买按通道计算的许可。开源的 `bcg729` 是一种免许可的替代方案。
 
-² Resistance to frame erasure refers to how well perceived quality (MOS) holds up under packet loss. The exact crossover point varies with packetization and network conditions; use this column for relative comparison, not as a precise figure.
+² 对帧擦除的抵抗力是指在丢包情况下感知质量 (MOS) 的保持程度。确切的临界点会随打包方式和网络条件而变化；请将此列仅用于相对比较，而非精确数值。
 
-**Codec recommendations for Asterisk 22:**
+**Asterisk 22 的 Codec 建议：**
 
-- **G.711 (ulaw/alaw):** Use for PSTN trunks and maximum interoperability; zero transcoding cost within Asterisk.
-- **G.729:** Useful for low-bandwidth WAN trunks; Sangoma's `codec_g729` module is free to download but requires a purchased per-channel license to use.
-- **G.722:** Good choice for wideband (HD voice) on LAN/internal extensions; same bandwidth as G.711 with better quality.
-- **Opus:** Recommended for modern endpoints, WebRTC clients, and any deployment where the endpoint supports it. Adaptive bitrate, excellent packet-loss resilience, freely available via Sangoma's `codec_opus` binary module.
+- **G.711 (ulaw/alaw)：** 用于 PSTN trunk 和最大程度的互操作性；在 Asterisk 内部转码成本为零。
+- **G.729：** 适用于低带宽 WAN trunk；Sangoma 的 `codec_g729` 模块可免费下载，但使用需要购买按通道计算的许可。
+- **G.722：** LAN/内部 extension 进行宽带 (HD 语音) 通信的良好选择；带宽与 G.711 相同但质量更好。
+- **Opus：** 推荐用于现代 endpoint、WebRTC 客户端以及任何 endpoint 支持该功能的部署场景。具有自适应比特率、出色的丢包恢复能力，可通过 Sangoma 的 `codec_opus` 二进制模块免费获取。
 
-## 协议头部导致的开销
+## 协议头带来的开销
 
-尽管编解码器几乎不占用带宽，但我们必须考虑以太网、IP、UDP 和 RTP 等协议头部带来的开销。因此，实际消耗的带宽取决于所使用的头部。在以太网网络上，需求高于 PPP 网络，因为 PPP 头部比以太网头部更短。例如，一个 G.729 语音包仅携带 20 字节的有效负载，却被大约 58 字节的以太网、IP、UDP 和 RTP 头部所包裹——因此是头部而非编解码器主导了带宽（见下图）。
+尽管 codec 对带宽的占用很小，但我们必须考虑由 Ethernet、IP、UDP 和 RTP 等协议头带来的开销。因此，实际消耗的带宽取决于所使用的协议头。在 Ethernet 网络上的需求要高于 PPP 网络，因为 PPP 协议头的长度比 Ethernet 协议头短。例如，单个 G.729 语音数据包仅携带 20 字节的有效载荷，但却被包裹在约 58 字节的 Ethernet、IP、UDP 和 RTP 协议头中——因此，主导带宽消耗的是协议头，而非 codec（见下图）。
 
-![单个 g.729 语音包在以太网中的情况：20 字节的有效负载被 58 字节的以太网、IP、UDP 和 RTP 头部包裹——一次 g.729 通话消耗 31.2 Kbps.](../images/06-voip-network-fig05.png)
+![单个 Ethernet 上的 g.729 语音数据包：20 字节的有效载荷被包裹在 58 字节的 Ethernet、IP、UDP 和 RTP 协议头中——一次 g.729 通话消耗 31.2 Kbps。](images/g729_packet.png)(../images/06-voip-network-fig05.png)
 
 - Ethernet (Ethernet+IP+UDP+RTP+G.711) = 95.2 Kbps
 - PPP (PPP+IP+UDP+RTP+G.711) = 82.4 Kbps
@@ -167,90 +169,100 @@ Codec G.729 (8 Kbps)
 - PPP (PPP+IP+UDP+RTP+G.729) = 26.4 Kbps
 - Frame-Relay (FR+IP+UDP+RTP+G.729) = 26.8 Kbps
 
-您可以使用在线 VoIP 带宽计算器（如 <https://www.voip.school/bandcalc/bandcalc.php>）轻松计算其他带宽需求。
+您可以使用在线 VoIP 带宽计算器轻松计算其他带宽需求，例如 <https://www.voip.school/bandcalc/bandcalc.php>。
 
 
 ## 流量工程
 
-VoIP 网络设计中的主要问题是为特定目的地（如远程办公室或服务提供商）确定线路数量和所需带宽。同时，还需确定 Asterisk 的并发通话数量（这是 Asterisk 规模化的主要参数）。
+VoIP 网络设计中的一个主要问题是针对特定目的地（如远程办公室或服务提供商）确定线路数量和所需带宽。确定 Asterisk 的并发呼叫数（Asterisk 规模规划的主要参数）也同样重要。
 
-### 简化
+### 简化方法
 
-最常用的简化方法是按用户类型估算通话数量。例如：
+最主要且最广泛使用的简化方法是按用户类型估算呼叫数。例如：
 
-- 企业 PBX（每五个分机对应一个并发通话）
-- 家庭用户（每十六个用户对应一个并发通话）
+- 企业 PBX（每 5 个 extension 对应一个并发呼叫）
+- 住宅用户（每 16 个用户对应一个并发呼叫）
 
-示例 #1 公司总部有 120 个分机，另外有两个分支机构——第一个分支有 30 个分机，第二个分支有 15 个分机。我们的目标是为总部的 E1 中继线路以及 Frame‑Relay 网络所需的带宽进行容量规划。
+示例 #1：公司总部有 120 个 extension，两个分支机构——第一个有 30 个 extension，第二个有 15 个 extension。我们的目标是确定总部 E1 trunk 的数量以及 Frame-Relay 网络所需的带宽。
 
-![Example network topology (same city): headquarters with 120 extensions connects to the PSTN over T1 lines, and to branch #1 (30 extensions) and branch #2 (15 extensions) over a Frame-Relay cloud.](../images/06-voip-network-fig06.png)
+![示例网络拓扑（同一城市）：总部有 120 个 extension，通过 T1 线路连接到 PSTN，并通过 Frame-Relay 云连接到分支机构 #1（30 个 extension）和分支机构 #2（15 个 extension）。]((../images/06-voip-network-fig06.png))
 
 1a T1 线路数量
 
-- 使用 T1 线路的分机总数：120+30+15=165 条
-- 按企业使用每五个分机使用一条中继计算
-- 总线路数 = 33 条，约为 2 条 T1 线路
+- 使用 T1 线路的 extension 总数：120+30+15=165 条线路
+- 商业用途按每 5 个 extension 使用一个 trunk 计算
+- 线路总数 = 33，或大约 2xT1 线路
 
-1b 带宽需求 我们选择 g.729 编解码器，因为它在带宽需求、音质和中等 CPU 消耗之间取得了平衡。
+1b 带宽需求：考虑到带宽需求、音质和中等的 CPU 消耗，我们选择 g.729 codec。
 
-每五个分机使用一条中继时：
+按每 5 个 extension 一个 trunk 计算：
 
-- 分支 #1（Frame‑relay）所需带宽：26.8*6=160.8 Kbps
-- 分支 #2（Frame‑relay）所需带宽：26.8*3= 80.4 Kbps
+- 分支机构 #1 所需带宽 (Frame-relay)：26.8*6=160.8 Kbps
+- 分支机构 #2 所需带宽 (Frame-relay)：26.8*3= 80.4 Kbps
 
 ### Erlang B 方法
 
-当拥有历史数据时，可以更科学地对中继进行容量规划，而不是使用简化方法。我们将使用 Agner Karup Erlang（哥本哈根电话公司，1909 年）的工作，他提出了计算两城之间中继组线路数量的公式。
+当您拥有历史数据时，可以比简化方法更科学地规划 trunk 规模。我们将使用 Agner Karup Erlang（哥本哈根电话公司，1909 年）的研究成果，他开发了一个公式来计算两个城市之间 trunk 组中的线路数量。
 
-**Erlang** 是电信中常用的流量计量单位；它描述了一小时内的流量量。例如，假设一小时内产生 20 通电话，每通平均通话 5 分钟：
+**Erlang** 是电信中常用的流量测量单位；它描述了一小时内的流量总量。例如，假设一小时内发生了 20 次呼叫，平均每次通话 5 分钟：
 
-- 小时内的通话分钟数：20 × 5 = 100 分钟
-- 小时内的流量小时数：100 / 60 = **1.66 Erlangs**
+- 一小时内的通话分钟数：20 × 5 = 100 分钟
+- 一小时内的流量小时数：100 / 60 = **1.66 Erlangs**
 
-可以从通话记录器中读取这些度量，并用它们来设计网络和计算所需线路数。确定线路数后，即可计算带宽需求。
+您可以从呼叫记录器中读取这些测量值，并利用它们来设计网络并计算所需的线路数量。一旦知道了线路数量，就可以计算带宽需求。
 
-**Erlang B** 是计算中继组线路数量最常用的方法。它假设通话随机到达（泊松分布），且被阻塞的通话会立即被清除。该方法要求已知 **Busy Hour Traffic (BHT)**，可以从通话记录器获取，或按简化方式估算：BHT = 一天通话分钟数的 17%。
+**Erlang B** 是计算 trunk 组中线路数量最常用的方法。它假设呼叫是随机到达的（泊松分布），并且被阻塞的呼叫会被立即清除。它要求您知道 **Busy Hour Traffic (BHT)**，您可以从呼叫记录器中获取该值，或者作为简化估算：BHT = 一天通话分钟数的 17%。
 
-![Erlang B calculator results: 5 Erlangs at 1% blocking requires 11 lines (headquarters to branch #1), and 2.83 Erlangs at 1% blocking requires 8 lines (headquarters to branch #2).](../images/06-voip-network-fig07.png)
+![Erlang B 计算器结果：在 1% 阻塞率下，5 Erlangs 需要 11 条线路（总部到分支机构 #1），在 1% 阻塞率下，2.83 Erlangs 需要 8 条线路（总部到分支机构 #2）。]((../images/06-voip-network-fig07.png))
 
-另一个重要变量是服务等级（Grade of Service，GoS），它定义了因线路不足导致的阻塞通话概率。通常取 0.05（5% 通话丢失）或 0.01（1% 通话丢失）。示例 #1：使用本节前面介绍的总部与两个分支的示例，我们提供一些流量模式数据。从通话记录器中得到以下数据（通话分钟数和 BHT）：
+另一个重要的变量是服务等级 (GoS)，它定义了因线路短缺而导致呼叫阻塞的概率。您可以裁定此参数，通常为 0.05（5% 的呼叫丢失）或 0.01（1% 的呼叫丢失）。示例 #1：使用本节前面介绍的总部和两个分支机构的示例，我们将为您提供一些关于流量模式的数据。从呼叫记录器中，我们发现了以下数据：来自呼叫记录器的数据（通话分钟数和 BHT）：
 
-- 总部到分支 #1 = 2,000 分钟，BHT = 300 分钟
-- 总部到分支 #2 = 1,000 分钟，BHT = 170 分钟
-- 分支 #1 到分支 #2 = 0，BHT=0
+- 总部到分支机构 #1 = 2,000 分钟，BHT = 300 分钟
+- 总部到分支机构 #2 = 1,000 分钟，BHT = 170 分钟
+- 分支机构 #1 到分支机构 #2 = 0，BHT=0
 
-设定 GoS=0.01
+让我们设定 GoS=0.01
 
-- 总部到分支 #1 - BHT=300 分钟/60 = 5 Erlangs
-- 总部到分支 #2 – BHT=170 分钟/60 = 2.83 Erlangs
+- 总部到分支机构 #1 - BHT=300 分钟/60 = 5 Erlangs
+- 总部到分支机构 #2 – BHT=170 分钟/60 = 2.83 Erlangs
 
-使用如 <https://www.erlang.com> 的 Erlang 
+使用 Erlang 计算器，例如 <https://www.erlang.com>
 
-## 减少 VoIP 所需带宽
+- 对于总部到分支机构 #1，需要 11 条线路。
+- 对于总部到分支机构 #2，需要 8 条线路。
+
+1.b 所需带宽：我们使用的 WAN 丢包率很低。由于 g729 codec 具有良好的音质和数据压缩能力 (8 Kbps)，我们将选择它。
+
+所选 codec：g729 数据链路层：Frame-Relay
+
+- 分支机构 #1 的估计语音带宽：26.8x11 = 294.8 Kbps
+- 分支机构 #2 的估计语音带宽：26.8x8 = 214.40 Kbps
+
+## 降低 VoIP 所需的带宽
 
 可以使用三种方法来降低 VoIP 通话所需的带宽：
 
-- RTP 头部压缩
-- IAX Trunked
-- VoIP 负载
+- RTP 报头压缩
+- IAX 中继（Trunked）
+- VoIP 有效载荷（Payload）
 
-### RTP 头部压缩
+### RTP 报头压缩
 
-在 Frame-Relay 和 PPP 网络中，可以使用 RTP 头部压缩。RTP 头部压缩在 RFC 2508 中定义，是一种在多种路由器上可用的 IETF 标准。不过需要注意，有些路由器需要不同的功能集才能使用此资源。使用 RTP 头部压缩的效果非常显著，在我们的示例中，它将每段语音对话所需的带宽从 26.8 Kbps 降至 11.2 Kbps，降低了 58.2%！
+在 Frame-Relay 和 PPP 网络中，可以使用 RTP 报头压缩。RTP 报头压缩定义在 RFC 2508 中。它是许多路由器中都支持的一种 IETF 标准。然而，请务必谨慎，因为某些路由器需要特定的功能集才能使用此资源。使用 RTP 报头压缩的效果非常显著，它将我们示例中每个语音通话所需的带宽从 26.8 Kbps 降低到了 11.2 Kbps——减少了 58.2%！
 
-### IAX2 trunk mode
+### IAX2 中继模式
 
-如果你正在连接两台 Asterisk 服务器，可以在 trunk 模式下使用 IAX2 协议。这项革命性技术不需要任何特殊路由器，且可应用于任何类型的数据链路。
+如果您正在连接两台 Asterisk 服务器，则可以使用中继模式下的 IAX2 协议。这项革命性的技术不需要任何特殊的路由器，并且可以应用于任何类型的数据链路。
 
-![IAX2 trunk mode on Ethernet: a single g.729 call needs its full header stack (31.2 Kbps), but a second call shares those headers and adds only a small IAX2 miniframe, averaging about 9.6 Kbps of extra bandwidth per additional call.](../images/06-voip-network-fig08.png)
+![以太网上的 IAX2 中继模式：单个 g.729 通话需要其完整的报头堆栈（31.2 Kbps），但第二个通话会共享这些报头，并且仅增加一个小的 IAX2 微帧（miniframe），每个额外通话平均仅增加约 9.6 Kbps 的带宽。](../images/06-voip-network-fig08.png)
 
-IAX2 trunk mode 复用第二通话及以后通话的相同头部。使用 g729 在 PPP 链路上时，第一通话将消耗 30 Kbps 带宽，而第二通话使用与第一通话相同的头部，将额外通话所需的带宽降低到 9.6 Kbps。我们可以按如下方式计算 trunk 模式下的所需带宽：Branch #1 (11 calls) Bandwidth = 31.2 + (11-1)* 9.6 Kbps = 127.2 Kbps Branch #2 (8 calls) Bandwidth = 31.2 + (8-1)* 9.6 Kbps = 98.4 Kbps 第一次通话使用 31.2 Kbps，随后每次增加 9.6 Kbps，依此类推。
+IAX2 中继模式会复用从第二个通话开始的所有通话的相同报头。在 PPP 链路中使用 g729 时，第一个通话将消耗 30 Kbps 的带宽，而第二个通话将使用与第一个通话相同的报头，从而将额外通话所需的带宽降低至 9.6 Kbps。我们可以按如下方式计算中继模式下所需的带宽：分支 #1（11 个通话）带宽 = 31.2 + (11-1)* 9.6 Kbps = 127.2 Kbps；分支 #2（8 个通话）带宽 = 31.2 + (8-1)* 9.6 Kbps = 98.4 Kbps。第一个通话使用 31.2 Kbps，随后的每个通话使用 9.6 Kbps，依此类推。
 
-### 增大语音负载
+### 增加语音有效载荷
 
-在通过 Internet 使用 VoIP 网关时，这种方法非常常见。使用更大的负载会牺牲时延，以换取带宽的降低。你可以通过在 allow 指令中为编解码器追加帧大小来更改 RTP 包化方式。
+当通过互联网使用 VoIP 网关时，这种方法非常普遍。当使用更大的有效载荷时，您将以牺牲延迟为代价来换取带宽的降低。您可以通过在 allow 指令中的 codec 后面附加帧大小来更改 RTP 打包方式。
 
-![Increasing the voice payload: packing 60 bytes of g.729 payload into one packet (instead of 20) amortizes the 58 bytes of headers across more voice, dropping bandwidth to about 16.05 Kbps per call at the cost of added latency.](../images/06-voip-network-fig09.png)
+![增加语音有效载荷：将 60 字节的 g.729 有效载荷打包到一个数据包中（而不是 20 字节），可以将 58 字节的报头分摊到更多的语音数据中，从而以增加延迟为代价，将每个通话的带宽降低至约 16.05 Kbps。](../images/06-voip-network-fig09.png)
 
 示例：
 
@@ -258,58 +270,58 @@ IAX2 trunk mode 复用第二通话及以后通话的相同头部。使用 g729 �
 allow=ulaw:30
 ```
 
-冒号后的数字是以毫秒为单位的包化间隔——每个 RTP 包中携带多少语音。更大的数值会将固定的头部开销摊分到更多音频上（带宽更低），但会增加时延。每种编解码器都有自己的最小、最大和默认帧大小；例如 G.711（`ulaw`/`alaw`）默认是 20 ms。
+冒号后面的数字是打包间隔（以毫秒为单位）——即每个 RTP 数据包中携带多少语音数据。较大的值会将固定的报头开销分摊到更多的音频数据上（带宽更低），但代价是增加了延迟。每个 codec 都有其自己的最小、最大和默认帧大小；例如，G.711（`ulaw`/`alaw`）默认为 20 ms。
 
-## Summary
+## 总结
 
-在本章中，您了解到 Asterisk 使用通道来处理 VoIP。它支持 SIP（通过 `chan_pjsip` 在 Asterisk 22 中）和 IAX2；H.323 仅通过社区 `ooh323` 插件提供，较旧的 MGCP 和 SCCP（Skinny）通道已不再是标准 Asterisk 22 构建的一部分。您比较并学习了如何为 VoIP 通道选择信令协议和 codec。IAX2 在带宽利用上更高效，并且可以轻松穿越 NAT。SIP/PJSIP 是第三方电话和网关厂商支持最广的协议，也是 Asterisk 22 中唯一的 SIP 通道驱动。H.323 协议是最早的协议，应用于连接传统 VoIP 基础设施。在流量工程章节中，我们学习了如何设计和评估 VoIP 网络的规模。
+在本章中，你已经了解到 Asterisk 是通过通道（channels）来处理 VoIP 的。它支持 SIP（在 Asterisk 22 中通过 `chan_pjsip` 实现）和 IAX2；H.323 仅可通过社区的 `ooh323` 插件获得，而较旧的 MGCP 和 SCCP (Skinny) 通道已不再是标准 Asterisk 22 构建的一部分。你对比并学习了如何为 VoIP 通道选择信令协议和 codec。IAX2 在带宽利用上更高效，且能轻松穿透 NAT。SIP/PJSIP 是第三方电话和网关厂商支持最广泛的协议，也是 Asterisk 22 中唯一的 SIP 通道驱动程序。H.323 协议是最古老的协议，应仅用于连接传统的 VoIP 基础设施。在流量工程（Traffic Engineering）一节中，我们学习了如何设计和规划 VoIP 网络规模。
 
-## Quiz
+## 测试题
 
-1. Which of the following are benefits of VoIP described in this chapter (check all that apply)?
-   - A. Convergence of data and voice networks to reduce cost
-   - B. Lower infrastructure cost for additions, removals, and changes
-   - C. Open standards that free you from a single vendor
-   - D. Easier and cheaper Computer Telephony Integration
-   - E. Guaranteed lower per-minute calling rates than any phone company
-2. Convergence is the integration of voice, data, and video in a single network; its primary benefit is cost reduction in the implementation and maintenance of separate networks.
-   - A. False
-   - B. True
-3. Asterisk treats every VoIP protocol as a channel and can bridge any channel type to any other, transcoding between codecs when needed.
-   - A. False
-   - B. True
-4. In Asterisk 22, SIP is handled by which channel driver?
+1. 以下哪些是本章所述 VoIP 的优势（请勾选所有适用项）？
+   - A. 数据和语音网络的融合以降低成本
+   - B. 降低添加、移除和变更设备的基建成本
+   - C. 开放标准使您摆脱单一供应商的束缚
+   - D. 更简单且成本更低的计算机电话集成 (Computer Telephony Integration)
+   - E. 保证比任何电话公司都低的每分钟通话费率
+2. 融合是指将语音、数据和视频集成在单一网络中；其主要优势在于降低了实施和维护独立网络的成本。
+   - A. 错误
+   - B. 正确
+3. Asterisk 将每种 VoIP 协议视为一个通道，并能将任何类型的通道桥接到其他任何通道，并在需要时在 codec 之间进行转码。
+   - A. 错误
+   - B. 正确
+4. 在 Asterisk 22 中，SIP 由哪个通道驱动程序处理？
    - A. chan_sip
    - B. chan_pjsip
    - C. chan_skinny
    - D. chan_mgcp
-5. In the TCP/IP (IETF) model that SIP is actually defined against in RFC 3261, the signaling protocols SIP, H.323, and IAX2 operate at the ___ layer.
-   - A. Presentation
-   - B. Application
-   - C. Physical
-   - D. Session
-   - E. Data link
-6. SIP is the most adopted protocol for IP phones and is an open standard largely defined by the IETF in RFC 3261.
-   - A. False
-   - B. True
-7. IAX2 transports both signaling and media over a single UDP port, which makes it efficient and easy to traverse NAT. Which UDP port does IAX2 use?
+5. 在 RFC 3261 中实际定义 SIP 所依据的 TCP/IP (IETF) 模型中，信令协议 SIP、H.323 和 IAX2 运行在 ___ 层。
+   - A. 表示层
+   - B. 应用层
+   - C. 物理层
+   - D. 会话层
+   - E. 数据链路层
+6. SIP 是 IP 电话采用最广泛的协议，也是主要由 IETF 在 RFC 3261 中定义的开放标准。
+   - A. 错误
+   - B. 正确
+7. IAX2 在单个 UDP 端口上传输信令和媒体，这使其高效且易于穿透 NAT。IAX2 使用哪个 UDP 端口？
    - A. 5060
    - B. 1720
    - C. 4569
    - D. 5061
-8. IAX was originally developed by Digium (now Sangoma). Despite limited adoption by phone vendors, IAX is excellent when you need (check all that apply):
-   - A. To reduce bandwidth usage (it does not use RTP)
-   - B. A video media format
-   - C. Easy NAT and firewall traversal
-   - D. Trunk mode to combine many Asterisk-to-Asterisk calls and amortize header overhead
-9. In Asterisk 22, a device is configured as a single PJSIP `endpoint` object that both places and receives calls — there is no separate "user" or "peer" role.
-   - A. False
-   - B. True
-10. Regarding codecs in Asterisk 22, check all the true statements:
-    - A. G.711 is equivalent to PCM and uses 64 Kbps of bandwidth.
-    - B. Sangoma's codec_g729 module is free to download, but lawful use requires a purchased per-channel license.
-    - C. GSM is popular because it uses about 13 Kbps and needs no license.
-    - D. G.711 u-law is common in North America, while a-law is common in Europe and Latin America.
-    - E. G.729 is light and uses very few CPU resources to encode and decode compared with G.711.
+8. IAX 最初由 Digium（现为 Sangoma）开发。尽管电话供应商对其采用有限，但在以下情况下 IAX 非常出色（请勾选所有适用项）：
+   - A. 需要减少带宽使用（它不使用 RTP）
+   - B. 需要视频媒体格式
+   - C. 需要简单的 NAT 和防火墙穿透
+   - D. 需要 Trunk 模式来合并多个 Asterisk 到 Asterisk 的呼叫并分摊报头开销
+9. 在 Asterisk 22 中，设备被配置为单个 PJSIP `endpoint` 对象，该对象既能拨出也能接收呼叫——不存在独立的“用户”或“对端”角色。
+   - A. 错误
+   - B. 正确
+10. 关于 Asterisk 22 中的 codec，请勾选所有正确的陈述：
+    - A. G.711 等同于 PCM，占用 64 Kbps 带宽。
+    - B. Sangoma 的 codec_g729 模块可免费下载，但合法使用需要购买每通道许可。
+    - C. GSM 很受欢迎，因为它仅占用约 13 Kbps 且无需许可。
+    - D. G.711 u-law 在北美很常见，而 a-law 在欧洲和拉丁美洲很常见。
+    - E. 与 G.711 相比，G.729 很轻量，编码和解码所需的 CPU 资源非常少。
 
-**Answers:** 1 — A, B, C, D · 2 — B · 3 — B · 4 — B · 5 — B (Application — SIP is an application-layer protocol in the TCP/IP model the IETF uses) · 6 — B · 7 — C · 8 — A, C, D · 9 — B · 10 — A, B, C, D
+**答案：** 1 — A, B, C, D · 2 — B · 3 — B · 4 — B · 5 — B（应用层 — SIP 是 IETF 使用的 TCP/IP 模型中的应用层协议） · 6 — B · 7 — C · 8 — A, C, D · 9 — B · 10 — A, B, C, D

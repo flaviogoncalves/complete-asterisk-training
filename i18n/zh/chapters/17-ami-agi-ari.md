@@ -1,22 +1,24 @@
-# 扩展 Asterisk 与 AMI 和 AGI
+# 使用 AMI 和 AGI 扩展 Asterisk
 
-在多种情况下，可能需要使用外部应用程序来扩展 Asterisk 的功能。扩展 Asterisk 的方式有很多种。本章将介绍两种经典的将 Asterisk 与其他系统集成的方法：AMI – Asterisk Manager Interface 和 AGI – Asterisk Gateway Interface。我们还会查看 `asterisk –rx` 命令和 `system()` 应用程序。选择哪种方式与 Asterisk 集成取决于具体的应用场景。对于 AGI，最常见的应用是连接数据库的 IVR。对于 AMI，拨号器是最受欢迎的应用。第三种更现代的接口——ARI，即 Asterisk REST Interface——将在下一章单独介绍。
+在许多情况下，可能需要使用外部应用程序来扩展 Asterisk 的功能。扩展 Asterisk 的方式多种多样。在本章中，我们将介绍将 Asterisk 与其他系统集成的两种经典方式：AMI（Asterisk Manager Interface）和 AGI（Asterisk Gateway Interface）。我们还将探讨 `asterisk –rx` 命令和 `system()` 应用程序。选择哪种方式与 Asterisk 集成取决于具体的应用程序。对于 AGI 而言，最常见的应用是连接到数据库的 IVR。对于 AMI，拨号器（dialer）是最受欢迎的应用。第三种更现代的接口——ARI（Asterisk REST Interface）——将在下一章中单独介绍。
 
 ## 目标
 
-通过本章学习，读者应能够：
+读完本章后，读者应能够：
 
-- 描述访问外部程序的选项  
-- 使用 `asterisk –rx` 命令执行控制台指令  
-- 在 dialplan 中使用 `system()` 应用调用外部程序  
-- 解释 AMI 是什么以及它的工作原理  
-- 配置 `manager.conf` 文件并启用 AMI  
-- 从 PHP 程序执行 AMI 命令  
-- 解释 Asterisk manager proxy 是什么以及它的工作方式  
-- 描述不同的 AGI 变体（DeadAGI、AGI、EAGI、FastAGI）  
-- 执行使用 PHP 编写的简单 AGI 程序
+- 描述访问外部程序的选项
+- 使用 asterisk –rx 命令执行控制台命令
+- 在 dialplan 中使用 system() 应用程序调用外部程序
+- 解释什么是 AMI 及其工作原理
+- 配置 manager.conf 文件并启用 AMI
+- 从 PHP 程序执行 AMI 命令
+- 解释什么是 Asterisk manager proxy 及其工作原理
+- 描述不同的 AGI 类型（DeadAGI、AGI、EAGI、FastAGI）
+- 执行一个使用 PHP 创建的简单 AGI 程序
 
 ## 扩展 Asterisk 的主要方式
+
+Asterisk 提供了多种与外部程序进行交互的方式。在本章中，我们将介绍：
 
 - Linux 命令行和 Asterisk 控制台
 - System() 应用程序
@@ -25,7 +27,7 @@
 
 ## 使用控制台 CLI 扩展 Asterisk
 
-应用程序可以轻松地在 Linux shell 中使用以下命令调用 Asterisk。
+应用程序可以轻松地使用以下命令从 Linux shell 调用 Asterisk。
 
 ```
 asterisk -rx <command>
@@ -37,7 +39,7 @@ asterisk -rx <command>
 asterisk -rx "stop now"
 ```
 
-甚至可以调用带有输出的命令：
+即使是带有输出的命令也可以被调用：
 
 ```
 asterisk:~# asterisk -rx "pjsip show endpoints"
@@ -55,9 +57,9 @@ Endpoint:  <Endpoint/CID.....................................>  <State.....>  <C
  Endpoint:  4000                                                 Not in use    0 of inf
 ```
 
-## Extending Asterisk using the System() application
+## 使用 System() 应用程序扩展 Asterisk
 
-The system() application enables Asterisk to call an external application.
+System() 应用程序使 Asterisk 能够调用外部应用程序。
 
 ```
 asterisk*CLI> core show application System
@@ -72,7 +74,7 @@ Result of execution is returned in the SYSTEMSTATUS channel variable:
    SUCCESS      Specified command successfully executed
 ```
 
-Example: This application does a screen-pop using netbios WindowsPopup.
+示例：此应用程序使用 netbios WindowsPopup 执行屏幕弹出（screen-pop）。
 
 ```
 exten => 9000,1,System(/bin/echo -e "'Incoming Call From -> ${CALLERID(num)}
@@ -83,32 +85,32 @@ exten => 9000,3,Hangup
 
 ## 什么是 AMI？
 
-AMI 使客户端程序能够通过 TCP 连接连接到 Asterisk 实例并发送命令或读取事件。系统集成商会发现这些资源对于跟踪通道状态非常有用。AMI 基于一种使用 key:value 对的行协议在 TCP 上进行通信的简单概念。Asterisk 本身并未准备好处理过多的此接口连接。如果你对 AMI 有大量连接，请考虑使用 Asterisk manager proxy。
+AMI 允许客户端程序连接到 Asterisk 实例，并通过 TCP 连接发送命令或读取事件。系统集成商会发现这些资源对于跟踪通道状态非常有用。AMI 依赖于一种简单的概念，即通过 TCP 使用 key:value 对的行协议。Asterisk 本身并不适合处理该接口上的过多连接。如果您有大量连接到 AMI，请考虑使用 Asterisk manager proxy。
 
-### 使用哪种语言来操作 AMI
+### 使用哪种编程语言开发 AMI
 
-如今选择编程语言可能很困难。选项实在太多——Java、PHP、Perl、C、C#、Python 以及其他几种语言。只要语言支持套接字或 telnet 接口，就可以使用 AMI。我们在本书中选择了 PHP，因为它的流行度。
+如今选择编程语言可能很困难。选项实在太多了——Java、PHP、Perl、C、C#、Python 以及其他多种语言。任何支持 socket 或 telnet 接口的语言都可以使用 AMI。我们在本书中选择了 PHP，因为它非常流行。
 
 ### AMI 协议行为
 
-- 在向 Asterisk 发送任何命令之前，需要先建立 AMI 会话
-- 当客户端发送数据包时，第一行的键为 “Action”
-- 当数据包来自 Asterisk 时，第一行的键为 “Response” 或 “Event”
-- 认证完成后，数据包可以在任意方向传输
+- 在向 Asterisk 发送任何命令之前，您需要建立一个 AMI 会话
+- 当从客户端发送时，数据包的第一行将包含键 “Action”
+- 当来自 Asterisk 时，数据包的第一行将包含键 “Response” 或 “Event”
+- 身份验证后，数据包可以在任何方向上传输
 
 ### 数据包类型
 
 数据包的类型由以下键的存在决定：
 
-- Action：客户端向 AMI 发送的请求特定操作的数据包。客户端可用的操作集合是有限的，由已加载的模块决定。数据包包含操作名称及其参数。
-- Response：Asterisk 对客户端最近一次发送的 Action 的响应。
-- Event：属于 Asterisk 核心或某个模块生成的事件的数据。
+- Action：从连接到 AMI 的客户端发送，请求特定操作的数据包。客户端可用的操作是有限的。加载的模块决定了这些操作。数据包包含操作名称及其参数。
+- Response：Asterisk 对客户端发送的最后一个操作所作出的响应。
+- Event：属于 Asterisk 核心或模块生成的事件的数据。
 
-当客户端发送 Action 类型的数据包时，会包含一个名为 ActionID 的参数。由于无法预测 Asterisk 发送的响应顺序，ActionID 用于将操作与响应关联。Event 数据包在两种不同的情境下使用。首先，事件向客户端通报 Asterisk 中的变化（例如，新建通道、通道断开，或坐席登录/退出队列）。其次，事件用于向客户端传递对其 Action 的响应。
+当客户端发送 Action 类型的数据包时，会包含一个名为 ActionID 的参数。由于无法预测 Asterisk 发送响应的顺序，因此使用 ActionID 来关联操作和响应。Event 数据包在两种不同的上下文中使用。首先，事件通知客户端有关 Asterisk 的变化（例如，新创建的通道、断开连接的通道，或座席登录和退出队列）。其次，事件用于传输对客户端操作的响应。
 
-## Configuring users and permissions
+## 配置用户和权限
 
-要访问 AMI，需要建立一个监听 TCP 端口（通常是 5038）的 TCP 连接。您需要配置 /etc/asterisk/manager.conf 文件来创建用户账户并分配权限。权限集合是有限的：“read”、“write”或两者兼有。这些权限在
+要访问 AMI，必须建立一个监听 TCP 端口（通常为 5038）的 TCP 连接。你需要配置 /etc/asterisk/manager.conf 文件来创建用户账户和权限。权限集是有限的：可以是“read”、“write”或两者兼有。这些权限定义在
 
 ```
 manager.conf file.
@@ -124,9 +126,9 @@ deny=0.0.0.0/0.0.0.0
 permit=127.0.0.1/255.255.255.255
 ```
 
-### Logging in to the AMI
+### 登录 AMI
 
-要登录并认证 AMI，您需要发送一个类型为 login 的 action 包，并提供在 manager.conf 中创建的用户名和账户。
+要登录并验证 AMI，你需要发送一个 login 类型的动作数据包，并使用在 manager.conf 中创建的用户名和账户。
 
 ```
 Action:login
@@ -145,7 +147,7 @@ fputs($socket, "Secret: senha\r\n\r\n");
 ?>
 ```
 
-如果您不需要接收事件，可以使用 “Events Off”。
+如果你不需要接收事件，可以使用 “Events Off”。
 
 ```
 <?php
@@ -157,9 +159,9 @@ fputs($socket, "Events: off\r\n\r\n");
 ?>
 ```
 
-### Action packets
+### 动作数据包
 
-当您向 Asterisk 发送 action 包时，可以通过在 action 之后传递 key:value 对来提供一些额外的键（例如，被叫号码）。也可以将通道和全局变量传递给 dialplan。
+当你向 Asterisk 发送动作数据包时，可以通过在动作之后传递 key:value 对来提供一些额外的键（例如，被叫号码）。也可以将通道变量和全局变量传递给 dialplan。
 
 ```
 Action: <action type><CRLF>
@@ -171,9 +173,9 @@ Variable: <Variable 2>=<Value 2><CRLF>
 <CRLF>
 ```
 
-### Action commands
+### 动作命令
 
-您可以使用 CLI 指令 `manager show` 命令列出可用的 actions。在 Asterisk 22 中，核心命令集包括（此列表仅作示例；加载的模块会添加更多）：
+你可以使用 CLI 指令 manager show commands 来列出可用的动作。在 Asterisk 22 中，核心命令集包括（此列表仅供参考；已加载的模块会增加更多命令）：
 
 ```
 Action Privilege Synopsis
@@ -254,7 +256,7 @@ Action Privilege Synopsis
   ParkedCalls      <none>           List parked calls
 ```
 
-如果需要了解特定命令的参数，请使用 `manager show <command>`。示例：
+如果你需要了解具体的命令参数，请使用 manager show command <command>。示例：
 
 ```
 asterisk*CLI> manager show command Originate
@@ -336,31 +338,29 @@ originate,all
 OriginateResponse
 ```
 
-### Event packets
+### 事件数据包
 
-每当 Asterisk 中发生某些事件时，管理接口会生成事件——通道被创建或状态改变、两个通道被桥接或解除桥接、注册信息变化、队列成员被添加，等等。每个事件都是一段
+每当 Asterisk 中发生某些事情时，管理接口就会生成事件 —— 例如通道被创建或状态改变、两个通道被桥接或解除桥接、注册状态改变、队列成员被添加等等。每个事件都是一个由`Key: value`行组成的块，并以`Event:`标头开头。
 
-`Key: value` 行，以 `Event:` 头部开始。
-
-具体的事件集合取决于已加载的模块和 Asterisk 版本，因此与其复制一个很快就会过时的列表，不如查询运行中的服务器以获取权威的集合：
+确切的事件集取决于已加载的模块和 Asterisk 版本，因此与其复制一份很快就会过时的列表，不如直接查询正在运行的服务器以获取权威列表：
 
 ```
 asterisk*CLI> manager show events             ; list every event this build can emit
 asterisk*CLI> manager show event BridgeEnter  ; describe one event and its fields
 ```
 
-例如，呼叫桥接通过 `BridgeCreate`、`BridgeEnter`、`BridgeLeave` 和 `BridgeDestroy` 事件报告（`BridgeEnter` 为 “当通道进入桥接时触发”）。较早的 `Link`/`Unlink` 事件已在 Asterisk 12 中移除。
+例如，呼叫桥接通过`BridgeCreate`、`BridgeEnter`、`BridgeLeave`和`BridgeDestroy`事件报告（`BridgeEnter`是“当通道进入桥接时触发”）。较旧的`Link`/`Unlink`事件已在 Asterisk 12 中被移除。
 
 ## Asterisk Gateway Interface
 
-AGI 是一种类似于 Web 服务器使用的 CGI 的 Asterisk 网关接口。它允许使用 Perl、PHP、Python 等高级语言来扩展 Asterisk 的功能。CGI 的主要应用是构建 IVR。AGI 有四种类型：
+AGI 是类似于 Web 服务器所使用的 CGI 的 Asterisk 网关接口。它允许使用 Perl、PHP 和 Python 等高级语言来扩展 Asterisk 的功能。CGI 的主要应用场景是构建 IVR。AGI 分为四种类型：
 
-- Normal AGI，在 Asterisk 本机内部调用程序。
+- 普通 AGI，在 Asterisk 服务器内部调用程序。
 - Fast AGI，使用 TCP 套接字在另一台服务器上调用 AGI。
-- EAGI，允许从 AGI 访问和控制声音通道。
-- DeadAGI，即使在 hangup() 之后仍可访问通道。通常在 ‘h’ 扩展中调用。请注意，在 Asterisk 22 中 `DeadAGI` 应用已被弃用——常规 `AGI` 应用会检测到已挂断的通道并自动以 “dead” 模式运行脚本，因此新的 dialplan 应直接调用 `AGI()`。
+- EAGI，允许从 AGI 访问和控制音频通道。
+- DeadAGI，即使在 hangup() 之后也能访问通道。通常在 ‘h’ extension 中调用。请注意，在 Asterisk 22 中，`DeadAGI` 应用程序已被弃用——常规的 `AGI` 应用程序会自动检测挂断的通道并以“dead”模式运行脚本，因此新的 dialplan 应直接调用 `AGI()`。
 
-Application format:
+应用程序格式：
 
 ```
 asterisk*CLI> core show application AGI
@@ -390,7 +390,7 @@ AGI(command[,arg1[,arg2[,...]]])
 Use the CLI command 'agi show commands' to list available agi commands
 ```
 
-您可以使用命令 `agi show commands` 查看可用的 AGI 命令（以下输出仅作示例；Asterisk 22 添加了若干额外命令）：
+您可以使用命令 `agi show commands` 查看可用的 AGI 命令（以下输出仅供参考；Asterisk 22 增加了一些额外的命令）：
 
 ```
 Dead                        Command   Description
@@ -443,20 +443,20 @@ stream
    No                          gosub   Execute a dialplan subroutine
 ```
 
-调试时，使用 agi debug。
+如需调试，请使用 agi debug。
 
-### Using AGI
+### 使用 AGI
 
-在本例中，我们将使用 php-cli，即 php 的命令行版本。如果系统中尚未安装 php-cli，请先进行安装。按照以下步骤使用 php AGI 脚本。
+在本示例中，我们将使用 php-cli，即 PHP 的命令行版本。如果尚未安装 php-cli，请先进行安装。请按照以下步骤使用 PHP AGI 脚本。
 
-1. 所有 AGI 脚本位于 `/var/lib/asterisk/agi-bin`
+1. 所有 AGI 脚本都位于 `/var/lib/asterisk/agi-bin`
 2. 更改权限以允许执行。
 
 ```
 chmod 755 *.php
 ```
 
-3. Shell 接口（php 特有）。脚本的前几行必须是：
+3. Shell 接口（PHP 特定）。脚本的第一行必须是：
 
 ```
 #!/usr/bin/php -q
@@ -471,7 +471,7 @@ $stdout = fopen('php://stdout', 'w');
 $stdlog = fopen('agi.log', 'w');
 ```
 
-5. 管理 Asterisk 输出。Asterisk 在每次调用 AGI 时都会发送信息集合。
+5. 管理 Asterisk 输出。每次调用 AGI 时，Asterisk 都会发送设置信息。
 
 ```
 agi_request:testephp
@@ -502,19 +502,19 @@ while (!feof($stdin)) {
 上述脚本将创建一个名为 $agi 的数组。可用选项包括：
 
 - agi_request – AGI 文件名
-- agi_channel – AGI 发起的通道
+- agi_channel – AGI 发起通道
 - agi_language – 设置的语言
 - agi_type – 通道类型（例如 SIP、DAHDI）
 - agi_uniqueid – 唯一标识符
-- agi_callerid – 主叫号码（例如 Flavio <8590>）
-- agi_context – 发起的 context
-- agi_extension – 被叫的 extensions
+- agi_callerid – CallerID（例如 Flavio <8590>）
+- agi_context – 发起 context
+- agi_extension – 被叫 extension
 - agi_priority – 优先级
-- agi_accountcode – 发起的 account code
+- agi_accountcode – 发起账号代码
 
-要调用名为 agi_extensions 的变量，使用 $agi[agi_extensions]。
+要调用名为 agi_extensions 的变量，请使用 $agi[agi_extensions]。
 
-6. 使用通道 AGI。此时，您可以开始与 Asterisk 对话。使用 fputs 命令向 AGI 发送指令，也可以使用 echo 命令。
+6. 使用通道 AGI。此时，您可以开始与 Asterisk 通信。使用 fputs 命令向 AGI 发送命令。您也可以使用 echo 命令。
 
 ```
 fputs($stdout,"SAY NUMBER 4000 '79#' \n");
@@ -525,30 +525,30 @@ fflush($stdout);
 
 - AGI 命令选项不是可选的
 - 某些选项需要用引号括起来 <escape digits>
-- 某些选项不应使用引号 <digit string>
-- 某些选项两种格式皆可
-- 可以使用单引号
+- 某些选项不应加引号 <digit string>
+- 某些选项可以使用两种格式
+- 您可以使用单引号
 
-Step 7 – Pass variables 通道变量可以在 AGI 中设置，但不能在 AGI 内部使用。下面的示例在 AGI 中无法工作。
+第 7 步 – 传递变量。通道变量可以在 AGI 中设置，但不能在 AGI 内部使用。以下示例在 AGI 内部无法工作。
 
 ```
 SET VARIABLE MY_DIALCOMMAND "PJSIP/${EXTEN}"
 ```
 
-下面的示例可以工作：
+以下示例可以正常工作：
 
 ```
 SET VARIABLE MY_DIALCOMMAND "PJSIP/4000"
 ```
 
-Step 8: Asterisk responses 为了验证 Asterisk 的响应，需要执行以下操作：
+第 8 步：Asterisk 响应。验证来自 Asterisk 的响应是必要的：
 
 ```
 $msg  = fgets($stdin,1024);
 fputs($stdlog,$msg . "\n");
 ```
 
-Step 9: Kill the locked (zombie) processes 如果脚本因某种原因失败，进程会挂起。使用 killproc 命令在再次测试前将其清除。
+第 9 步：终止锁定（僵尸）进程。如果您的脚本因某种原因失败，进程将会挂起。在再次测试之前，请使用 killproc 命令进行清理。
 
 ```
  #!/usr/bin/php -q
@@ -603,60 +603,62 @@ exit is possible
 
 ### DeadAGI
 
-DeadAGI 在没有实时通道时使用。通常在 ‘h’ 扩展中执行 DeadAGI。在 Asterisk 22 中 `DeadAGI` 应用已被弃用，未来版本可能会移除；标准 `AGI` 应用现在会自动处理已挂断（“dead”）的通道，因此在新 dialplan 中应优先使用 `AGI()`。
+当您没有活动通道时，可以使用 DeadAGI。通常您会在 ´h´ extension 中执行 DeadAGI。在 Asterisk 22 中，`DeadAGI` 应用程序已被弃用，并可能在未来的版本中移除；标准的 `AGI` 应用程序现在会自动处理已挂断（“dead”）的通道，因此在新的 dialplan 中请优先使用 `AGI()`。
 
 ### FASTAGI
 
-Fast AGI 通过 TCP 端口（默认 4573）实现 AGI，作为输入/输出通道。FastAGI 的格式为 (agi://)。例如：
+Fast AGI 使用 TCP 端口（默认 4573）作为 I/O 通道来实现 AGI。FastAGI 格式为 (agi://)。例如：
 
 ```
 exten => 0800400001, 1, Agi(agi://192.168.0.1)
 ```
 
-当 TCP 连接丢失或断开时，AGI 结束，TCP
+当 TCP 连接丢失或断开时，AGI 结束，TCP 连接关闭，随后呼叫断开。此资源有助于减轻在外部服务器上运行脚本的 Asterisk 服务器的 CPU 负载。您可以在源代码目录中获取有关 FastAGI 的更多详细信息（请参阅文件 “agi/fastagi-test”）。Asterisk-Java 库为 Java 提供了 FastAGI 服务器实现。有关更多信息，请参阅 https://github.com/asterisk-java/asterisk-java
 
-## 更改源代码
+下一章将介绍现代的 REST/WebSocket 接口 ARI。
 
-Asterisk 是用 C 语言（而非 C++）开发的。教授 C 编程超出本文档的范围。如果您感兴趣，可以在 https://docs.asterisk.org 找到相关文档，其中提供了关于如何为 Asterisk 应用补丁以及大部分由 Doxygen 软件生成的 API 文档的实用技巧。对于熟悉 C 编程的人来说，修改应用程序的源代码是扩展 Asterisk 最强大（也是最危险）的方式。
+## 修改源代码
 
-## 摘要
+Asterisk 是使用 C 语言（而非 C++）开发的。教授 C 语言编程超出了本文档的范围。如果您对此感兴趣，可以在 https://docs.asterisk.org 找到相关文档，其中提供了关于如何应用和创建 Asterisk 补丁的实用建议，以及主要由 Doxygen 软件生成的 API 文档。对于熟悉 C 语言编程的人来说，修改应用程序的源代码可能是扩展 Asterisk 最强大（也最危险）的方式。
 
-在本章中，您学习了如何将外部程序与 Asterisk PBX 接口。我们从使用 asterisk –rx 将命令从 Linux shell 传递到 Asterisk 控制台开始。接着，我们了解了 System() 应用程序，它允许在 dialplan 中调用外部程序。AMI 是最接近传统 PBX 中常见的 CTI 接口的接口。要从 dialplan 调用应用程序，我们使用了 AGI，并尝试了其不同的变体：用于死通道的 DeadAGI、用于处理音频流的 EAGI、使用 TCP 套接字作为输入/输出接口的 Fast AGI，以及在同一台 Asterisk 机器上调用和处理脚本的普通 AGI。下一章将专注于 ARI，这个现代的 REST/WebSocket API 为外部应用程序提供对 Asterisk 通道和桥接的完整控制。
+## 总结
 
-## Quiz
+在本章中，您学习了如何将外部程序与 Asterisk PBX 进行对接。我们首先介绍了如何使用 asterisk –rx 将命令从 Linux shell 传递到 Asterisk 控制台。接下来，我们了解了 System() 应用程序，它允许从 dialplan 中调用外部程序。AMI 是最接近传统 PBX 中常见的 CTI 接口的接口。为了从 dialplan 中调用应用程序，我们使用了 AGI，并体验了它的不同变体：用于处理已挂断通道的 DeadAGI、用于处理音频流的 EAGI、用于将 TCP 套接字作为输入/输出接口的 Fast AGI，以及用于在同一 Asterisk 服务器内调用和处理脚本的普通 AGI。下一章将专门介绍 ARI，这是一种现代的 REST/WebSocket API，它使外部应用程序能够完全控制 Asterisk 通道和桥接。
 
-1. 以下哪项不是 Asterisk 的接口方式？
+## 测试题
+
+1. 以下哪项不是 Asterisk 的接口方法？
    - A. AMI
    - B. AGI
    - C. `asterisk -rx`
    - D. System()
    - E. External()
-2. AMI 允许通过 TCP 套接字传递 Asterisk 命令，并且此接口在全新 Asterisk 安装中默认启用。
-   - A. True
-   - B. False
-3. AMI 非常安全，因为它的认证使用 MD5 挑战/响应。
-   - A. True
-   - B. False
-4. FastAGI 让 dialplan 可以通过 TCP 套接字（通常是 4573 端口）调用另一台机器上的外部脚本。
-   - A. True
-   - B. False
+2. AMI 允许通过 TCP 套接字传递 Asterisk 命令，并且此接口在全新的 Asterisk 安装中默认启用。
+   - A. 正确
+   - B. 错误
+3. AMI 非常安全，因为它的身份验证使用 MD5 质询/响应机制。
+   - A. 正确
+   - B. 错误
+4. FastAGI 允许 dialplan 通过 TCP 套接字（通常是端口 4573）调用另一台机器上的外部脚本。
+   - A. 正确
+   - B. 错误
 5. DeadAGI 用于活动通道。它可以在 DAHDI 通道上使用，但不能在 SIP 或 IAX 通道上使用。
-   - A. True
-   - B. False
-6. AGI 只支持 PHP 作为脚本语言。
-   - A. True
-   - B. False
+   - A. 正确
+   - B. 错误
+6. AGI 仅支持 PHP 作为脚本语言。
+   - A. 正确
+   - B. 错误
 7. 命令 ___ 显示所有可用的 AGI 命令。
 8. 命令 ___ 显示所有可用的 AMI 命令。
-9. 在 AMI action 包中，客户端包含哪个头部，以便将异步响应和事件与触发它们的操作关联起来？
+9. 在 AMI 动作数据包中，客户端包含哪个报头，以便将从 Asterisk 返回的异步响应和事件与触发它们的动作关联起来？
    - A. `ActionID`
    - B. `Variable`
    - C. `Secret`
    - D. `Event`
-10. 为了运行 `Originate` 操作并发起外呼，用户必须拥有 AMI manager.conf 的哪个权限类？
+10. 用户必须具备哪个 AMI manager.conf 权限类才能运行 `Originate` 动作并拨出外呼？
     - A. `originate`
     - B. `verbose`
     - C. `log`
     - D. `reporting`
 
-**Answers:** 1 — E · 2 — B · 3 — B · 4 — A · 5 — B · 6 — B · 7 — `agi show commands` · 8 — `manager show commands` · 9 — A · 10 — A
+**答案：** 1 — E · 2 — B · 3 — B · 4 — A · 5 — B · 6 — B · 7 — `agi show commands` · 8 — `manager show commands` · 9 — A · 10 — A

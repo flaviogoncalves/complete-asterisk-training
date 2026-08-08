@@ -1,52 +1,44 @@
-# WebRTC with Asterisk
+# WebRTC مع Asterisk
 
-WebRTC (Web Real-Time Communication) lets a web browser place and receive calls
-with no plugin and no external softphone — just JavaScript, a microphone, and a
-secure connection to Asterisk. Asterisk has been able to act as a WebRTC server
-since Asterisk 11, and since the PJSIP stack (`res_pjsip`) arrived in Asterisk 12
-it has been the recommended way to do it; in Asterisk 22 the configuration has settled into a
-handful of well-understood options. This chapter shows how to turn a PJSIP
-endpoint into a browser phone, how the secure media path works, and when you
-should reach for Asterisk's built-in WebRTC support versus a dedicated gateway.
+تتيح تقنية WebRTC (Web Real-Time Communication) لمتصفح الويب إجراء واستقبال المكالمات دون الحاجة إلى أي إضافات (plugins) أو softphone خارجي — فقط باستخدام JavaScript، وميكروفون، واتصال آمن بـ Asterisk. كان Asterisk قادراً على العمل كخادم WebRTC منذ الإصدار Asterisk 11، ومنذ ظهور حزمة PJSIP (`res_pjsip`) في Asterisk 12 أصبحت هي الطريقة الموصى بها للقيام بذلك؛ وفي Asterisk 22 استقرت الإعدادات على مجموعة محددة من الخيارات المفهومة جيداً. يوضح هذا الفصل كيفية تحويل endpoint من نوع PJSIP إلى هاتف متصفح، وكيف يعمل مسار الوسائط الآمن، ومتى يجب عليك استخدام دعم WebRTC المدمج في Asterisk مقابل استخدام بوابة (gateway) مخصصة.
 
-Everything in this chapter is verified against the book's Asterisk 22 lab; the
-configuration shown is the same one in `lab/asterisk/etc`.
+تم التحقق من كل ما ورد في هذا الفصل مقابل مختبر Asterisk 22 الخاص بالكتاب؛ والإعدادات الموضحة هي نفسها الموجودة في `lab/asterisk/etc`.
 
-## Objectives
+## الأهداف
 
-By the end of this chapter, you should be able to:
+بحلول نهاية هذا الفصل، يجب أن تكون قادراً على:
 
-- Explain what WebRTC adds to Asterisk and when to use it
-- Describe how WebRTC media security (DTLS-SRTP) and ICE differ from plain SIP
-- Enable the Asterisk HTTP server and the secure WebSocket (`wss`) endpoint
-- Configure a `wss` PJSIP transport and a WebRTC endpoint with `webrtc=yes`
-- Connect a browser softphone (SIP.js) and place a call
-- Decide between Asterisk-native WebRTC and a media gateway such as Janus
+- شرح ما تضيفه تقنية WebRTC إلى Asterisk ومتى يجب استخدامها.
+- وصف كيفية اختلاف أمن الوسائط في WebRTC (عبر DTLS-SRTP) وتقنية ICE عن بروتوكول SIP العادي.
+- تفعيل خادم HTTP في Asterisk ونقطة النهاية (endpoint) الخاصة بـ WebSocket الآمن (`wss`).
+- تهيئة ناقل (transport) PJSIP ونقطة نهاية (endpoint) لـ WebRTC باستخدام `wss` و `webrtc=yes`.
+- توصيل هاتف برمجي (softphone) يعتمد على المتصفح (SIP.js) وإجراء مكالمة.
+- اتخاذ قرار بشأن المفاضلة بين استخدام WebRTC المدمج في Asterisk أو بوابة وسائط (media gateway) مثل Janus.
 
 ## لماذا WebRTC مع Asterisk
 
-نقطة النهاية WebRTC، من منظور Asterisk، هي مجرد نقطة نهاية PJSIP أخرى. ما يتغير هو *كيف* يصل المتصفح إليها وكيف يتم تأمين الوسائط. الاستخدامات النموذجية تشمل:
+يعتبر الـ endpoint من نوع WebRTC، من وجهة نظر Asterisk، مجرد endpoint آخر من نوع PJSIP. ما يتغير هو *كيفية* وصول المتصفح إليه وكيفية تأمين الوسائط. تشمل الاستخدامات النموذجية ما يلي:
 
-- **النقر للاتصال** على موقع ويب — يقوم الزائر بالاتصال بطابور أو امتداد من صفحة ويب.
-- **الوكلاء عبر الويب** — يعمل وكيل مركز الاتصال بالكامل في المتصفح، دون الحاجة إلى تثبيت أو تحديث برنامج هاتف نرمجي على سطح المكتب.
-- **الاتصال المدمج** في تطبيقك الويب الخاص — على سبيل المثال، برنامج الهاتف النرمجي SipPulse يتحدث مع Asterisk.
-- **هواتف داخلية بلا تثبيت** — يستخدم الموظفون علامة تبويب المتصفح بدلاً من هاتف مادي أو عميل مثبت.
+- **النقر للاتصال (Click-to-call)** على موقع ويب — حيث يتصل الزائر بطابور انتظار أو extension من صفحة ويب.
+- **وكلاء الويب (Web-based agents)** — حيث يعمل وكيل مركز الاتصال بالكامل داخل المتصفح، دون الحاجة لتثبيت أو تحديث أي softphone على سطح المكتب.
+- **الاتصال المضمن (Embedded calling)** في تطبيق الويب الخاص بك — على سبيل المثال، استخدام SipPulse كـ softphone ويب يتحدث مع Asterisk.
+- **هواتف داخلية لا تتطلب تثبيت (Zero-install internal phones)** — حيث يستخدم الموظفون علامة تبويب في المتصفح بدلاً من هاتف فعلي أو عميل مثبت.
 
-## كيف يختلف WebRTC عن SIP العادي
+الميزة الكبرى هي الوصول: فكل متصفح حديث يدعم WebRTC بالفعل. أما التكلفة فهي أن WebRTC صارم — فهو *يتطلب* وسائط مشفرة ووسيلة نقل آمنة، لذا هناك المزيد من الإعدادات مقارنة بهاتف SIP يعمل عبر UDP العادي.
 
-هاتف SIP العادي يُرسل الإشارات عبر UDP/TCP وعادةً ما يحمل الصوت كـ RTP عادي. عميل المتصفح WebRTC يختلف بثلاث طرق مهمة، وعلى Asterisk أن يتطابق مع كل منها:
+## كيف يختلف WebRTC عن SIP التقليدي
 
-- **الإشارة تُنقل عبر WebSocket.** بدلاً من SIP عبر منفذ UDP 5060، يفتح المتصفح WebSocket آمن (`wss://`) إلى خادم HTTP المدمج في Asterisk. رسائل SIP تنتقل داخل ذلك الـ WebSocket.
-- **الوسائط دائمًا مشفرة باستخدام DTLS‑SRTP.** المتصفحات ترفض RTP العادي. الطرفان يقومان بمصافحة DTLS (مُصادقة ببصمات الشهادات المتبادلة في SDP) وتستخرج مفاتيح SRTP منها.
-- **الاتصال يتم التفاوض عليه عبر ICE.** بدلاً من افتراض عنوان IP ومنفذ يمكن الوصول إليهما، يجمع الطرفان عناوين مرشحة (مضيف، STUN‑reflexive، TURN‑relayed) ويختبرانها حتى يعمل أحدها. عادةً ما يتم دمج RTP وRTCP على منفذ واحد (`rtcp_mux`).
+يقوم هاتف SIP العادي بإرسال الإشارات عبر UDP/TCP وعادةً ما ينقل الصوت كـ RTP عادي. يختلف عميل متصفح WebRTC في ثلاث طرق مهمة، ويجب على Asterisk مطابقة كل منها:
 
-الأخبار السارة: في Asterisk 22 خيار نقطة النهاية الواحد، `webrtc=yes`، يُفعِّل كل هذا مع الإعدادات الافتراضية المعقولة. سنرى بالضبط ما يضبطه.
+- **تنتقل الإشارات عبر WebSocket.** بدلاً من SIP عبر منفذ UDP 5060، يفتح المتصفح WebSocket آمن (`wss://`) إلى خادم HTTP المدمج في Asterisk. تنتقل رسائل SIP داخل ذلك الـ WebSocket.
+- **الوسائط مشفرة دائماً باستخدام DTLS-SRTP.** ترفض المتصفحات استخدام RTP عادي. يقوم الطرفان بإجراء مصافحة DTLS (يتم التحقق منها بواسطة بصمات الشهادات المتبادلة في SDP) واشتقاق مفاتيح SRTP منها.
+- **يتم التفاوض على الاتصال باستخدام ICE.** بدلاً من افتراض وجود عنوان IP ومنفذ يمكن الوصول إليهما، يقوم كلا الطرفين بجمع عناوين المرشحين (host، STUN-reflexive، TURN-relayed) واختبارها حتى ينجح أحدها. عادةً ما يتم دمج RTP و RTCP في منفذ واحد (`rtcp_mux`).
 
-## Step 1 — the HTTP server and the WebSocket
+الخبر السار هو: في Asterisk 22، يقوم خيار endpoint واحد، وهو (`webrtc=yes`)، بتفعيل كل هذا بإعدادات افتراضية منطقية. سنرى بالضبط ما الذي يقوم هذا الخيار بضبطه.
 
-WebRTC signaling is served by Asterisk's built-in HTTP server (`res_http_websocket`
-exposes the `/ws` path on it). Browsers require a *secure* WebSocket, so we enable
-TLS. Edit `http.conf`:
+## الخطوة 1 — خادم HTTP و WebSocket
+
+يتم تقديم إشارات WebRTC بواسطة خادم HTTP المدمج في Asterisk (يقوم `res_http_websocket` بكشف المسار `/ws` عليه). تتطلب المتصفحات اتصال WebSocket *آمن*، لذا نقوم بتفعيل TLS. قم بتحرير `http.conf`:
 
 ```
 [general]
@@ -61,7 +53,7 @@ tlscertfile=/etc/asterisk/keys/asterisk.crt
 tlsprivatekey=/etc/asterisk/keys/asterisk.key
 ```
 
-Reload (`module reload res_http_websocket` or restart) and confirm:
+أعد التحميل (`module reload res_http_websocket` أو أعد التشغيل) وتأكد من الآتي:
 
 ```
 *CLI> http show status
@@ -75,40 +67,32 @@ Enabled URI's:
 /ws => Asterisk HTTP WebSocket
 ```
 
-The browser will connect to `wss://your-asterisk:8089/ws`.
+سيتصل المتصفح بـ `wss://your-asterisk:8089/ws`.
 
-### About the certificate
+### حول الشهادة
 
-The TLS certificate here secures the *WebSocket* (the signaling channel). In a lab
-a self-signed certificate is fine — you accept it once in the browser. In
-production use a real certificate (for example Let's Encrypt) whose name matches
-the host the browser connects to, otherwise the browser will refuse the WebSocket.
+تعمل شهادة TLS هنا على تأمين *WebSocket* (قناة الإشارات). في بيئة المختبر، تكون الشهادة الموقعة ذاتياً مقبولة — حيث تقبلها مرة واحدة في المتصفح. أما في بيئة الإنتاج، فاستخدم شهادة حقيقية (على سبيل المثال Let's Encrypt) يكون اسمها مطابقاً للمضيف الذي يتصل به المتصفح، وإلا سيرفض المتصفح اتصال WebSocket.
 
-For the lab, `lab/make-certs.sh` generates a self-signed certificate with
-`CN=localhost` (plus `localhost`/`127.0.0.1` SANs) and writes it to
-`asterisk/etc/keys/`. For a public deployment, obtain a real certificate instead — for
-example with Let's Encrypt:
+بالنسبة للمختبر، يقوم `lab/make-certs.sh` بإنشاء شهادة موقعة ذاتياً باستخدام `CN=localhost` (بالإضافة إلى `localhost`/`127.0.0.1` كـ SANs) ويكتبها في `asterisk/etc/keys/`. بالنسبة للنشر العام، احصل على شهادة حقيقية بدلاً من ذلك — على سبيل المثال باستخدام Let's Encrypt:
 
 ```
 certbot certonly --standalone -d voip.example.com
 ```
 
-Then point `http.conf` at the issued files and reload `res_http_websocket`:
+ثم قم بتوجيه `http.conf` إلى الملفات الصادرة وأعد تحميل `res_http_websocket`:
 
 ```
 tlscertfile=/etc/letsencrypt/live/voip.example.com/fullchain.pem
 tlsprivatekey=/etc/letsencrypt/live/voip.example.com/privkey.pem
 ```
 
-Make sure the certificate name matches the host the browser connects to, and renew it
-(certbot's timer does this automatically) before it expires, or the WebSocket will fail.
+تأكد من أن اسم الشهادة يطابق المضيف الذي يتصل به المتصفح، وقم بتجديدها (يقوم مؤقت certbot بهذا تلقائياً) قبل انتهاء صلاحيتها، وإلا سيفشل اتصال WebSocket.
 
-This certificate is **not** the same as the DTLS certificate used to encrypt the
-media — Asterisk generates that one automatically, as we will see.
+هذه الشهادة **ليست** هي نفسها شهادة DTLS المستخدمة لتشفير الوسائط — حيث يقوم Asterisk بإنشاء تلك الشهادة تلقائياً، كما سنرى.
 
-## Step 2 — the WSS transport
+## الخطوة 2 — ناقل WSS
 
-PJSIP needs a transport of type `wss`. Add it to `pjsip.conf`:
+يحتاج PJSIP إلى ناقل من النوع `wss`. أضفه إلى `pjsip.conf`:
 
 ```
 [transport-wss]
@@ -117,7 +101,7 @@ protocol=wss
 bind=0.0.0.0
 ```
 
-Verify it loaded:
+تحقق من تحميله:
 
 ```
 *CLI> pjsip show transports
@@ -125,15 +109,11 @@ Transport:  transport-udp             udp      0      0  0.0.0.0:5060
 Transport:  transport-wss             wss      0      0  0.0.0.0:5060
 ```
 
-Do not be misled by the `0.0.0.0:5060` shown for the `wss` transport — the WebSocket
-is **not** served on port 5060. WebRTC signaling is served by the HTTP server you
-configured in Step 1 (port 8089 for `wss`). The PJSIP `wss` transport is a thin shim
-over `res_http_websocket`, so the `bind` address printed for it is cosmetic and can be
-ignored; the port that matters is `tlsbindaddr` in `http.conf`.
+لا تنخدع بـ `0.0.0.0:5060` المعروض لناقل `wss` — فخدمة WebSocket **لا** تعمل على المنفذ 5060. يتم تقديم إشارات WebRTC بواسطة خادم HTTP الذي قمت بتهيئته في الخطوة 1 (المنفذ 8089 لـ `wss`). ناقل PJSIP `wss` عبارة عن طبقة رقيقة فوق `res_http_websocket`، لذا فإن عنوان `bind` المطبوع له هو مجرد مظهر خارجي ويمكن تجاهله؛ المنفذ المهم هو `tlsbindaddr` في `http.conf`.
 
-## Step 3 — the WebRTC endpoint
+## الخطوة 3 — نقطة نهاية WebRTC
 
-Now the endpoint itself. The key is `webrtc=yes`:
+الآن ننتقل إلى نقطة النهاية (endpoint) نفسها. المفتاح هو `webrtc=yes`:
 
 ```
 [webrtc-1000]
@@ -157,8 +137,7 @@ type=aor
 max_contacts=1
 ```
 
-`webrtc=yes` is a convenience switch. It is equivalent to setting all of the
-WebRTC-required options by hand. You can confirm exactly what it turned on:
+يُعد `webrtc=yes` مفتاحاً مريحاً للاستخدام. وهو يعادل ضبط جميع الخيارات المطلوبة لـ WebRTC يدوياً. يمكنك التأكد مما قام بتفعيله بالضبط:
 
 ```
 *CLI> pjsip show endpoint webrtc-1000
@@ -172,30 +151,18 @@ WebRTC-required options by hand. You can confirm exactly what it turned on:
  webrtc                             : yes
 ```
 
-Reading that output:
+عند قراءة هذا المخرج:
 
-- `media_encryption: dtls` and `dtls_auto_generate_cert: Yes` — media is DTLS-SRTP,
-  and Asterisk auto-generates the DTLS certificate, so you do **not** create one
-  yourself. The fingerprint is advertised in the SDP (`SHA-256`).
-- `ice_support: true` — Asterisk gathers and negotiates ICE candidates.
-- `rtcp_mux: true` — RTP and RTCP share one port, as browsers expect.
-- `use_avpf: true` — the AVPF RTP profile (feedback), required by WebRTC.
+- `media_encryption: dtls` و `dtls_auto_generate_cert: Yes` — الوسائط هي DTLS-SRTP، ويقوم Asterisk بإنشاء شهادة DTLS تلقائياً، لذا **لا** تحتاج إلى إنشائها بنفسك. يتم الإعلان عن البصمة (fingerprint) في SDP (`SHA-256`).
+- `ice_support: true` — يقوم Asterisk بجمع وتفاوض مرشحي ICE.
+- `rtcp_mux: true` — يتشارك RTP و RTCP في منفذ واحد، كما تتوقع المتصفحات.
+- `use_avpf: true` — ملف تعريف AVPF RTP (التغذية الراجعة)، وهو مطلوب بواسطة WebRTC.
 
-`allow=opus` is recommended — Opus is the codec browsers prefer. Asterisk 22 ships
-Opus *passthrough* in core (the `res_format_attr_opus` module), which is enough to
-relay Opus between two Opus-capable legs without re-encoding. *Transcoding* Opus to
-another codec requires the separate `codec_opus` module, which the official WebRTC
-guide lists as optional but highly recommended and which you install on top of the
-base build; see the codecs discussion in *Designing a VoIP network*. Keep `ulaw` as a
-fallback for bridging to non-WebRTC legs that cannot speak Opus.
+يُنصح باستخدام `allow=opus` — حيث أن Opus هو الـ codec الذي تفضله المتصفحات. يأتي Asterisk 22 مزوداً بـ Opus *passthrough* في النواة (وحدة `res_format_attr_opus`)، وهو ما يكفي لنقل Opus بين طرفين يدعمان Opus دون الحاجة إلى إعادة الترميز (re-encoding). يتطلب *تحويل الترميز* (transcoding) لـ Opus إلى codec آخر وحدة `codec_opus` المنفصلة، والتي يدرجها دليل WebRTC الرسمي كخيار إضافي ولكنه موصى به بشدة، والتي تقوم بتثبيتها فوق البنية الأساسية؛ راجع مناقشة الـ codecs في *Designing a VoIP network*. احتفظ بـ `ulaw` كخيار احتياطي للربط مع الأطراف غير التابعة لـ WebRTC التي لا تدعم Opus.
 
-## Step 4 — ICE, STUN and TURN
+## الخطوة 4 — تقنيات ICE و STUN و TURN
 
-على شبكة LAN مسطحة، يكفي ICE مع مرشحات المضيف ولا حاجة لأي شيء آخر. عبر
-الإنترنت عادةً ما تُضيف خادم STUN حتى يتمكن Asterisk والمتصفح من اكتشاف
-عناوينهما العامة، وخادم TURN للحالات التي يكون فيها نقل الوسائط مباشرةً
-مستحيلًا (NAT متماثل، جدران نارية مقيدة). وجه Asterisk إليه في
-`rtp.conf`:
+في شبكة محلية (LAN) مسطحة، تكفي تقنية ICE مع مرشحات المضيف (host candidates) ولا يلزم أي شيء آخر. أما عبر الإنترنت، فعادةً ما تضيف خادم STUN حتى يتمكن Asterisk والمتصفح من اكتشاف عناوينهم العامة، وخادم TURN للحالات التي يكون فيها الاتصال المباشر للوسائط مستحيلاً (مثل NAT المتماثل أو جدران الحماية المقيدة). قم بتوجيه Asterisk إليها في `rtp.conf`:
 
 ```
 [general]
@@ -206,20 +173,11 @@ stunaddr=stun.l.google.com:19302
 ; turnpassword=...
 ```
 
-يُكوَّن المتصفح بخوادم ICE الخاصة به في JavaScript (قائمة
-`RTCPeerConnection` `iceServers`). في حالة نشر داخلي بحت يمكنك تخطي
-STUN/TURN تمامًا.
+يتم تكوين المتصفح باستخدام خوادم ICE الخاصة به في JavaScript (قائمة `RTCPeerConnection` `iceServers`). بالنسبة للنشر الداخلي البحت، يمكنك تخطي STUN/TURN تماماً.
 
-`turnaddr` يأخذ منفذًا اختياريًا (الافتراضي `3478`)؛ `turnusername` و`turnpassword`
-يُوثّقان إلى الممر. STUN يساعد النظير فقط على *اكتشاف* عنوانه العام — عندما
-يكون الطرفان خلف NAT متماثل أو جدار ناري مقيد، يصبح نقل الوسائط مباشرةً
-مستحيلًا ويكون ممر TURN هو الوحيد الذي يسمح بتدفق الصوت.
+يأخذ `turnaddr` منفذاً اختيارياً (الافتراضي هو `3478`)؛ ويقوم كل من `turnusername` و `turnpassword` بالمصادقة على المرحل (relay). يساعد STUN فقط الطرف المقابل في *اكتشاف* عنوانه العام — عندما يقع كلا الطرفين خلف NAT متماثل أو جدار حماية مقيد، يصبح الاتصال المباشر للوسائط مستحيلاً، ويكون مرحل TURN هو الشيء الوحيد الذي يجعل تدفق الصوت ممكناً.
 
-**توصية للإنتاج:** خادم STUN عام (مثل خادم Google) يكفي لاكتشاف العناوين،
-لكن لا **تعتمد** على TURN عام للمرور الفعلي — ممرات TURN تنقل كل وسائطك،
-لذلك تريد أن تكون تحت سيطرتك. شغّل خادم
-[coturn](https://github.com/coturn/coturn) الخاص بك. مثال على إعداد `/etc/turnserver.conf`
-ببيانات اعتماد طويلة الأمد يبدو هكذا:
+**توصية للبيئة الإنتاجية:** خادم STUN عام (مثل خادم Google) جيد لاكتشاف العناوين، ولكن **لا** تعتمد على خوادم TURN العامة لحركة المرور الفعلية — حيث يقوم TURN بترحيل جميع الوسائط الخاصة بك، لذا يجب أن يكون تحت سيطرتك. قم بتشغيل خادم [coturn](https://github.com/coturn/coturn) الخاص بك. يبدو ملف `/etc/turnserver.conf` البسيط الذي يستخدم بيانات اعتماد طويلة الأمد كما يلي:
 
 ```
 listening-port=3478
@@ -230,7 +188,7 @@ realm=voip.example.com
 external-ip=203.0.113.10
 ```
 
-ثم وجه Asterisk إليه في `rtp.conf`:
+ثم قم بتوجيه Asterisk إليه في `rtp.conf`:
 
 ```
 [general]
@@ -241,13 +199,11 @@ turnusername=asterisk
 turnpassword=Strong-TURN-secret
 ```
 
-امنح المتصفح نفس خادم TURN في قائمة `iceServers` حتى يتمكن كلا الطرفين من التمرير.
-للإنتاج مع المستخدمين على شبكات الجوال أو خلف جدران نارية مؤسسية، يكون
-coturn المستضاف ذاتيًا ضروريًا فعليًا.
+امنح المتصفح نفس خادم TURN في قائمة `iceServers` الخاصة به حتى يتمكن كلا الطرفين من الترحيل. بالنسبة للبيئة الإنتاجية التي تضم مستخدمين على شبكات الهاتف المحمول أو خلف جدران حماية الشركات، يعد استخدام خادم coturn مستضاف ذاتياً أمراً ضرورياً فعلياً.
 
 ## الخطوة 5 — عميل المتصفح
 
-أي مكتبة WebRTC SIP تعمل؛ اثنتان شائعتان هما **SIP.js** و **JsSIP**. يتضمن المختبر برنامج هاتف SIP.js بسيط في `lab/webrtc/index.html`. الجزء الأساسي هو عنوان URL للنقل والبيانات الاعتمادية:
+تعمل أي مكتبة WebRTC SIP؛ ومن أكثرها استخداماً على نطاق واسع هما **SIP.js** و **JsSIP**. يتضمن المختبر هاتفاً برمجياً (softphone) بسيطاً يعتمد على SIP.js في `lab/webrtc/index.html`. الجزء الأساسي هو رابط النقل (transport URL) وبيانات الاعتماد:
 
 ```javascript
 const ua = new SIP.UserAgent({
@@ -263,16 +219,16 @@ const inviter = new SIP.Inviter(ua, SIP.UserAgent.makeURI('sip:600@your-asterisk
 await inviter.invite();
 ```
 
-حقيقتان للمتصفح يجب تذكرهما:
+هناك حقيقتان في المتصفح يجب تذكرهما:
 
-- **السياق الآمن.** `getUserMedia` (الوصول إلى الميكروفون) لا يعمل إلا على صفحات `https://` أو `http://localhost`. قدِّم الصفحة عبر HTTPS في بيئة الإنتاج.
-- **قبول الشهادة مرة واحدة.** باستخدام شهادة مختبر موقعة ذاتيًا، قم بزيارة `https://your-asterisk:8089/ws` في المتصفح نفسه أولًا وقبل التحذير، وإلا سيفشل WebSocket بصمت.
+- **السياق الآمن.** لا يعمل `getUserMedia` (الوصول إلى الميكروفون) إلا على صفحات `https://` أو `http://localhost`. قم بتقديم الصفحة عبر HTTPS في بيئة الإنتاج.
+- **قبول الشهادة لمرة واحدة.** مع شهادة مختبر موقعة ذاتياً، قم بزيارة `https://your-asterisk:8089/ws` في نفس المتصفح أولاً واقبل التحذير، وإلا سيفشل اتصال WebSocket بصمت.
 
-برنامج الهاتف الويب SipPulse هو عميل مرجعي من فئة الإنتاج مبني على نفس هذه الأساسيات.
+يُعد هاتف SipPulse البرمجي عبر الويب عميلاً مرجعياً بمستوى الإنتاج مبنياً على نفس هذه المبادئ الأساسية.
 
 ## التحقق من مكالمة WebRTC
 
-مع تسجيل المتصفح، `pjsip show contacts` يُظهر جهة الاتصال الديناميكية، وتُظهر المكالمة القناة:
+بعد تسجيل المتصفح، يظهر `pjsip show contacts` جهة الاتصال الديناميكية، وتضيء المكالمة القناة:
 
 ```
 *CLI> pjsip show contacts
@@ -281,90 +237,81 @@ await inviter.invite();
 PJSIP/webrtc-1000-00000001  internal  600  Up  Echo
 ```
 
-إذا كان الصوت أحادي الاتجاه أو غير موجود، فغالبًا ما يكون السبب في ICE أو الشهادة — راجع قسم استكشاف الأخطاء وإصلاحها أدناه.
+إذا كان الصوت في اتجاه واحد أو مفقوداً، فغالباً ما يكون السبب هو ICE أو الشهادة — راجع استكشاف الأخطاء وإصلاحها أدناه.
 
-## Asterisk WebRTC vs a media gateway
+## Asterisk WebRTC مقابل بوابة الوسائط (media gateway)
 
-Asterisk يمكنه إنهاء WebRTC مباشرةً، لكنه ليس دائمًا الأداة المناسبة:
+يمكن لـ Asterisk إنهاء اتصالات WebRTC مباشرة، ولكنها ليست الأداة المناسبة دائماً:
 
-- **استخدم WebRTC الأصلي في Asterisk** عندما يكون المتصفح *هاتفًا* على نظام PBX الخاص بك — وكيلًا، امتدادًا داخليًا، أو زر نقر للاتصال ينتقل إلى مخطط الاتصال الخاص بك. المتصفح هو مجرد نقطة نهاية أخرى وكل شيء (قوائم الانتظار، البريد الصوتي، IVR) يعمل.
-- **استخدم بوابة مخصصة (مثل Janus)** عندما تحتاج إلى توسيع عدد كبير من جلسات المتصفح بشكل مستقل عن التحكم في المكالمات، أو تنفيذ تحويل انتقائي لمؤتمرات/بث كبير، أو إبقاء طبقة الوسائط منفصلة عن PBX. البوابة تربط WebRTC بـ SIP العادي، ثم يرى Asterisk طرف SIP عادي.
+- **استخدم WebRTC الأصلي في Asterisk** عندما يكون المتصفح بمثابة *هاتف* على نظام PBX الخاص بك — كأن يكون وكيلاً، أو extension داخلياً، أو ميزة "انقر للاتصال" (click-to-call) التي تصل إلى الـ dialplan الخاص بك. المتصفح هنا ليس سوى endpoint آخر، وكل شيء (طوابير الانتظار، voicemail، IVR) يعمل بشكل طبيعي.
+- **استخدم بوابة مخصصة (مثل Janus)** عندما تحتاج إلى توسيع نطاق العديد من جلسات المتصفح بشكل مستقل عن التحكم في المكالمات، أو إجراء إعادة توجيه انتقائي للمؤتمرات الكبيرة/البث، أو الحفاظ على مستوى الوسائط (media plane) منفصلاً عن الـ PBX. تقوم البوابة بربط WebRTC بـ SIP عادي، وعندها يرى Asterisk طرف SIP عادياً.
 
-العديد من الأنظمة الحقيقية تجمع بين الاثنين: Asterisk للتحكم في المكالمات، وبوابة لتوسيع وسائط المتصفح. (هذا هو العمارة وراء مجموعة SipPulse الخاصة.)
+تجمع العديد من الأنظمة الحقيقية بين الاثنين: Asterisk للتحكم في المكالمات، وبوابة لتوسيع نطاق الوسائط من جانب المتصفح. (هذه هي البنية التحتية التي تقوم عليها حزمة SipPulse الخاصة.)
 
 ## استكشاف الأخطاء وإصلاحها
 
-- **WebSocket won't connect:** المتصفح رفض شهادة TLS. افتح `https://host:8089/ws` مباشرةً وقبلها، أو ثبّت شهادة موثوقة.  
-- **Registers but no audio:** فشل ICE — أضف STUN، وTURN إذا كان عبر NAT. تحقق من `pjsip set logger on` وانظر إلى مرشحات SDP.  
-- **One-way audio:** عادةً NAT/ICE على جانب واحد، أو ترميز لا يوجد له تطابق مشترك — تأكد من `allow=opus,ulaw`.  
-- **Call drops at answer:** فشل مصافحة DTLS؛ تأكد من أن `dtls_auto_generate_cert` هو `Yes` وأن ساعة النظام صحيحة (الشهادات حساسة للوقت).
+- **تعذر اتصال WebSocket:** رفض المتصفح شهادة TLS. افتح `https://host:8089/ws` مباشرةً واقبل الشهادة، أو قم بتثبيت شهادة موثوقة.
+- **يتم التسجيل ولكن لا يوجد صوت:** فشل ICE — أضف STUN، و TURN إذا كان الاتصال عبر NAT. تحقق من `pjsip set logger on` وانظر إلى مرشحي SDP.
+- **صوت أحادي الاتجاه:** عادةً ما يكون السبب هو NAT/ICE على أحد الجانبين، أو وجود codec لا يوجد تطابق مشترك له — تأكد من `allow=opus,ulaw`.
+- **انقطاع المكالمة عند الرد:** فشلت مصافحة DTLS؛ تأكد من أن `dtls_auto_generate_cert` هو `Yes` وأن ساعة النظام مضبوطة بشكل صحيح (الشهادات حساسة للوقت).
 
 ## المختبر
 
-1. شغّل `./lab.sh up`، ثم `bash lab/make-certs.sh` وأعد تشغيل Asterisk.
-2. قدّم `lab/webrtc/index.html` (`python3 -m http.server` من `lab/webrtc`) وافتحه؛ قَبِل الشهادة عند `https://localhost:8089/ws`.
-3. سجّل كـ `webrtc-1000` واتصل بـ `600` (اختبار صدى) — يجب أن تسمع صوتك.
-4. من برنامج SipPulse Softphone المسجَّل كـ `6001`، اطّلق الرقم `1000` لتجعل المتصفح يرن.
-5. افحص التفاوض: `pjsip set logger on`، أجرِ مكالمة، وابحث عن بصمة DTLS ومرشحات ICE في SDP.
+1. قم بتشغيل `./lab.sh up`، ثم `bash lab/make-certs.sh` وأعد تشغيل Asterisk.
+2. قم بتشغيل `lab/webrtc/index.html` (`python3 -m http.server` من `lab/webrtc`) وافتحه؛ واقبل الشهادة في `https://localhost:8089/ws`.
+3. قم بالتسجيل بصفتك `webrtc-1000` واتصل بـ `600` (اختبار الصدى) — يجب أن تسمع صوتك.
+4. من هاتف SipPulse Softphone المسجل كـ `6001`، اطلب `1000` للاتصال بالمتصفح.
+5. افحص عملية التفاوض: `pjsip set logger on`، وأجرِ مكالمة، وابحث عن بصمة DTLS ومرشحي ICE في SDP.
 
-## Summary
+## ملخص
 
-WebRTC يحول المتصفح إلى نقطة نهاية Asterisk من الدرجة الأولى. الوصفة صغيرة لكنها صارمة: فعّل خادم HTTP مع TLS حتى يتمكن المتصفح من فتح WebSocket آمن، أضف نقل PJSIP `wss`، واضبط `webrtc=yes` على نقطة النهاية — مما يُفعِّل DTLS‑SRTP (مع شهادة مُولَّدة تلقائيًا)، ICE، تعدد RTP/RTCP، وملف تعريف AVPF. أضف STUN/TURN عند عبور NAT، قدِّم صفحتك عبر HTTPS، ووجّه عميل SIP.js (أو JsSIP) إلى `wss://asterisk:8089/ws`. بالنسبة لهواتف المتصفح على PBX الخاص بك، فإن WebRTC الأصلي في Asterisk هو المسار الأبسط؛ بالنسبة للوسائط على نطاق واسع، اجمعه مع بوابة.
+تحوّل تقنية WebRTC المتصفح إلى endpoint من الدرجة الأولى في Asterisk. الوصفة بسيطة ولكنها صارمة: قم بتمكين خادم HTTP باستخدام TLS حتى يتمكن المتصفح من فتح WebSocket آمن، وأضف `wss` PJSIP transport، وقم بضبط `webrtc=yes` على الـ endpoint — وهو ما يعمل على تفعيل DTLS-SRTP (مع شهادة يتم إنشاؤها تلقائياً)، و ICE، و RTP/RTCP multiplexing، و AVPF profile. أضف STUN/TURN عند عبور NAT، وقدم صفحتك عبر HTTPS، ووجه عميل SIP.js (أو JsSIP) إلى `wss://asterisk:8089/ws`. بالنسبة لهواتف المتصفح على الـ PBX الخاص بك، فإن WebRTC الأصلي في Asterisk هو المسار الأبسط؛ أما بالنسبة للوسائط واسعة النطاق، فقم بإقرانها مع بوابة (gateway).
 
-## Quiz
+## اختبار
 
-1. أي بروتوكول نقل يستخدمه عميل متصفح WebRTC لحمل إشارات SIP إلى
-   Asterisk؟
+1. أي بروتوكول نقل يستخدمه عميل متصفح WebRTC لنقل إشارات SIP إلى Asterisk؟
    - A. UDP عادي على المنفذ 5060
-   - B. WebSocket آمن (`wss://`) إلى خادم HTTP الخاص بـ Asterisk
-   - C. TLS على المنفذ 5061
+   - B. بروتوكول WebSocket آمن (`wss://`) إلى خادم HTTP الخاص بـ Asterisk
+   - C. بروتوكول TLS على المنفذ 5061
    - D. مقبس TCP خام على المنفذ 8088
 
-2. وسائط WebRTC بين المتصفح و Asterisk مشفرة باستخدام أي آلية؟
-   - A. SDES‑SRTP (المفاتيح يتم تبادلها في SDP)
-   - B. DTLS‑SRTP (المفاتيح مستمدة من مصافحة DTLS)
+2. يتم تشفير وسائط WebRTC بين المتصفح و Asterisk باستخدام أي آلية؟
+   - A. SDES-SRTP (تبادل المفاتيح في SDP)
+   - B. DTLS-SRTP (المفاتيح مشتقة من مصافحة DTLS)
    - C. IPsec
-   - D. RTP عادي — WebRTC لا يشفر الوسائط
+   - D. RTP عادي — WebRTC لا يقوم بتشفير الوسائط
 
-3. صواب أم خطأ: عندما تقوم بتعيين `webrtc=yes`، يجب عليك إنشاء شهادة DTLS يدوياً وتثبيتها
-   المستخدمة لتشفير الوسائط.
+3. صواب أم خطأ: عند ضبط `webrtc=yes`، يجب عليك إنشاء وتثبيت شهادة DTLS المستخدمة لتشفير الوسائط يدويًا.
 
-4. على أي منفذ يُظهر خادم HTTP الخاص بـ Asterisk في المختبر **WebSocket** الآمن
-   لـ WebRTC؟
+4. على أي منفذ يعرض خادم HTTP الخاص بـ Asterisk في المختبر بروتوكول WebSocket **الآمن** لـ WebRTC؟
    - A. 5060
    - B. 5061
    - C. 8088
    - D. 8089
 
-5. أي مما يلي يتم تشغيله افتراضياً بواسطة `webrtc=yes`؟ (اختر كل ما ينطبق.)
+5. أي مما يلي يقوم `webrtc=yes` بتفعيله افتراضيًا؟ (اختر كل ما ينطبق.)
    - A. `media_encryption: dtls`
    - B. `ice_support: true`
    - C. `rtcp_mux: true`
    - D. `use_avpf: true`
    - E. `transport: transport-udp`
 
-6. املأ الفراغ: يتفاوض WebRTC على الاتصال من خلال جمع الطرفين
-   وفحص عناوين المرشحين (المضيف، STUN‑reflexive، TURN‑relayed) باستخدام
-   إطار العمل ________.
+6. املأ الفراغ: يتفاوض WebRTC على الاتصال من خلال قيام كلا الطرفين بجمع واختبار عناوين المرشحين (المضيف، STUN-reflexive، TURN-relayed) باستخدام إطار عمل ________.
 
-7. في `rtp.conf`، أي إعدادين يوجهان Asterisk إلى خادم خارجي حتى يتمكن
-   من اكتشاف عنوانه العام وإعادة توجيه الوسائط عندما تفشل المسارات المباشرة؟ (اختر كل ما ينطبق.)
+7. في `rtp.conf`، أي إعدادين يوجهان Asterisk إلى خادم خارجي حتى يتمكن من اكتشاف عنوانه العام وترحيل الوسائط عندما تفشل المسارات المباشرة؟ (اختر كل ما ينطبق.)
    - A. `icesupport=yes`
    - B. `stunaddr=`
    - C. `turnaddr=`
    - D. `tlsbindaddr=`
 
-8. مسار URL الذي يُظهره `res_http_websocket` الخاص بـ Asterisk لإشارات WebRTC هو
-   ________.
+8. مسار URL الذي يعرضه `res_http_websocket` الخاص بـ Asterisk لإشارات WebRTC هو ________.
 
-9. وفقاً للفصل، متى يجب اللجوء إلى بوابة وسائط مخصصة
-   (مثل Janus) بدلاً من WebRTC الأصلي في Asterisk؟
-   - A. كلما احتاج أي متصفح لإجراء مكالمة
-   - B. عندما تحتاج إلى توسيع عدد جلسات وسائط المتصفح بشكل مستقل عن التحكم في المكالمات، وإجراء توجيه انتقائي للمؤتمرات الكبيرة، أو إبقاء طبقة الوسائط منفصلة عن PBX
+9. وفقًا للفصل، متى يجب عليك اللجوء إلى بوابة وسائط مخصصة (مثل Janus) بدلاً من WebRTC الأصلي في Asterisk؟
+   - A. كلما احتاج أي متصفح إلى إجراء مكالمة
+   - B. عندما تحتاج إلى توسيع نطاق العديد من جلسات وسائط المتصفح بشكل مستقل عن التحكم في المكالمات، أو إجراء إعادة توجيه انتقائي للمؤتمرات الكبيرة، أو إبقاء مستوى الوسائط منفصلاً عن PBX
    - C. فقط عندما لا يدعم المتصفح DTLS
-   - D. عندما تريد أن يعمل البريد الصوتي و IVR للمتصفح الطرفي
+   - D. عندما تريد أن يعمل voicemail و IVR لنقطة نهاية المتصفح
 
-10. صواب أم خطأ: `getUserMedia` (الوصول إلى الميكروفون) يعمل على أي صفحة `http://`، لذا
-    تقديم هاتف المتصفح عبر HTTPS اختياري.
+10. صواب أم خطأ: `getUserMedia` (الوصول إلى الميكروفون) يعمل على أي صفحة `http://`، لذا فإن تقديم softphone المتصفح عبر HTTPS اختياري.
 
-**Answers:** 1 — B · 2 — B · 3 — False (Asterisk auto-generates the DTLS cert; `dtls_auto_generate_cert: Yes`) · 4 — D · 5 — A, B, C, D · 6 — ICE · 7 — B, C · 8 — `/ws` · 9 — B · 10 — False (secure context required: `getUserMedia` only works on `https://` or `http://localhost`)
+**الإجابات:** 1 — B · 2 — B · 3 — خطأ (يقوم Asterisk بإنشاء شهادة DTLS تلقائيًا؛ `dtls_auto_generate_cert: Yes`) · 4 — D · 5 — A, B, C, D · 6 — ICE · 7 — B, C · 8 — `/ws` · 9 — B · 10 — خطأ (مطلوب سياق آمن: `getUserMedia` يعمل فقط على `https://` أو `http://localhost`)

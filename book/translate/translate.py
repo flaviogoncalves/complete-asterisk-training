@@ -37,6 +37,22 @@ def unmask_code(md, blocks):
         md = md.replace("【C%d】" % i, b)
     return md
 
+
+# English function words that NO target language (de/es/fr/it/pt prose, or ar/hi/zh/ja at all) uses —
+# their presence in a "translated" chunk means prose was left in English. Used to gate completeness.
+EN_STOP = re.compile(
+    r"\b(the|and|is|are|was|were|this|that|these|those|with|from|your|you|will|would|can|could|"
+    r"when|where|which|while|used|using|following|between|before|after|both|into|their|there|have|"
+    r"has|had|each|also|such|than|then|them|they|its|not|but|been|being|only|other|more|most|some|"
+    r"any|all|one|two|first|second|must|should|need|allow|allows|provide|provides|example)\b", re.I)
+
+
+def english_leak(text):
+    """Count English function words in prose (code/sentinels excluded). A real translation ≈ 0."""
+    t = re.sub(r"```.*?```", " ", text, flags=re.S)
+    t = re.sub(r"`[^`\n]+`|【C\d+】", " ", t)
+    return len(EN_STOP.findall(t))
+
 DEFAULT_MODEL = os.environ.get("GEMINI_TRANSLATE_MODEL", "gemini-flash-lite-latest")
 KEY_NAMES = ("GEMINI_API_KEY", "GOOGLE_API_KEY", "GOOGLE_GENAI_API_KEY")
 # Optional OpenAI-compatible backend. When LLM_BASE_URL is set, translation goes to
@@ -80,6 +96,10 @@ def prompt_for(lang_name, glossary, md):
     keep = ", ".join(glossary)
     return f"""You are a professional technical translator. Translate the following Markdown \
 chapter of a book about Asterisk (VoIP/telephony) from English into {lang_name}.
+
+Translate EVERY sentence of prose fully into {lang_name}. Never leave a sentence, paragraph, \
+heading, list item, or table cell in English. The ONLY things that stay in English are the 【C…】 \
+placeholders and the specific technical terms listed below — everything else MUST be {lang_name}.
 
 STRICT RULES — follow exactly:
 - Translate ONLY human-readable prose: paragraph text, headings, list-item text, table-cell \
@@ -188,6 +208,7 @@ def translate_block(text, lang_name, glossary, model, key, attempts=3):
     Masking hides code from the model so it can never be mutated; restoration is byte-exact."""
     masked, blocks = mask_code(text)
     prompt = prompt_for(lang_name, glossary, masked)
+    leak_max = max(2, int(0.20 * english_leak(text)))   # translated output must shed ≥80% of English
     restored = None
     for _ in range(attempts):
         t = translate(model, key, prompt).replace("```", "")  # spurious fences are not real code
@@ -196,8 +217,8 @@ def translate_block(text, lang_name, glossary, model, key, attempts=3):
                    lambda m: "" if m.group(0) in seen else (seen.add(m.group(0)) or m.group(0)), t)
         missing = [i for i in range(len(blocks)) if ("【C%d】" % i) not in t]
         restored = unmask_code(t, blocks)
-        if not missing and "【C" not in restored:
-            return restored, True
+        if not missing and "【C" not in restored and english_leak(restored) <= leak_max:
+            return restored, True   # code intact AND prose actually translated
     return restored, False
 
 
