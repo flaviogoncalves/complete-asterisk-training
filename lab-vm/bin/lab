@@ -1,0 +1,328 @@
+#!/usr/bin/env bash
+# ---------------------------------------------------------------------------
+# `lab` — the student's safety net and status board.
+#
+# The one command a stuck student can always reach for. Everything it does is
+# something they could do by hand; it exists so that being stuck is never the
+# end of the course.
+# ---------------------------------------------------------------------------
+set -uo pipefail
+
+[[ -f /opt/lab/lab.env ]] && source /opt/lab/lab.env
+
+ok()   { printf '  \033[1;32m✓\033[0m %s\n' "$*"; }
+bad()  { printf '  \033[1;31m✗\033[0m %s\n' "$*"; }
+info() { printf '  \033[1;36m·\033[0m %s\n' "$*"; }
+head_() { printf '\n\033[1m%s\033[0m\n' "$*"; }
+
+asterisk_installed() { command -v asterisk >/dev/null 2>&1; }
+
+# Commands that write to /etc/asterisk need root. Say so plainly rather than
+# failing halfway through with a permission error and a half-restored config.
+need_root() {
+    [[ $EUID -eq 0 ]] && return 0
+    bad "'lab $1' changes system files and must run as root"
+    info "Try: sudo lab $1"
+    exit 1
+}
+# Asterisk's control socket is owned by the asterisk user, so a plain `lab`
+# login cannot read it. Without sudo every check below reports the CLI as dead
+# on a perfectly healthy machine — which is the first thing a stuck student
+# sees, and it sends them looking for a fault that is not there.
+cli() {
+    if [[ $EUID -eq 0 ]]; then
+        asterisk -rx "$1" 2>/dev/null
+    else
+        sudo -n asterisk -rx "$1" 2>/dev/null
+    fi
+}
+
+# ---------------------------------------------------------------------------
+usage() {
+    cat <<'EOF'
+lab — Asterisk lab helper
+
+  lab status     Is the lab healthy? Checks the network, the service and SIP.
+  lab ip         Print this machine's lab IP address.
+  lab verify     Place a real test call and confirm the PBX answers it.
+  lab reset      Restore /etc/asterisk to the last known-good configuration.
+  lab backup     Save the current /etc/asterisk as your own restore point.
+  lab restore    Restore the configuration saved by `lab backup`.
+  lab rescue     Build and install Asterisk unattended, safely, if your own
+                 build in Lab 1 failed. Slow, but it will finish.
+  lab logs       Follow the Asterisk log.
+
+Nothing here is magic. `lab status` in particular just runs commands you
+already know — read /usr/local/bin/lab if you are curious.
+EOF
+}
+
+# ---------------------------------------------------------------------------
+# This machine's address on the LAN. DHCP assigns it, so it is discovered
+# rather than assumed — nothing in the lab hardcodes an IP.
+lab_ip() {
+    ip -4 -o addr show scope global 2>/dev/null \
+        | awk '{print $4}' | cut -d/ -f1 | head -1
+}
+
+cmd_ip() {
+    local ip; ip="$(lab_ip)"
+    if [[ -z "${ip}" ]]; then
+        bad "this machine has no LAN address"
+        info "On a VM: Settings -> Network -> Adapter 1 must be a 'Bridged Adapter'."
+        info "On a cloud server: check the provider console for this machine's address."
+        exit 1
+    fi
+    echo "${ip}"
+    echo
+    echo "Point your softphone at: ${ip}:5060 (UDP)"
+}
+
+cmd_status() {
+    head_ "Network"
+    local ip; ip="$(lab_ip)"
+    if [[ -n "${ip}" ]]; then
+        ok "this lab is at ${ip} — point your softphone there"
+    else
+        bad "no LAN address on this machine"
+        info "On a VM: Settings -> Network -> Adapter 1 must be a 'Bridged Adapter', then reboot."
+        info "On a cloud server: check the provider console for this machine's address."
+    fi
+
+    head_ "Asterisk"
+    if ! asterisk_installed; then
+        bad "Asterisk is not installed"
+        info "That is expected until you finish Lab 1. Nothing is wrong."
+        return 0
+    fi
+    ok "installed: $(asterisk -V)"
+
+    if systemctl is-active --quiet asterisk; then
+        ok "service is running"
+    else
+        bad "service is not running"
+        info "Try: sudo systemctl start asterisk   then: sudo journalctl -u asterisk -n 50"
+        return 1
+    fi
+
+    if cli 'core show version' | grep -q Asterisk; then
+        ok "CLI responds"
+    else
+        bad "CLI does not respond"
+        info "Try: sudo journalctl -u asterisk -n 50"
+        return 1
+    fi
+
+    head_ "SIP"
+    local eps
+    eps="$(cli 'pjsip show endpoints')"
+    if grep -q 'No objects found' <<<"${eps}"; then
+        info "no endpoints configured yet — expected until Lab 2"
+    else
+        # Count only real rows. `pjsip show endpoints` prints a legend row that
+        # also starts with " Endpoint:", and a trunk shows "Not in use" without
+        # being a registered phone — counting either inflates the total.
+        local total phones
+        total="$(grep -cE '^ Endpoint:  [^<]' <<<"${eps}")"
+        phones="$(grep -E '^ Endpoint:  [0-9]' <<<"${eps}" | grep -cv 'Unavailable')"
+        ok "${total} endpoint(s) defined, ${phones} phone(s) registered"
+        grep -E '^ Endpoint:  [^<]' <<<"${eps}" | sed 's/^/    /'
+    fi
+
+    local regs
+    regs="$(cli 'pjsip show registrations')"
+    if ! grep -q 'No objects found' <<<"${regs}"; then
+        head_ "Trunk registrations"
+        grep -E '^ +<?sip:|Registered|Rejected|Unregistered' <<<"${regs}" | sed 's/^/    /'
+    fi
+
+    head_ "Calls"
+    cli 'core show channels' | tail -3 | sed 's/^/    /'
+}
+
+cmd_verify() {
+    asterisk_installed || { bad "Asterisk is not installed yet — finish Lab 1 first"; exit 1; }
+    command -v sipp >/dev/null 2>&1 || { bad "sipp is missing"; exit 1; }
+
+    local target="${EXT_SIPP:-9000}"
+    if ! cli "dialplan show ${target}@${CTX_INTERNAL:-internal}" | grep -q "${target}"; then
+        bad "extension ${target} does not exist in context ${CTX_INTERNAL:-internal}"
+        info "This check needs the lab dialplan. Have you finished Lab 2?"
+        exit 1
+    fi
+
+    info "placing a test call to ${target} ..."
+    if sipp -sn uac 127.0.0.1 -s "${target}" -m 1 -timeout 20s -trace_err \
+            >/tmp/lab-verify.log 2>&1; then
+        ok "the PBX answered the call"
+    else
+        bad "the call did not complete — see /tmp/lab-verify.log"
+        exit 1
+    fi
+}
+
+cmd_reset() {
+    need_root reset
+    # Where to restore from, best first. The student image is built with
+    # `provision.sh base`, which has no /opt/lab/baseline — so falling back to
+    # the stock configs saved by Lab 1 is what makes this work on their machine
+    # rather than only on the reference VM.
+    local src=""
+    for cand in /opt/lab/baseline /etc/asterisk.samples; do
+        [[ -d "${cand}" ]] && { src="${cand}"; break; }
+    done
+    if [[ -z "${src}" ]]; then
+        bad "nothing to restore from"
+        info "Expected /opt/lab/baseline or /etc/asterisk.samples."
+        info "Lab 1 creates the second one right after 'make samples'. If you"
+        info "skipped that, run: sudo cp -a /etc/asterisk /etc/asterisk.samples"
+        exit 1
+    fi
+    info "restoring from ${src}"
+    read -rp "Replace /etc/asterisk with the known-good lab configuration? [y/N] " a
+    [[ "${a,,}" == y* ]] || { echo "Nothing changed."; exit 0; }
+
+    # Never destroy what we are replacing.
+    local keep="/opt/lab/before-reset-$(date +%Y%m%d-%H%M%S)"
+    mkdir -p "${keep}" && cp -a /etc/asterisk/. "${keep}/"
+    info "your current config was saved to ${keep}"
+
+    cp -a "${src}/." /etc/asterisk/
+    chown -R asterisk:asterisk /etc/asterisk
+    systemctl restart asterisk 2>/dev/null || true
+    ok "configuration restored"
+}
+
+cmd_backup() {
+    need_root backup
+    local dst="/opt/lab/mybackup"
+    rm -rf "${dst}" && mkdir -p "${dst}"
+    cp -a /etc/asterisk/. "${dst}/"
+    ok "saved /etc/asterisk to ${dst} — restore it with: sudo lab restore"
+}
+
+cmd_restore() {
+    need_root restore
+    [[ -d /opt/lab/mybackup ]] || { bad "you have not run 'lab backup' yet"; exit 1; }
+    cp -a /opt/lab/mybackup/. /etc/asterisk/
+    chown -R asterisk:asterisk /etc/asterisk
+    systemctl restart asterisk 2>/dev/null || true
+    ok "restored your backup"
+}
+
+cmd_rescue() {
+    need_root rescue
+    local ver="${ASTERISK_VERSION:-22.10.0}"
+    local src="/usr/src/asterisk-${ver}"
+    [[ -d "${src}" ]] || { bad "source tree ${src} is missing"; exit 1; }
+
+    if asterisk_installed && [[ "$(asterisk -V | awk '{print $2}')" == "${ver}" ]]; then
+        ok "Asterisk ${ver} is already installed — nothing to rescue"
+        exit 0
+    fi
+
+    cat <<EOF
+
+This builds and installs Asterisk ${ver} for you, using one compiler job at a
+time so it cannot run out of memory. It is slower than the build in Lab 1 —
+expect 30 to 45 minutes — but it will finish.
+
+Progress is written to /var/log/lab-rescue.log. You can watch it from another
+window with:  tail -f /var/log/lab-rescue.log
+
+EOF
+    read -rp "Go ahead? [y/N] " a
+    [[ "${a,,}" == y* ]] || { echo "Nothing changed."; exit 0; }
+
+    {
+        cd "${src}" || exit 1
+        ./configure --with-jansson-bundled --with-pjproject-bundled --with-srtp
+        make menuselect.makeopts
+        menuselect/menuselect \
+            --enable res_srtp --enable res_http_websocket \
+            --enable CORE-SOUNDS-EN-ULAW --enable EXTRA-SOUNDS-EN-ULAW \
+            menuselect.makeopts
+        make -j1
+        make install
+        make samples
+        make install-logrotate
+        ldconfig
+    } >/var/log/lab-rescue.log 2>&1
+
+    if ! asterisk_installed; then
+        bad "the rescue build failed — the last lines of /var/log/lab-rescue.log:"
+        tail -20 /var/log/lab-rescue.log
+        exit 1
+    fi
+
+    id -u asterisk >/dev/null 2>&1 || adduser --system --group \
+        --home /var/lib/asterisk --no-create-home --gecos "Asterisk PBX" asterisk
+    chown -R asterisk:asterisk /var/lib/asterisk /var/log/asterisk \
+                               /var/spool/asterisk /etc/asterisk
+    install -m 0644 /opt/lab/asterisk.service /etc/systemd/system/asterisk.service
+    systemctl daemon-reload
+    systemctl enable --now asterisk
+
+    ok "Asterisk $(asterisk -V) installed and running"
+    info "Carry on from Step 7 of Lab 1."
+}
+
+cmd_certs() {
+    need_root certs
+    # The lab's address comes from DHCP, so the certificate cannot be baked
+    # into the image — it has to name whatever address this machine actually
+    # has. Run at every boot; only does work when the address has changed.
+    # Nothing to certify until Asterisk is installed. Creating /etc/asterisk/keys
+    # on a machine with no Asterisk leaves a student in Lab 0 wondering what
+    # already configured their PBX — the honest answer is nothing did.
+    if ! asterisk_installed; then
+        info "Asterisk is not installed yet — no certificate needed until Lab 6"
+        return 0
+    fi
+    local dir=/etc/asterisk/keys
+    local ip
+    ip="$(ip -4 -o addr show scope global 2>/dev/null | awk '{print $4}' | cut -d/ -f1 | head -1)"
+    [[ -n "${ip}" ]] || { bad "no IP address yet"; exit 1; }
+
+    if [[ -f ${dir}/asterisk.pem ]] \
+       && openssl x509 -in ${dir}/asterisk.pem -noout -text 2>/dev/null \
+          | grep -q "IP Address:${ip}"; then
+        ok "certificate already matches ${ip}"
+        return 0
+    fi
+
+    info "generating a TLS certificate for ${ip}"
+    mkdir -p "${dir}"
+    openssl req -x509 -newkey rsa:2048 -nodes -days 3650 \
+        -keyout "${dir}/asterisk.key" \
+        -out    "${dir}/asterisk.pem" \
+        -subj   "/CN=${ip}/O=Asterisk Lab" \
+        -addext "subjectAltName=IP:${ip},DNS:${LAB_HOSTNAME:-asterisk-lab}" 2>/dev/null
+
+    id -u asterisk >/dev/null 2>&1 && chown -R asterisk:asterisk "${dir}"
+    chmod 640 "${dir}/asterisk.key"
+    ok "certificate written for ${ip}"
+
+    systemctl is-active --quiet asterisk && systemctl reload asterisk 2>/dev/null
+    return 0
+}
+
+cmd_logs() {
+    tail -f /var/log/asterisk/messages.log 2>/dev/null \
+        || journalctl -u asterisk -f
+}
+
+# ---------------------------------------------------------------------------
+case "${1:-status}" in
+    status)  cmd_status ;;
+    ip)      cmd_ip ;;
+    verify)  cmd_verify ;;
+    reset)   cmd_reset ;;
+    backup)  cmd_backup ;;
+    restore) cmd_restore ;;
+    rescue)  cmd_rescue ;;
+    certs)   cmd_certs ;;
+    logs)    cmd_logs ;;
+    -h|--help|help) usage ;;
+    *) echo "Unknown command: $1"; echo; usage; exit 2 ;;
+esac

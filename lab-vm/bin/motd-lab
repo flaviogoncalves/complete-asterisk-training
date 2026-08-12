@@ -1,0 +1,61 @@
+#!/usr/bin/env bash
+# Login banner. Answers, before the student has to ask, the three questions
+# that otherwise send them back to the course page: what is this machine, what
+# is its address, and what are the phone credentials.
+[[ -f /opt/lab/lab.env ]] && source /opt/lab/lab.env
+
+ip="$(ip -4 -o addr show scope global 2>/dev/null | awk '{print $4}' | cut -d/ -f1 | head -1)"
+[[ -n "${ip}" ]] || ip="(no network — check the VM's Adapter 1 is Bridged)"
+
+if command -v asterisk >/dev/null 2>&1; then
+    ast="$(asterisk -V 2>/dev/null)"
+    if systemctl is-active --quiet asterisk 2>/dev/null; then
+        state="running"
+    else
+        state="installed but NOT running — try: sudo systemctl start asterisk"
+    fi
+else
+    ast="not installed yet"
+    state="this is where Lab 1 starts"
+fi
+
+# Only advertise extensions that actually exist. On a fresh machine there is no
+# Asterisk and no configuration, and printing softphone credentials there is a
+# lie the student cannot act on — it tells them to register to endpoints they
+# have not created yet.
+phones=""
+if command -v asterisk >/dev/null 2>&1; then
+    eps="$(asterisk -rx 'pjsip show endpoints' 2>/dev/null | grep -E '^ Endpoint:  [0-9]')"
+    [[ -n "${eps}" ]] && phones=yes
+fi
+
+cat <<EOF
+
+  Asterisk Lab
+  ---------------------------------------------------------------
+  This machine   ${ip}
+  Asterisk       ${ast}
+                 ${state}
+EOF
+
+if [[ -n "${phones}" ]]; then
+cat <<EOF
+
+  Softphone      server ${ip}   port 5060/UDP
+                 ${EXT_A:-6001} / ${EXT_A_PASS:-Lab-6001-secret}   (${EXT_A_NAME:-Alice})
+                 ${EXT_B:-6002} / ${EXT_B_PASS:-Lab-6002-secret}   (${EXT_B_NAME:-Bob})
+EOF
+else
+cat <<EOF
+
+  Next           No extensions yet — you create them in Lab 2.
+EOF
+fi
+
+cat <<EOF
+
+  Try            lab status     is everything healthy?
+                 lab ip         this machine's address
+                 lab reset      undo a broken configuration
+
+EOF
