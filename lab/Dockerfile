@@ -15,7 +15,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /usr/src
-RUN wget -q "https://downloads.asterisk.org/pub/telephony/asterisk/asterisk-${ASTERISK_VERSION}.tar.gz" \
+# NOTE: releases/, not the top-level asterisk/ directory. The top level holds
+# only the newest point release — when 22.10.1 shipped, the 22.10.0 URL became
+# a 404 and this build broke for every student mid-lab. releases/ is permanent.
+RUN wget -q "https://downloads.asterisk.org/pub/telephony/asterisk/releases/asterisk-${ASTERISK_VERSION}.tar.gz" \
     && tar xzf "asterisk-${ASTERISK_VERSION}.tar.gz" \
     && rm "asterisk-${ASTERISK_VERSION}.tar.gz"
 
